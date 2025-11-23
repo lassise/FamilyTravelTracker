@@ -81,7 +81,40 @@ export const useFamilyData = () => {
 
   useEffect(() => {
     fetchData();
+
+    // Set up realtime subscriptions
+    const channel = supabase
+      .channel('family_data_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'family_members' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'countries' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'country_visits' },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  return { familyMembers, countries, loading, refetch: fetchData };
+  // Calculate total continents visited
+  const totalContinents = new Set(countries.map(c => c.continent)).size;
+
+  return { 
+    familyMembers, 
+    countries, 
+    loading, 
+    refetch: fetchData,
+    totalContinents 
+  };
 };

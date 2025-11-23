@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,16 +23,18 @@ interface CountryDialogProps {
     flag: string;
     continent: string;
   };
+  familyMembers?: Array<{ id: string; name: string }>;
   onSuccess: () => void;
 }
 
 const continents = ["Africa", "Antarctica", "Asia", "Europe", "North America", "Oceania", "South America"];
 
-const CountryDialog = ({ country, onSuccess }: CountryDialogProps) => {
+const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(country?.name || "");
   const [flag, setFlag] = useState(country?.flag || "");
   const [continent, setContinent] = useState(country?.continent || "");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -55,15 +58,32 @@ const CountryDialog = ({ country, onSuccess }: CountryDialogProps) => {
         if (error) throw error;
         toast({ title: "Country updated successfully!" });
       } else {
-        const { error } = await supabase
+        const { data: newCountry, error } = await supabase
           .from("countries")
           .insert([{
             name: validated.name,
             flag: validated.flag,
             continent: validated.continent
-          }]);
+          }])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Add country visits for selected members
+        if (newCountry && selectedMembers.length > 0) {
+          const visits = selectedMembers.map(memberId => ({
+            country_id: newCountry.id,
+            family_member_id: memberId
+          }));
+          
+          const { error: visitsError } = await supabase
+            .from("country_visits")
+            .insert(visits);
+          
+          if (visitsError) throw visitsError;
+        }
+
         toast({ title: "Country added successfully!" });
       }
 
@@ -74,6 +94,7 @@ const CountryDialog = ({ country, onSuccess }: CountryDialogProps) => {
       setName("");
       setFlag("");
       setContinent("");
+      setSelectedMembers([]);
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
@@ -150,6 +171,35 @@ const CountryDialog = ({ country, onSuccess }: CountryDialogProps) => {
               </SelectContent>
             </Select>
           </div>
+
+          {!country && familyMembers.length > 0 && (
+            <div>
+              <Label>Visited By (Optional)</Label>
+              <div className="space-y-2 mt-2">
+                {familyMembers.map((member) => (
+                  <div key={member.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`member-${member.id}`}
+                      checked={selectedMembers.includes(member.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedMembers([...selectedMembers, member.id]);
+                        } else {
+                          setSelectedMembers(selectedMembers.filter(id => id !== member.id));
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={`member-${member.id}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {member.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

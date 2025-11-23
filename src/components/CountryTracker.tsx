@@ -28,8 +28,6 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
 
       if (error) {
         toast({ title: "Error updating visit", variant: "destructive" });
-      } else {
-        onUpdate();
       }
     } else {
       // Add visit
@@ -39,8 +37,6 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
 
       if (error) {
         toast({ title: "Error updating visit", variant: "destructive" });
-      } else {
-        onUpdate();
       }
     }
   };
@@ -70,7 +66,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
             Our family's travel journey across the world
           </p>
-          <CountryDialog onSuccess={onUpdate} />
+          <CountryDialog familyMembers={familyMembers} onSuccess={onUpdate} />
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

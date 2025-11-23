@@ -6,7 +6,7 @@ import FamilyMemberDialog from "@/components/FamilyMemberDialog";
 import { useFamilyData } from "@/hooks/useFamilyData";
 
 const Index = () => {
-  const { familyMembers, countries, loading, refetch } = useFamilyData();
+  const { familyMembers, countries, loading, refetch, totalContinents } = useFamilyData();
 
   if (loading) {
     return (
@@ -21,7 +21,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Hero />
+      <Hero 
+        totalCountries={countries.length}
+        totalContinents={totalContinents}
+        totalMembers={familyMembers.length}
+      />
       
       <section className="py-20 container mx-auto px-4">
         <div className="text-center mb-12">

@@ -1,7 +1,13 @@
 import { Plane } from "lucide-react";
 import heroImage from "@/assets/hero-travel.jpg";
 
-const Hero = () => {
+interface HeroProps {
+  totalCountries: number;
+  totalContinents: number;
+  totalMembers: number;
+}
+
+const Hero = ({ totalCountries, totalContinents, totalMembers }: HeroProps) => {
   return (
     <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden">
       <div 
@@ -27,16 +33,16 @@ const Hero = () => {
         
         <div className="flex flex-wrap gap-8 justify-center animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500">
           <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 shadow-2xl border border-border/50 min-w-[150px]">
-            <div className="text-4xl font-bold text-primary mb-2">127</div>
+            <div className="text-4xl font-bold text-primary mb-2">{totalCountries}</div>
             <div className="text-sm text-muted-foreground">Countries Visited</div>
           </div>
           <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 shadow-2xl border border-border/50 min-w-[150px]">
-            <div className="text-4xl font-bold text-secondary mb-2">4</div>
-            <div className="text-sm text-muted-foreground">Family Members</div>
+            <div className="text-4xl font-bold text-accent mb-2">{totalContinents}</div>
+            <div className="text-sm text-muted-foreground">Continents Visited</div>
           </div>
           <div className="bg-card/90 backdrop-blur-sm rounded-2xl p-6 shadow-2xl border border-border/50 min-w-[150px]">
-            <div className="text-4xl font-bold text-accent mb-2">6</div>
-            <div className="text-sm text-muted-foreground">Continents</div>
+            <div className="text-4xl font-bold text-secondary mb-2">{totalMembers}</div>
+            <div className="text-sm text-muted-foreground">Family Members</div>
           </div>
         </div>
       </div>
