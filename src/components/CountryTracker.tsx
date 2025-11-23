@@ -1,26 +1,65 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CheckCircle2, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import CountryDialog from "./CountryDialog";
+import { Country } from "@/hooks/useFamilyData";
 
-interface Country {
-  name: string;
-  flag: string;
-  continent: string;
-  visitedBy: string[];
+interface CountryTrackerProps {
+  countries: Country[];
+  familyMembers: Array<{ id: string; name: string }>;
+  onUpdate: () => void;
 }
 
-const countries: Country[] = [
-  { name: "Japan", flag: "🇯🇵", continent: "Asia", visitedBy: ["Mom", "Dad", "Alex", "Sophie"] },
-  { name: "France", flag: "🇫🇷", continent: "Europe", visitedBy: ["Mom", "Dad", "Sophie"] },
-  { name: "Thailand", flag: "🇹🇭", continent: "Asia", visitedBy: ["Mom", "Dad", "Alex"] },
-  { name: "Italy", flag: "🇮🇹", continent: "Europe", visitedBy: ["Mom", "Dad", "Alex", "Sophie"] },
-  { name: "Australia", flag: "🇦🇺", continent: "Oceania", visitedBy: ["Mom", "Dad"] },
-  { name: "Spain", flag: "🇪🇸", continent: "Europe", visitedBy: ["Mom", "Sophie"] },
-  { name: "USA", flag: "🇺🇸", continent: "North America", visitedBy: ["Mom", "Dad", "Alex", "Sophie"] },
-  { name: "Canada", flag: "🇨🇦", continent: "North America", visitedBy: ["Dad", "Alex"] },
-];
+const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerProps) => {
+  const { toast } = useToast();
 
-const CountryTracker = () => {
+  const handleToggleVisit = async (countryId: string, memberId: string, isVisited: boolean) => {
+    if (isVisited) {
+      // Remove visit
+      const { error } = await supabase
+        .from("country_visits")
+        .delete()
+        .eq("country_id", countryId)
+        .eq("family_member_id", memberId);
+
+      if (error) {
+        toast({ title: "Error updating visit", variant: "destructive" });
+      } else {
+        onUpdate();
+      }
+    } else {
+      // Add visit
+      const { error } = await supabase
+        .from("country_visits")
+        .insert([{ country_id: countryId, family_member_id: memberId }]);
+
+      if (error) {
+        toast({ title: "Error updating visit", variant: "destructive" });
+      } else {
+        onUpdate();
+      }
+    }
+  };
+
+  const handleDelete = async (countryId: string, countryName: string) => {
+    if (!confirm(`Are you sure you want to delete ${countryName}?`)) return;
+
+    const { error } = await supabase
+      .from("countries")
+      .delete()
+      .eq("id", countryId);
+
+    if (error) {
+      toast({ title: "Error deleting country", variant: "destructive" });
+    } else {
+      toast({ title: `${countryName} deleted successfully` });
+      onUpdate();
+    }
+  };
   return (
     <section className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
@@ -28,16 +67,17 @@ const CountryTracker = () => {
           <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Countries We've Explored
           </h2>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
             Our family's travel journey across the world
           </p>
+          <CountryDialog onSuccess={onUpdate} />
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {countries.map((country) => (
             <Card 
-              key={country.name}
-              className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-2 hover:border-primary/30"
+              key={country.id}
+              className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/30"
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -52,16 +92,42 @@ const CountryTracker = () => {
                 <Badge variant="outline" className="text-xs">
                   {country.continent}
                 </Badge>
-                <div className="flex flex-wrap gap-1">
-                  {country.visitedBy.map((member) => (
-                    <Badge 
-                      key={member}
-                      variant="secondary"
-                      className="text-xs"
-                    >
-                      {member}
-                    </Badge>
-                  ))}
+                
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Visited by:</p>
+                  {familyMembers.map((member) => {
+                    const isVisited = country.visitedBy.includes(member.name);
+                    return (
+                      <div key={member.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`${country.id}-${member.id}`}
+                          checked={isVisited}
+                          onCheckedChange={() => handleToggleVisit(country.id, member.id, isVisited)}
+                        />
+                        <label
+                          htmlFor={`${country.id}-${member.id}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {member.name}
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <CountryDialog
+                    country={country}
+                    onSuccess={onUpdate}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(country.id, country.name)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>

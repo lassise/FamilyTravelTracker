@@ -1,16 +1,43 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Globe } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MapPin, Globe, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import FamilyMemberDialog from "./FamilyMemberDialog";
 
 interface FamilyMemberProps {
+  id: string;
   name: string;
   role: string;
   countriesVisited: number;
   avatar: string;
   color: string;
+  onUpdate: () => void;
 }
 
-const FamilyMember = ({ name, role, countriesVisited, avatar, color }: FamilyMemberProps) => {
+const FamilyMember = ({ id, name, role, countriesVisited, avatar, color, onUpdate }: FamilyMemberProps) => {
+  const { toast } = useToast();
+
+  const handleDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+
+    const { error } = await supabase
+      .from("family_members")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete family member",
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: `${name} deleted successfully` });
+      onUpdate();
+    }
+  };
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/50 overflow-hidden">
       <CardContent className="p-0">
@@ -40,6 +67,22 @@ const FamilyMember = ({ name, role, countriesVisited, avatar, color }: FamilyMem
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="w-4 h-4" />
               <span>Explorer since 2020</span>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <FamilyMemberDialog
+                member={{ id, name, role, avatar, color }}
+                onSuccess={onUpdate}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
             </div>
           </div>
         </div>
