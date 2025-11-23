@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      countries: {
+        Row: {
+          continent: string
+          created_at: string | null
+          flag: string
+          id: string
+          name: string
+        }
+        Insert: {
+          continent: string
+          created_at?: string | null
+          flag: string
+          id?: string
+          name: string
+        }
+        Update: {
+          continent?: string
+          created_at?: string | null
+          flag?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      country_visits: {
+        Row: {
+          country_id: string | null
+          created_at: string | null
+          family_member_id: string | null
+          id: string
+        }
+        Insert: {
+          country_id?: string | null
+          created_at?: string | null
+          family_member_id?: string | null
+          id?: string
+        }
+        Update: {
+          country_id?: string | null
+          created_at?: string | null
+          family_member_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "country_visits_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "country_visits_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          avatar: string
+          color: string
+          created_at: string | null
+          id: string
+          name: string
+          role: string
+        }
+        Insert: {
+          avatar: string
+          color: string
+          created_at?: string | null
+          id?: string
+          name: string
+          role: string
+        }
+        Update: {
+          avatar?: string
+          color?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          role?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
