@@ -102,44 +102,57 @@ const ContinentFilter = ({ countries, familyMembers }: ContinentFilterProps) => 
                   
                   <DropdownMenuSeparator />
                   
-                  {continentCountries.sort((a, b) => a.name.localeCompare(b.name)).map((country) => {
-                    const visitedByAnyone = isVisitedByAnyone(country);
-                    const visitedByAll = isVisitedByAll(country);
-                    
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={country.id}
-                        checked={visitedByAnyone}
-                        onSelect={(e) => e.preventDefault()}
-                        className="gap-2"
-                      >
-                        <div className="flex items-center justify-between w-full gap-2">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="text-lg">{country.flag}</span>
-                            <span className="text-sm truncate">{country.name}</span>
+                  {continentCountries
+                    .sort((a, b) => {
+                      const aVisited = isVisitedByAnyone(a);
+                      const bVisited = isVisitedByAnyone(b);
+                      
+                      // Visited countries first, then unvisited
+                      if (aVisited && !bVisited) return -1;
+                      if (!aVisited && bVisited) return 1;
+                      
+                      // Within each group, sort alphabetically
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((country) => {
+                      const visitedByAnyone = isVisitedByAnyone(country);
+                      const visitedByAll = isVisitedByAll(country);
+                      
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={country.id}
+                          checked={visitedByAnyone}
+                          onSelect={(e) => e.preventDefault()}
+                          className="gap-2"
+                        >
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className="text-lg">{country.flag}</span>
+                              <span className={`text-sm truncate ${!visitedByAnyone ? 'text-muted-foreground' : ''}`}>
+                                {country.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {visitedByAll ? (
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs px-1.5 py-0 h-5 bg-green-500/10 border-green-500"
+                                >
+                                  ✓
+                                </Badge>
+                              ) : visitedByAnyone ? (
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs px-1.5 py-0 h-5 bg-primary/10 border-primary"
+                                >
+                                  {country.visitedBy.length}
+                                </Badge>
+                              ) : null}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {visitedByAnyone && (
-                              <Badge 
-                                variant="outline" 
-                                className="text-xs px-1.5 py-0 h-5 bg-primary/10 border-primary"
-                              >
-                                {country.visitedBy.length}
-                              </Badge>
-                            )}
-                            {visitedByAll && (
-                              <Badge 
-                                variant="outline" 
-                                className="text-xs px-1.5 py-0 h-5 bg-green-500/10 border-green-500"
-                              >
-                                ✓
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
                 </DropdownMenuContent>
               </DropdownMenu>
             );
