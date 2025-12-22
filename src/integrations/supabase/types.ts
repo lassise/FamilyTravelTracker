@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          attachment_urls: string[] | null
+          booking_type: string
+          check_in: string | null
+          check_out: string | null
+          confirmation_number: string | null
+          cost: number | null
+          created_at: string
+          currency: string | null
+          id: string
+          latitude: number | null
+          location_address: string | null
+          location_name: string | null
+          longitude: number | null
+          notes: string | null
+          provider: string | null
+          title: string
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          booking_type: string
+          check_in?: string | null
+          check_out?: string | null
+          confirmation_number?: string | null
+          cost?: number | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          latitude?: number | null
+          location_address?: string | null
+          location_name?: string | null
+          longitude?: number | null
+          notes?: string | null
+          provider?: string | null
+          title: string
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          booking_type?: string
+          check_in?: string | null
+          check_out?: string | null
+          confirmation_number?: string | null
+          cost?: number | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          latitude?: number | null
+          location_address?: string | null
+          location_name?: string | null
+          longitude?: number | null
+          notes?: string | null
+          provider?: string | null
+          title?: string
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       countries: {
         Row: {
           continent: string
@@ -100,6 +171,134 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          currency: string | null
+          description: string
+          expense_date: string | null
+          id: string
+          paid_by: string | null
+          receipt_url: string | null
+          trip_id: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          currency?: string | null
+          description: string
+          expense_date?: string | null
+          id?: string
+          paid_by?: string | null
+          receipt_url?: string | null
+          trip_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          currency?: string | null
+          description?: string
+          expense_date?: string | null
+          id?: string
+          paid_by?: string | null
+          receipt_url?: string | null
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_group_members: {
+        Row: {
+          created_at: string
+          family_group_id: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          family_group_id: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          family_group_id?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_group_members_family_group_id_fkey"
+            columns: ["family_group_id"]
+            isOneToOne: false
+            referencedRelation: "family_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_groups: {
+        Row: {
+          created_at: string
+          id: string
+          invite_code: string | null
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invite_code?: string | null
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invite_code?: string | null
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_groups_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_members: {
         Row: {
           avatar: string
@@ -127,15 +326,524 @@ export type Database = {
         }
         Relationships: []
       }
+      itinerary_days: {
+        Row: {
+          created_at: string
+          date: string | null
+          day_number: number
+          id: string
+          notes: string | null
+          plan_b: string | null
+          title: string | null
+          trip_id: string
+          updated_at: string
+          weather_notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          date?: string | null
+          day_number: number
+          id?: string
+          notes?: string | null
+          plan_b?: string | null
+          title?: string | null
+          trip_id: string
+          updated_at?: string
+          weather_notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string | null
+          day_number?: number
+          id?: string
+          notes?: string | null
+          plan_b?: string | null
+          title?: string | null
+          trip_id?: string
+          updated_at?: string
+          weather_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_days_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      itinerary_items: {
+        Row: {
+          category: string | null
+          cost_estimate: number | null
+          created_at: string
+          description: string | null
+          duration_minutes: number | null
+          end_time: string | null
+          id: string
+          is_kid_friendly: boolean | null
+          is_stroller_friendly: boolean | null
+          itinerary_day_id: string
+          latitude: number | null
+          location_address: string | null
+          location_name: string | null
+          longitude: number | null
+          requires_reservation: boolean | null
+          reservation_info: string | null
+          sort_order: number
+          start_time: string | null
+          time_slot: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          cost_estimate?: number | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          is_kid_friendly?: boolean | null
+          is_stroller_friendly?: boolean | null
+          itinerary_day_id: string
+          latitude?: number | null
+          location_address?: string | null
+          location_name?: string | null
+          longitude?: number | null
+          requires_reservation?: boolean | null
+          reservation_info?: string | null
+          sort_order?: number
+          start_time?: string | null
+          time_slot?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          cost_estimate?: number | null
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          is_kid_friendly?: boolean | null
+          is_stroller_friendly?: boolean | null
+          itinerary_day_id?: string
+          latitude?: number | null
+          location_address?: string | null
+          location_name?: string | null
+          longitude?: number | null
+          requires_reservation?: boolean | null
+          reservation_info?: string | null
+          sort_order?: number
+          start_time?: string | null
+          time_slot?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_items_itinerary_day_id_fkey"
+            columns: ["itinerary_day_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packing_items: {
+        Row: {
+          assigned_to: string | null
+          category: string | null
+          created_at: string
+          id: string
+          is_packed: boolean | null
+          item_name: string
+          notes: string | null
+          packing_list_id: string
+          quantity: number | null
+          sort_order: number | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_packed?: boolean | null
+          item_name: string
+          notes?: string | null
+          packing_list_id: string
+          quantity?: number | null
+          sort_order?: number | null
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_packed?: boolean | null
+          item_name?: string
+          notes?: string | null
+          packing_list_id?: string
+          quantity?: number | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_items_packing_list_id_fkey"
+            columns: ["packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "packing_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      packing_lists: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          template_type: string | null
+          trip_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          template_type?: string | null
+          trip_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          template_type?: string | null
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_lists_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_places: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_kid_friendly: boolean | null
+          latitude: number | null
+          location_address: string | null
+          longitude: number | null
+          name: string
+          notes: string | null
+          rating: number | null
+          source: string | null
+          trip_id: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_kid_friendly?: boolean | null
+          latitude?: number | null
+          location_address?: string | null
+          longitude?: number | null
+          name: string
+          notes?: string | null
+          rating?: number | null
+          source?: string | null
+          trip_id?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_kid_friendly?: boolean | null
+          latitude?: number | null
+          location_address?: string | null
+          longitude?: number | null
+          name?: string
+          notes?: string | null
+          rating?: number | null
+          source?: string | null
+          trip_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_places_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_places_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_emergency_info: {
+        Row: {
+          created_at: string
+          custom_notes: string | null
+          embassy_info: string | null
+          emergency_number: string | null
+          hospital_address: string | null
+          hospital_name: string | null
+          hospital_phone: string | null
+          id: string
+          insurance_info: string | null
+          pharmacy_address: string | null
+          pharmacy_name: string | null
+          police_number: string | null
+          trip_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_notes?: string | null
+          embassy_info?: string | null
+          emergency_number?: string | null
+          hospital_address?: string | null
+          hospital_name?: string | null
+          hospital_phone?: string | null
+          id?: string
+          insurance_info?: string | null
+          pharmacy_address?: string | null
+          pharmacy_name?: string | null
+          police_number?: string | null
+          trip_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_notes?: string | null
+          embassy_info?: string | null
+          emergency_number?: string | null
+          hospital_address?: string | null
+          hospital_name?: string | null
+          hospital_phone?: string | null
+          id?: string
+          insurance_info?: string | null
+          pharmacy_address?: string | null
+          pharmacy_name?: string | null
+          police_number?: string | null
+          trip_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_emergency_info_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          itinerary_day_id: string | null
+          itinerary_item_id: string | null
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          itinerary_day_id?: string | null
+          itinerary_item_id?: string | null
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          itinerary_day_id?: string | null
+          itinerary_item_id?: string | null
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_notes_itinerary_day_id_fkey"
+            columns: ["itinerary_day_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_notes_itinerary_item_id_fkey"
+            columns: ["itinerary_item_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_notes_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trips: {
+        Row: {
+          budget_total: number | null
+          cover_image: string | null
+          created_at: string
+          currency: string | null
+          destination: string | null
+          end_date: string | null
+          family_group_id: string | null
+          id: string
+          interests: string[] | null
+          kids_ages: number[] | null
+          notes: string | null
+          pace_preference: string | null
+          start_date: string | null
+          status: string | null
+          title: string
+          trip_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_total?: number | null
+          cover_image?: string | null
+          created_at?: string
+          currency?: string | null
+          destination?: string | null
+          end_date?: string | null
+          family_group_id?: string | null
+          id?: string
+          interests?: string[] | null
+          kids_ages?: number[] | null
+          notes?: string | null
+          pace_preference?: string | null
+          start_date?: string | null
+          status?: string | null
+          title: string
+          trip_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_total?: number | null
+          cover_image?: string | null
+          created_at?: string
+          currency?: string | null
+          destination?: string | null
+          end_date?: string | null
+          family_group_id?: string | null
+          id?: string
+          interests?: string[] | null
+          kids_ages?: number[] | null
+          notes?: string | null
+          pace_preference?: string | null
+          start_date?: string | null
+          status?: string | null
+          title?: string
+          trip_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trips_family_group_id_fkey"
+            columns: ["family_group_id"]
+            isOneToOne: false
+            referencedRelation: "family_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_group_role: {
+        Args: {
+          _group_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_group_member: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "member" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -262,6 +970,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "member", "viewer"],
+    },
   },
 } as const
