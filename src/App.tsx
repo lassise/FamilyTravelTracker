@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Trips from "./pages/Trips";
+import NewTrip from "./pages/NewTrip";
+import TripDetail from "./pages/TripDetail";
 import TravelHistory from "./pages/TravelHistory";
 import NotFound from "./pages/NotFound";
 
@@ -23,6 +25,8 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/trips" element={<Trips />} />
+            <Route path="/trips/new" element={<NewTrip />} />
+            <Route path="/trips/:tripId" element={<TripDetail />} />
             <Route path="/travel-history" element={<TravelHistory />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
