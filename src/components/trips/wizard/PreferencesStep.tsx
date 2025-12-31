@@ -16,7 +16,7 @@ const PACE_OPTIONS = [
     icon: Coffee,
   },
   {
-    value: "balanced",
+    value: "moderate",
     label: "Balanced",
     description: "Mix of activities and rest, moderate pace",
     icon: Scale,
