@@ -48,7 +48,7 @@ const TripWizard = () => {
     endDate: "",
     kidsAges: [],
     interests: [],
-    pacePreference: "balanced",
+    pacePreference: "moderate",
     budgetLevel: "moderate",
     lodgingLocation: "",
     napSchedule: "",
