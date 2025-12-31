@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Globe, Award, TrendingUp, Users, Plane, Target } from "lucide-react";
+import { Globe, Award, TrendingUp, Users, Plane, Target, Calendar } from "lucide-react";
 import type { FamilyMember } from "@/hooks/useFamilyData";
+import { useVisitDetails } from "@/hooks/useVisitDetails";
 
 interface TravelStatsProps {
   totalCountries: number;
@@ -9,7 +10,10 @@ interface TravelStatsProps {
 }
 
 const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelStatsProps) => {
-  // Calculate average countries per family member
+  const { visitDetails } = useVisitDetails();
+  
+  // Calculate total days abroad
+  const totalDaysAbroad = visitDetails.reduce((sum, v) => sum + (v.number_of_days || 0), 0);
   const avgCountriesPerMember = familyMembers.length > 0 
     ? familyMembers.reduce((sum, member) => sum + member.countriesVisited, 0) / familyMembers.length
     : 0;
@@ -45,6 +49,13 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
   
   const stats = [
     {
+      icon: Calendar,
+      label: "Days Abroad",
+      value: `${totalDaysAbroad}`,
+      description: `Total days spent outside the USA exploring the world`,
+      gradient: "from-amber-500 to-orange-500",
+    },
+    {
       icon: Globe,
       label: "Global Ranking",
       value: `Top ${100 - globalPercentile}%`,
@@ -73,13 +84,6 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
         ? `Average countries per person (Top traveler: ${mostTraveledMember.name})`
         : "Average countries per family member",
       gradient: "from-green-500 to-emerald-500",
-    },
-    {
-      icon: TrendingUp,
-      label: "Travel Intensity",
-      value: `${(totalCountries / familyMembers.length).toFixed(0)}x`,
-      description: `${(totalCountries / familyMembers.length).toFixed(0)}x more countries than average person's lifetime`,
-      gradient: "from-pink-500 to-rose-500",
     },
     {
       icon: Users,

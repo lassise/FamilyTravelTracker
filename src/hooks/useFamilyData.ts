@@ -16,6 +16,7 @@ export interface Country {
   flag: string;
   continent: string;
   visitedBy: string[];
+  countryCode?: string;
 }
 
 export const useFamilyData = () => {

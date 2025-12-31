@@ -85,6 +85,41 @@ export type Database = {
           },
         ]
       }
+      city_visits: {
+        Row: {
+          city_name: string
+          country_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          visit_date: string | null
+        }
+        Insert: {
+          city_name: string
+          country_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          visit_date?: string | null
+        }
+        Update: {
+          city_name?: string
+          country_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          visit_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "city_visits_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       countries: {
         Row: {
           continent: string
@@ -108,6 +143,47 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      country_visit_details: {
+        Row: {
+          country_id: string
+          created_at: string | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          number_of_days: number | null
+          updated_at: string | null
+          visit_date: string | null
+        }
+        Insert: {
+          country_id: string
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          number_of_days?: number | null
+          updated_at?: string | null
+          visit_date?: string | null
+        }
+        Update: {
+          country_id?: string
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          number_of_days?: number | null
+          updated_at?: string | null
+          visit_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "country_visit_details_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       country_visits: {
         Row: {
@@ -624,6 +700,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      travel_settings: {
+        Row: {
+          created_at: string | null
+          home_country: string
+          home_country_code: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          home_country?: string
+          home_country_code?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          home_country?: string
+          home_country_code?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       trip_emergency_info: {
         Row: {
