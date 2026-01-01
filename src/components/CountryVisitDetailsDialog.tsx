@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, MapPin, Plus, Trash2, Clock, X } from "lucide-react";
+import { Calendar, MapPin, Plus, Trash2, Clock, X, Lock, Edit3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -29,6 +29,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { getCitiesForCountry } from "@/lib/citiesData";
+import { differenceInDays, parseISO, isAfter } from "date-fns";
+
+// Calculate days between two dates (inclusive)
+const calculateDays = (startDate: string | null, endDate: string | null): number | null => {
+  if (!startDate || !endDate) return null;
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  if (isAfter(start, end)) return null; // Invalid: start is after end
+  return differenceInDays(end, start) + 1; // +1 to make it inclusive
+};
 
 interface VisitDetail {
   id: string;
@@ -121,11 +131,35 @@ const CountryVisitDetailsDialog = ({
   const handleUpdateVisit = async (
     visitId: string,
     field: string,
-    value: string | number | null
+    value: string | number | null,
+    currentVisit?: VisitDetail
   ) => {
+    let updateData: Record<string, string | number | null> = { [field]: value };
+
+    // Auto-calculate days when updating dates
+    if (currentVisit && (field === "visit_date" || field === "end_date")) {
+      const newStartDate = field === "visit_date" ? (value as string | null) : currentVisit.visit_date;
+      const newEndDate = field === "end_date" ? (value as string | null) : currentVisit.end_date;
+      
+      // Validate date order
+      if (newStartDate && newEndDate) {
+        const start = parseISO(newStartDate);
+        const end = parseISO(newEndDate);
+        if (isAfter(start, end)) {
+          toast({ title: "End date must be after start date", variant: "destructive" });
+          return;
+        }
+        // Auto-calculate days
+        const calculatedDays = calculateDays(newStartDate, newEndDate);
+        if (calculatedDays) {
+          updateData.number_of_days = calculatedDays;
+        }
+      }
+    }
+
     const { error } = await supabase
       .from("country_visit_details")
-      .update({ [field]: value })
+      .update(updateData)
       .eq("id", visitId);
 
     if (error) {
@@ -254,46 +288,75 @@ const CountryVisitDetailsDialog = ({
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <Label className="text-xs">Start Date</Label>
-                            <Input
-                              type="date"
-                              value={visit.visit_date || ""}
-                              onChange={(e) =>
-                                handleUpdateVisit(visit.id, "visit_date", e.target.value || null)
-                              }
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">End Date</Label>
-                            <Input
-                              type="date"
-                              value={visit.end_date || ""}
-                              onChange={(e) =>
-                                handleUpdateVisit(visit.id, "end_date", e.target.value || null)
-                              }
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Days</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={visit.number_of_days || 1}
-                              onChange={(e) =>
-                                handleUpdateVisit(
-                                  visit.id,
-                                  "number_of_days",
-                                  parseInt(e.target.value) || 1
-                                )
-                              }
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                        </div>
+                        {(() => {
+                          const hasDateRange = visit.visit_date && visit.end_date;
+                          const isAutoCalculated = hasDateRange && calculateDays(visit.visit_date, visit.end_date) !== null;
+                          
+                          return (
+                            <div className="space-y-3">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={visit.visit_date || ""}
+                                    onChange={(e) =>
+                                      handleUpdateVisit(visit.id, "visit_date", e.target.value || null, visit)
+                                    }
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={visit.end_date || ""}
+                                    onChange={(e) =>
+                                      handleUpdateVisit(visit.id, "end_date", e.target.value || null, visit)
+                                    }
+                                    className="h-8 text-sm"
+                                    min={visit.visit_date || undefined}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <Label className="text-xs">Days</Label>
+                                  {isAutoCalculated ? (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Lock className="w-3 h-3" />
+                                      Auto-calculated
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <Edit3 className="w-3 h-3" />
+                                      Manual entry
+                                    </span>
+                                  )}
+                                </div>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={visit.number_of_days || 1}
+                                  onChange={(e) =>
+                                    handleUpdateVisit(
+                                      visit.id,
+                                      "number_of_days",
+                                      parseInt(e.target.value) || 1
+                                    )
+                                  }
+                                  disabled={isAutoCalculated}
+                                  className={`h-8 text-sm ${isAutoCalculated ? "bg-muted cursor-not-allowed" : ""}`}
+                                />
+                                {!hasDateRange && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Add both dates to auto-calculate days
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
                   ))}
