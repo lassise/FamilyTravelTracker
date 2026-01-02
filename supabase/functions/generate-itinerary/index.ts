@@ -1,22 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface TripDetails {
-  destination: string;
-  startDate: string;
-  endDate: string;
-  kidsAges: number[];
-  interests: string[];
-  pacePreference: string;
-  budgetLevel: string;
-  lodgingLocation?: string;
-  napSchedule?: string;
-  strollerNeeds?: boolean;
-}
+// Input validation schema
+const TripDetailsSchema = z.object({
+  destination: z.string().trim().min(1, "Destination is required").max(100, "Destination too long"),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  kidsAges: z.array(z.number().int().min(0).max(18)).max(10, "Too many kids"),
+  interests: z.array(z.string().trim().min(1).max(50)).max(20, "Too many interests"),
+  pacePreference: z.string().trim().max(50),
+  budgetLevel: z.string().trim().max(50),
+  lodgingLocation: z.string().trim().max(200).optional(),
+  napSchedule: z.string().trim().max(200).optional(),
+  strollerNeeds: z.boolean().optional(),
+});
+
+type TripDetails = z.infer<typeof TripDetailsSchema>;
+
+// Sanitize text for safe prompt injection prevention
+const sanitizeForPrompt = (text: string): string => {
+  return text
+    .replace(/[\n\r]/g, ' ')
+    .replace(/[<>]/g, '')
+    .substring(0, 200)
+    .trim();
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -24,16 +38,79 @@ serve(async (req) => {
   }
 
   try {
-    const tripDetails: TripDetails = await req.json();
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.log('Request rejected: No authorization header');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Create Supabase client to verify JWT
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      console.log('Request rejected: Invalid token', authError?.message);
+      return new Response(JSON.stringify({ error: 'Invalid authentication token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    // Parse and validate input
+    const rawDetails = await req.json();
+    const validationResult = TripDetailsSchema.safeParse(rawDetails);
+    
+    if (!validationResult.success) {
+      console.log('Validation failed:', validationResult.error.errors);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validationResult.error.errors.map(e => e.message) 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const tripDetails = validationResult.data;
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
+    // Validate date order
     const startDate = new Date(tripDetails.startDate);
     const endDate = new Date(tripDetails.endDate);
+    
+    if (endDate < startDate) {
+      return new Response(JSON.stringify({ error: 'End date must be after start date' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const tripDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (tripDays > 30) {
+      return new Response(JSON.stringify({ error: 'Trip cannot exceed 30 days' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const systemPrompt = `You are an expert family travel planner specializing in trips with children. You create detailed, practical itineraries that account for kids' needs, energy levels, and attention spans.
 
@@ -47,16 +124,24 @@ Your itineraries should:
 - Note which activities require reservations
 - Include estimated costs and duration for each activity`;
 
-    const userPrompt = `Create a ${tripDays}-day family travel itinerary for ${tripDetails.destination}.
+    // Sanitize user inputs before including in prompt
+    const safeDestination = sanitizeForPrompt(tripDetails.destination);
+    const safeInterests = tripDetails.interests.map(i => sanitizeForPrompt(i)).join(', ');
+    const safePace = sanitizeForPrompt(tripDetails.pacePreference);
+    const safeBudget = sanitizeForPrompt(tripDetails.budgetLevel);
+    const safeLodging = tripDetails.lodgingLocation ? sanitizeForPrompt(tripDetails.lodgingLocation) : '';
+    const safeNapSchedule = tripDetails.napSchedule ? sanitizeForPrompt(tripDetails.napSchedule) : '';
+
+    const userPrompt = `Create a ${tripDays}-day family travel itinerary for ${safeDestination}.
 
 Trip Details:
 - Dates: ${tripDetails.startDate} to ${tripDetails.endDate}
 - Kids' ages: ${tripDetails.kidsAges.join(', ')} years old
-- Interests: ${tripDetails.interests.join(', ')}
-- Pace preference: ${tripDetails.pacePreference}
-- Budget level: ${tripDetails.budgetLevel}
-${tripDetails.lodgingLocation ? `- Staying near: ${tripDetails.lodgingLocation}` : ''}
-${tripDetails.napSchedule ? `- Nap schedule: ${tripDetails.napSchedule}` : ''}
+- Interests: ${safeInterests}
+- Pace preference: ${safePace}
+- Budget level: ${safeBudget}
+${safeLodging ? `- Staying near: ${safeLodging}` : ''}
+${safeNapSchedule ? `- Nap schedule: ${safeNapSchedule}` : ''}
 ${tripDetails.strollerNeeds ? '- Need stroller-friendly options' : ''}
 
 Please generate a detailed day-by-day itinerary in the following JSON format:
@@ -105,7 +190,7 @@ Please generate a detailed day-by-day itinerary in the following JSON format:
 
 Ensure all times are realistic and include buffer time for transitions with kids. Return ONLY valid JSON, no additional text.`;
 
-    console.log('Generating itinerary for:', tripDetails.destination);
+    console.log('Generating itinerary for:', safeDestination, 'by user:', user.id);
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -160,7 +245,7 @@ Ensure all times are realistic and include buffer time for transitions with kids
       throw new Error('Failed to parse itinerary response');
     }
 
-    console.log('Successfully generated itinerary with', itinerary.days?.length, 'days');
+    console.log('Successfully generated itinerary with', itinerary.days?.length, 'days for user:', user.id);
 
     return new Response(JSON.stringify({ itinerary }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
