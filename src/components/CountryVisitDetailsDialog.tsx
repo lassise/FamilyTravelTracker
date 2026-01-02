@@ -124,7 +124,6 @@ const CountryVisitDetailsDialog = ({
       toast({ title: "Error adding visit", variant: "destructive" });
     } else {
       fetchData();
-      onUpdate();
     }
   };
 
@@ -166,7 +165,6 @@ const CountryVisitDetailsDialog = ({
       toast({ title: "Error updating visit", variant: "destructive" });
     } else {
       fetchData();
-      onUpdate();
     }
   };
 
@@ -180,7 +178,6 @@ const CountryVisitDetailsDialog = ({
       toast({ title: "Error deleting visit", variant: "destructive" });
     } else {
       fetchData();
-      onUpdate();
     }
   };
 
@@ -207,7 +204,6 @@ const CountryVisitDetailsDialog = ({
       setNewCityName("");
       setCityComboboxOpen(false);
       fetchData();
-      onUpdate();
     }
   };
 
@@ -218,15 +214,22 @@ const CountryVisitDetailsDialog = ({
       toast({ title: "Error deleting city", variant: "destructive" });
     } else {
       fetchData();
-      onUpdate();
     }
   };
 
   const totalDays = visitDetails.reduce((sum, v) => sum + (v.number_of_days || 0), 0);
   const timesVisited = visitDetails.length;
 
+  const handleDialogChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      // Only trigger parent update when dialog closes
+      onUpdate();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="text-xs">
           <Calendar className="w-3 h-3 mr-1" />
