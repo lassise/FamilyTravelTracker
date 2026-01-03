@@ -23,9 +23,11 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         caption: "flex justify-center pt-1 relative items-center h-10 px-10",
         caption_label: "hidden",
         caption_dropdowns: "flex items-center gap-1",
-        dropdown_month: "relative inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-sm font-medium shadow-sm hover:bg-accent focus:outline-none",
-        dropdown_year: "relative inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-sm font-medium shadow-sm hover:bg-accent focus:outline-none",
-        dropdown: "absolute inset-0 w-full cursor-pointer opacity-0",
+        dropdown_month:
+          "relative inline-flex items-center rounded-md border border-input bg-background px-2 py-1 pr-7 text-sm font-medium shadow-sm hover:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+        dropdown_year:
+          "relative inline-flex items-center rounded-md border border-input bg-background px-2 py-1 pr-7 text-sm font-medium shadow-sm hover:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+        dropdown: "w-full bg-transparent cursor-pointer appearance-none focus:outline-none",
         vhidden: "sr-only",
         nav: "flex items-center",
         nav_button: cn(
