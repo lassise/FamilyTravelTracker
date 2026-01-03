@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash, CalendarDays } from "lucide-react";
+import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -34,23 +34,39 @@ import { getCitiesForCountry } from "@/lib/citiesData";
 import { differenceInDays, parseISO, isAfter, format } from "date-fns";
 import { DateRange } from "react-day-picker";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Calculate days between two dates (inclusive)
 const calculateDays = (startDate: string | null, endDate: string | null): number | null => {
   if (!startDate || !endDate) return null;
   const start = parseISO(startDate);
   const end = parseISO(endDate);
-  if (isAfter(start, end)) return null; // Invalid: start is after end
-  return differenceInDays(end, start) + 1; // +1 to make it inclusive
+  if (isAfter(start, end)) return null;
+  return differenceInDays(end, start) + 1;
 };
+
+// Local state interface for new visits being created
+interface NewVisitDraft {
+  id: string;
+  tripName: string;
+  isApproximate: boolean;
+  approximateMonth: number | null;
+  approximateYear: number | null;
+  visitDate: string | null;
+  endDate: string | null;
+  numberOfDays: number;
+  cities: string[];
+}
 
 // Debounced input component for trip name
 const TripNameInput = ({ 
-  visitId, 
   initialValue, 
   onSave 
 }: { 
-  visitId: string; 
   initialValue: string; 
   onSave: (value: string) => void;
 }) => {
@@ -78,12 +94,10 @@ const TripNameInput = ({
 
 // Debounced input component for days
 const DaysInput = ({ 
-  visitId, 
   initialValue, 
   disabled,
   onSave 
 }: { 
-  visitId: string; 
   initialValue: number; 
   disabled: boolean;
   onSave: (value: number) => void;
@@ -122,6 +136,7 @@ interface VisitDetail {
   end_date: string | null;
   number_of_days: number;
   notes: string | null;
+  trip_name: string | null;
   approximate_month?: number | null;
   approximate_year?: number | null;
   is_approximate?: boolean;
@@ -142,6 +157,334 @@ interface CountryVisitDetailsDialogProps {
   onUpdate: () => void;
 }
 
+// City picker component
+const CityPicker = ({
+  countryCode,
+  selectedCities,
+  onAddCity,
+  onRemoveCity,
+}: {
+  countryCode: string;
+  selectedCities: string[];
+  onAddCity: (city: string) => void;
+  onRemoveCity: (city: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const cities = getCitiesForCountry(countryCode);
+
+  const filteredCities = cities.filter(
+    (city) =>
+      city.toLowerCase().includes(searchValue.toLowerCase()) &&
+      !selectedCities.includes(city)
+  );
+
+  return (
+    <div className="space-y-2">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8">
+            <Plus className="w-3 h-3 mr-1" />
+            Add cities visited...
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-0" align="start">
+          <Command>
+            <CommandInput
+              placeholder="Search or type city..."
+              value={searchValue}
+              onValueChange={setSearchValue}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {searchValue.trim() && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-xs"
+                    onClick={() => {
+                      onAddCity(searchValue.trim());
+                      setSearchValue("");
+                      setOpen(false);
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add "{searchValue}"
+                  </Button>
+                )}
+              </CommandEmpty>
+              <CommandGroup>
+                {filteredCities.slice(0, 30).map((city) => (
+                  <CommandItem
+                    key={city}
+                    value={city}
+                    onSelect={() => {
+                      onAddCity(city);
+                      setSearchValue("");
+                      setOpen(false);
+                    }}
+                  >
+                    <MapPin className="w-3 h-3 mr-2 text-muted-foreground" />
+                    {city}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      
+      {selectedCities.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedCities.map((city) => (
+            <Badge key={city} variant="secondary" className="text-xs py-0.5 px-2">
+              <MapPin className="w-2.5 h-2.5 mr-1" />
+              {city}
+              <button
+                onClick={() => onRemoveCity(city)}
+                className="ml-1 hover:text-destructive"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// New visit draft card component
+const NewVisitCard = ({
+  draft,
+  index,
+  countryCode,
+  onUpdate,
+  onRemove,
+}: {
+  draft: NewVisitDraft;
+  index: number;
+  countryCode: string;
+  onUpdate: (id: string, updates: Partial<NewVisitDraft>) => void;
+  onRemove: (id: string) => void;
+}) => {
+  const months = [
+    { value: 1, label: "January" },
+    { value: 2, label: "February" },
+    { value: 3, label: "March" },
+    { value: 4, label: "April" },
+    { value: 5, label: "May" },
+    { value: 6, label: "June" },
+    { value: 7, label: "July" },
+    { value: 8, label: "August" },
+    { value: 9, label: "September" },
+    { value: 10, label: "October" },
+    { value: 11, label: "November" },
+    { value: 12, label: "December" },
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
+
+  const dateRange: DateRange | undefined =
+    draft.visitDate || draft.endDate
+      ? {
+          from: draft.visitDate ? parseISO(draft.visitDate) : undefined,
+          to: draft.endDate ? parseISO(draft.endDate) : undefined,
+        }
+      : undefined;
+
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    const startDate = range?.from ? format(range.from, "yyyy-MM-dd") : null;
+    const endDate = range?.to ? format(range.to, "yyyy-MM-dd") : null;
+    
+    let numberOfDays = draft.numberOfDays;
+    if (startDate && endDate) {
+      const calculated = calculateDays(startDate, endDate);
+      if (calculated) numberOfDays = calculated;
+    }
+
+    onUpdate(draft.id, {
+      visitDate: startDate,
+      endDate: endDate,
+      numberOfDays,
+      isApproximate: false,
+      approximateMonth: null,
+      approximateYear: null,
+    });
+  };
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="text-xs">New Visit #{index + 1}</Badge>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground cursor-pointer">
+                Approximate dates
+              </Label>
+              <Switch
+                checked={draft.isApproximate}
+                onCheckedChange={(checked) => {
+                  onUpdate(draft.id, {
+                    isApproximate: checked,
+                    visitDate: checked ? null : draft.visitDate,
+                    endDate: checked ? null : draft.endDate,
+                    approximateMonth: checked ? draft.approximateMonth : null,
+                    approximateYear: checked ? draft.approximateYear : null,
+                  });
+                }}
+                className="scale-75"
+              />
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(draft.id)}
+            className="text-destructive hover:text-destructive h-6 w-6 p-0"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Trip Name */}
+        <div className="mb-3">
+          <Label className="text-xs mb-1 block">Trip Name (optional)</Label>
+          <Input
+            type="text"
+            placeholder="e.g., Trip with In-laws"
+            value={draft.tripName}
+            onChange={(e) => onUpdate(draft.id, { tripName: e.target.value })}
+            className="h-8 text-sm"
+          />
+        </div>
+
+        <div className="space-y-3">
+          {draft.isApproximate ? (
+            <div>
+              <Label className="text-xs mb-1 block flex items-center gap-1">
+                <CalendarDays className="w-3 h-3" />
+                Approximate Time
+              </Label>
+              <div className="flex gap-2">
+                <Select
+                  value={draft.approximateMonth?.toString() || ""}
+                  onValueChange={(value) =>
+                    onUpdate(draft.id, { approximateMonth: value ? parseInt(value) : null })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-sm flex-1">
+                    <SelectValue placeholder="Month (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((month) => (
+                      <SelectItem key={month.value} value={month.value.toString()}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={draft.approximateYear?.toString() || ""}
+                  onValueChange={(value) =>
+                    onUpdate(draft.id, { approximateYear: value ? parseInt(value) : null })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-sm w-28">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <Label className="text-xs mb-1 block">Travel Dates</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal h-9"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "MMM d, yyyy")
+                      )
+                    ) : (
+                      <span className="text-muted-foreground">Pick travel dates</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={handleDateRangeChange}
+                    numberOfMonths={2}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
+          {/* Days */}
+          <div>
+            <Label className="text-xs mb-1 block">Days</Label>
+            <Input
+              type="number"
+              min={1}
+              value={draft.numberOfDays || ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                onUpdate(draft.id, {
+                  numberOfDays: value === "" ? 1 : parseInt(value) || 1,
+                });
+              }}
+              disabled={!draft.isApproximate && !!draft.visitDate && !!draft.endDate}
+              className="h-8 text-sm"
+              placeholder="Enter days"
+            />
+          </div>
+
+          {/* Cities */}
+          <div>
+            <Label className="text-xs mb-1 block flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              Cities Visited
+            </Label>
+            <CityPicker
+              countryCode={countryCode}
+              selectedCities={draft.cities}
+              onAddCity={(city) =>
+                onUpdate(draft.id, { cities: [...draft.cities, city] })
+              }
+              onRemoveCity={(city) =>
+                onUpdate(draft.id, { cities: draft.cities.filter((c) => c !== city) })
+              }
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const CountryVisitDetailsDialog = ({
   countryId,
   countryName,
@@ -152,13 +495,14 @@ const CountryVisitDetailsDialog = ({
   const [visitDetails, setVisitDetails] = useState<VisitDetail[]>([]);
   const [cityVisits, setCityVisits] = useState<CityVisit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [cityComboboxOpen, setCityComboboxOpen] = useState(false);
-  const [newCityName, setNewCityName] = useState("");
+  const [newVisits, setNewVisits] = useState<NewVisitDraft[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const cities = getCitiesForCountry(countryCode);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [visitsResult, citiesResult] = await Promise.all([
@@ -184,24 +528,96 @@ const CountryVisitDetailsDialog = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [countryId]);
 
   useEffect(() => {
     if (open) {
       fetchData();
+      setNewVisits([]);
     }
-  }, [open, countryId]);
+  }, [open, fetchData]);
 
-  const handleAddVisit = async () => {
-    const { error } = await supabase.from("country_visit_details").insert({
-      country_id: countryId,
-      number_of_days: 1,
-    });
+  const createNewVisitDraft = (): NewVisitDraft => ({
+    id: crypto.randomUUID(),
+    tripName: "",
+    isApproximate: false,
+    approximateMonth: null,
+    approximateYear: null,
+    visitDate: null,
+    endDate: null,
+    numberOfDays: 1,
+    cities: [],
+  });
 
-    if (error) {
-      toast({ title: "Error adding visit", variant: "destructive" });
-    } else {
+  const handleAddNewVisitDraft = () => {
+    setNewVisits((prev) => [...prev, createNewVisitDraft()]);
+  };
+
+  const handleUpdateNewVisitDraft = (id: string, updates: Partial<NewVisitDraft>) => {
+    setNewVisits((prev) =>
+      prev.map((draft) => (draft.id === id ? { ...draft, ...updates } : draft))
+    );
+  };
+
+  const handleRemoveNewVisitDraft = (id: string) => {
+    setNewVisits((prev) => prev.filter((draft) => draft.id !== id));
+  };
+
+  const handleSaveNewVisits = async () => {
+    if (newVisits.length === 0) return;
+
+    setSaving(true);
+    try {
+      // Insert all new visits
+      for (const draft of newVisits) {
+        const visitData = {
+          country_id: countryId,
+          trip_name: draft.tripName || null,
+          is_approximate: draft.isApproximate,
+          approximate_month: draft.approximateMonth,
+          approximate_year: draft.approximateYear,
+          visit_date: draft.visitDate,
+          end_date: draft.endDate,
+          number_of_days: draft.numberOfDays,
+        };
+
+        const { error: visitError } = await supabase
+          .from("country_visit_details")
+          .insert(visitData);
+
+        if (visitError) throw visitError;
+
+        // Insert cities for this visit
+        if (draft.cities.length > 0) {
+          const cityInserts = draft.cities.map((city) => ({
+            country_id: countryId,
+            city_name: city,
+          }));
+
+          // Check for duplicates first
+          const existingCities = cityVisits.map((c) => c.city_name.toLowerCase());
+          const newCities = cityInserts.filter(
+            (c) => !existingCities.includes(c.city_name.toLowerCase())
+          );
+
+          if (newCities.length > 0) {
+            const { error: cityError } = await supabase
+              .from("city_visits")
+              .insert(newCities);
+
+            if (cityError) throw cityError;
+          }
+        }
+      }
+
+      toast({ title: `Added ${newVisits.length} visit${newVisits.length > 1 ? "s" : ""}` });
+      setNewVisits([]);
       fetchData();
+    } catch (error) {
+      console.error("Error saving visits:", error);
+      toast({ title: "Error saving visits", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -213,12 +629,10 @@ const CountryVisitDetailsDialog = ({
   ) => {
     let updateData: Record<string, string | number | null> = { [field]: value };
 
-    // Auto-calculate days when updating dates
     if (currentVisit && (field === "visit_date" || field === "end_date")) {
       const newStartDate = field === "visit_date" ? (value as string | null) : currentVisit.visit_date;
       const newEndDate = field === "end_date" ? (value as string | null) : currentVisit.end_date;
-      
-      // Validate date order
+
       if (newStartDate && newEndDate) {
         const start = parseISO(newStartDate);
         const end = parseISO(newEndDate);
@@ -226,7 +640,6 @@ const CountryVisitDetailsDialog = ({
           toast({ title: "End date must be after start date", variant: "destructive" });
           return;
         }
-        // Auto-calculate days
         const calculatedDays = calculateDays(newStartDate, newEndDate);
         if (calculatedDays) {
           updateData.number_of_days = calculatedDays;
@@ -262,7 +675,6 @@ const CountryVisitDetailsDialog = ({
   const handleAddCity = async (cityName: string) => {
     if (!cityName.trim()) return;
 
-    // Check if city already exists for this country
     const existingCity = cityVisits.find(
       (c) => c.city_name.toLowerCase() === cityName.toLowerCase()
     );
@@ -279,8 +691,6 @@ const CountryVisitDetailsDialog = ({
     if (error) {
       toast({ title: "Error adding city", variant: "destructive" });
     } else {
-      setNewCityName("");
-      setCityComboboxOpen(false);
       fetchData();
     }
   };
@@ -301,9 +711,20 @@ const CountryVisitDetailsDialog = ({
   const handleDialogChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
-      // Only trigger parent update when dialog closes
       onUpdate();
     }
+  };
+
+  const toggleVisitExpanded = (visitId: string) => {
+    setExpandedVisits((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(visitId)) {
+        newSet.delete(visitId);
+      } else {
+        newSet.add(visitId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -337,42 +758,62 @@ const CountryVisitDetailsDialog = ({
 
         <ScrollArea className="h-[500px] pr-4">
           <div className="space-y-6">
-            {/* Quick Entry */}
+            {/* Add Multiple Visits Section */}
             <div className="p-4 border rounded-lg bg-muted/30">
               <div className="flex items-center gap-2 mb-2">
                 <Hash className="w-4 h-4 text-muted-foreground" />
-                <Label className="font-medium">Add a Trip</Label>
+                <Label className="font-medium">Add Visits</Label>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Add trips with exact dates or approximate timeframes (e.g., "4 days in June 2024").
+                Add one or more visits at once. Include cities you visited on each trip.
               </p>
-              <Button size="sm" onClick={handleAddVisit}>
-                <Plus className="w-4 h-4 mr-1" />
-                Add Visit Record
-              </Button>
+              
+              {newVisits.length > 0 && (
+                <div className="space-y-3 mb-3">
+                  {newVisits.map((draft, index) => (
+                    <NewVisitCard
+                      key={draft.id}
+                      draft={draft}
+                      index={index}
+                      countryCode={countryCode}
+                      onUpdate={handleUpdateNewVisitDraft}
+                      onRemove={handleRemoveNewVisitDraft}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleAddNewVisitDraft}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Another Visit
+                </Button>
+                {newVisits.length > 0 && (
+                  <Button size="sm" onClick={handleSaveNewVisits} disabled={saving}>
+                    {saving ? "Saving..." : `Save ${newVisits.length} Visit${newVisits.length > 1 ? "s" : ""}`}
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {/* Visits Section */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">Visit Records ({visitDetails.length})</h3>
-              </div>
+            {/* Existing Visits Section */}
+            {visitDetails.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold">Saved Visits ({visitDetails.length})</h3>
+                </div>
 
-              {visitDetails.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No visits recorded yet. Add your first visit!
-                </p>
-              ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {visitDetails.map((visit, index) => {
-                    const dateRange: DateRange | undefined = 
+                    const isExpanded = expandedVisits.has(visit.id);
+                    const dateRange: DateRange | undefined =
                       visit.visit_date || visit.end_date
                         ? {
                             from: visit.visit_date ? parseISO(visit.visit_date) : undefined,
                             to: visit.end_date ? parseISO(visit.end_date) : undefined,
                           }
                         : undefined;
-                    
+
                     const hasDateRange = visit.visit_date && visit.end_date;
                     const isAutoCalculated = hasDateRange && calculateDays(visit.visit_date, visit.end_date) !== null;
                     const isApproximate = visit.is_approximate || false;
@@ -380,7 +821,7 @@ const CountryVisitDetailsDialog = ({
                     const handleDateRangeChange = async (range: DateRange | undefined) => {
                       const startDate = range?.from ? format(range.from, "yyyy-MM-dd") : null;
                       const endDate = range?.to ? format(range.to, "yyyy-MM-dd") : null;
-                      
+
                       let updateData: Record<string, string | number | null | boolean> = {
                         visit_date: startDate,
                         end_date: endDate,
@@ -389,7 +830,6 @@ const CountryVisitDetailsDialog = ({
                         approximate_year: null,
                       };
 
-                      // Auto-calculate days if both dates present
                       if (startDate && endDate) {
                         const calculatedDays = calculateDays(startDate, endDate);
                         if (calculatedDays) {
@@ -413,13 +853,11 @@ const CountryVisitDetailsDialog = ({
                       const updateData: Record<string, string | number | null | boolean> = {
                         is_approximate: checked,
                       };
-                      
+
                       if (checked) {
-                        // Clear exact dates when switching to approximate
                         updateData.visit_date = null;
                         updateData.end_date = null;
                       } else {
-                        // Clear approximate fields when switching to exact
                         updateData.approximate_month = null;
                         updateData.approximate_year = null;
                       }
@@ -467,213 +905,227 @@ const CountryVisitDetailsDialog = ({
                     const currentYear = new Date().getFullYear();
                     const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
+                    // Build a display title for the visit
+                    let visitTitle = visit.trip_name || `Visit #${visitDetails.length - index}`;
+                    let visitSubtitle = "";
+                    if (isApproximate) {
+                      const monthName = months.find((m) => m.value === visit.approximate_month)?.label;
+                      visitSubtitle = [monthName, visit.approximate_year].filter(Boolean).join(" ") || "Date unknown";
+                    } else if (visit.visit_date) {
+                      visitSubtitle = visit.end_date
+                        ? `${format(parseISO(visit.visit_date), "MMM d")} - ${format(parseISO(visit.end_date), "MMM d, yyyy")}`
+                        : format(parseISO(visit.visit_date), "MMM d, yyyy");
+                    }
+                    visitSubtitle += ` • ${visit.number_of_days} day${visit.number_of_days !== 1 ? "s" : ""}`;
+
                     return (
-                      <Card key={visit.id}>
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-medium text-muted-foreground">
-                                Visit #{visitDetails.length - index}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <Label htmlFor={`approx-${visit.id}`} className="text-xs text-muted-foreground cursor-pointer">
-                                  Approximate dates
-                                </Label>
-                                <Switch
-                                  id={`approx-${visit.id}`}
-                                  checked={isApproximate}
-                                  onCheckedChange={handleApproximateToggle}
-                                  className="scale-75"
-                                />
+                      <Collapsible key={visit.id} open={isExpanded} onOpenChange={() => toggleVisitExpanded(visit.id)}>
+                        <Card>
+                          <CollapsibleTrigger asChild>
+                            <div className="p-3 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <div className="font-medium text-sm">{visitTitle}</div>
+                                  <div className="text-xs text-muted-foreground">{visitSubtitle}</div>
+                                </div>
                               </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteVisit(visit.id)}
-                              className="text-destructive hover:text-destructive h-6 w-6 p-0"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-
-                          {/* Trip Name */}
-                          <div className="mb-3">
-                            <Label className="text-xs mb-1 block">Trip Name (optional)</Label>
-                            <TripNameInput
-                              visitId={visit.id}
-                              initialValue={visit.notes || ""}
-                              onSave={(value) => handleUpdateVisit(visit.id, "notes", value || null)}
-                            />
-                          </div>
-
-                          <div className="space-y-3">
-                            {isApproximate ? (
-                              <>
-                                {/* Approximate Date Entry */}
-                                <div>
-                                  <Label className="text-xs mb-1 block flex items-center gap-1">
-                                    <CalendarDays className="w-3 h-3" />
-                                    Approximate Time
-                                  </Label>
-                                  <div className="flex gap-2">
-                                    <Select
-                                      value={visit.approximate_month?.toString() || ""}
-                                      onValueChange={(value) => handleApproximateUpdate("approximate_month", value ? parseInt(value) : null)}
-                                    >
-                                      <SelectTrigger className="h-8 text-sm flex-1">
-                                        <SelectValue placeholder="Month (optional)" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {months.map((month) => (
-                                          <SelectItem key={month.value} value={month.value.toString()}>
-                                            {month.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <Select
-                                      value={visit.approximate_year?.toString() || ""}
-                                      onValueChange={(value) => handleApproximateUpdate("approximate_year", value ? parseInt(value) : null)}
-                                    >
-                                      <SelectTrigger className="h-8 text-sm w-28">
-                                        <SelectValue placeholder="Year" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {years.map((year) => (
-                                          <SelectItem key={year} value={year.toString()}>
-                                            {year}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Select approximate month and year of your trip
-                                  </p>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                {/* Exact Date Entry */}
-                                <div>
-                                  <Label className="text-xs mb-1 block">Travel Dates</Label>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        className="w-full justify-start text-left font-normal h-9"
-                                      >
-                                        <Calendar className="mr-2 h-4 w-4" />
-                                        {dateRange?.from ? (
-                                          dateRange.to ? (
-                                            <>
-                                              {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
-                                            </>
-                                          ) : (
-                                            format(dateRange.from, "MMM d, yyyy")
-                                          )
-                                        ) : (
-                                          <span className="text-muted-foreground">Pick travel dates</span>
-                                        )}
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                      <CalendarComponent
-                                        initialFocus
-                                        mode="range"
-                                        defaultMonth={dateRange?.from}
-                                        selected={dateRange}
-                                        onSelect={handleDateRangeChange}
-                                        numberOfMonths={2}
-                                        className="pointer-events-auto"
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                </div>
-                              </>
-                            )}
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <Label className="text-xs">Days</Label>
-                                {!isApproximate && isAutoCalculated ? (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    Auto-calculated
-                                  </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteVisit(visit.id);
+                                  }}
+                                  className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
                                 ) : (
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Edit3 className="w-3 h-3" />
-                                    Manual entry
-                                  </span>
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
                                 )}
                               </div>
-                              <DaysInput
-                                visitId={visit.id}
-                                initialValue={visit.number_of_days}
-                                disabled={!isApproximate && isAutoCalculated}
-                                onSave={(value) => handleUpdateVisit(visit.id, "number_of_days", value)}
-                              />
-                              {isApproximate && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Enter how many days you spent on this trip
-                                </p>
-                              )}
-                              {!isApproximate && !hasDateRange && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Select dates above or enter days manually
-                                </p>
-                              )}
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <CardContent className="pt-0 pb-4 px-4 border-t">
+                              <div className="pt-3 space-y-3">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Label className="text-xs text-muted-foreground cursor-pointer">
+                                    Approximate dates
+                                  </Label>
+                                  <Switch
+                                    checked={isApproximate}
+                                    onCheckedChange={handleApproximateToggle}
+                                    className="scale-75"
+                                  />
+                                </div>
+
+                                {/* Trip Name */}
+                                <div>
+                                  <Label className="text-xs mb-1 block">Trip Name</Label>
+                                  <TripNameInput
+                                    initialValue={visit.trip_name || ""}
+                                    onSave={(value) => handleUpdateVisit(visit.id, "trip_name", value || null)}
+                                  />
+                                </div>
+
+                                {isApproximate ? (
+                                  <div>
+                                    <Label className="text-xs mb-1 block flex items-center gap-1">
+                                      <CalendarDays className="w-3 h-3" />
+                                      Approximate Time
+                                    </Label>
+                                    <div className="flex gap-2">
+                                      <Select
+                                        value={visit.approximate_month?.toString() || ""}
+                                        onValueChange={(value) =>
+                                          handleApproximateUpdate("approximate_month", value ? parseInt(value) : null)
+                                        }
+                                      >
+                                        <SelectTrigger className="h-8 text-sm flex-1">
+                                          <SelectValue placeholder="Month (optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {months.map((month) => (
+                                            <SelectItem key={month.value} value={month.value.toString()}>
+                                              {month.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Select
+                                        value={visit.approximate_year?.toString() || ""}
+                                        onValueChange={(value) =>
+                                          handleApproximateUpdate("approximate_year", value ? parseInt(value) : null)
+                                        }
+                                      >
+                                        <SelectTrigger className="h-8 text-sm w-28">
+                                          <SelectValue placeholder="Year" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {years.map((year) => (
+                                            <SelectItem key={year} value={year.toString()}>
+                                              {year}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <Label className="text-xs mb-1 block">Travel Dates</Label>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          className="w-full justify-start text-left font-normal h-9"
+                                        >
+                                          <Calendar className="mr-2 h-4 w-4" />
+                                          {dateRange?.from ? (
+                                            dateRange.to ? (
+                                              <>
+                                                {format(dateRange.from, "MMM d, yyyy")} -{" "}
+                                                {format(dateRange.to, "MMM d, yyyy")}
+                                              </>
+                                            ) : (
+                                              format(dateRange.from, "MMM d, yyyy")
+                                            )
+                                          ) : (
+                                            <span className="text-muted-foreground">Pick travel dates</span>
+                                          )}
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0" align="start">
+                                        <CalendarComponent
+                                          initialFocus
+                                          mode="range"
+                                          defaultMonth={dateRange?.from}
+                                          selected={dateRange}
+                                          onSelect={handleDateRangeChange}
+                                          numberOfMonths={2}
+                                          className="pointer-events-auto"
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                )}
+
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <Label className="text-xs">Days</Label>
+                                    {!isApproximate && isAutoCalculated ? (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Calendar className="w-3 h-3" />
+                                        Auto-calculated
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Edit3 className="w-3 h-3" />
+                                        Manual entry
+                                      </span>
+                                    )}
+                                  </div>
+                                  <DaysInput
+                                    initialValue={visit.number_of_days}
+                                    disabled={!isApproximate && isAutoCalculated}
+                                    onSave={(value) => handleUpdateVisit(visit.id, "number_of_days", value)}
+                                  />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
                     );
                   })}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Cities Section */}
+            {/* All Cities Section */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">Cities Visited</h3>
+                <h3 className="text-lg font-semibold">All Cities Visited</h3>
               </div>
 
               <div className="mb-3">
-                <Popover open={cityComboboxOpen} onOpenChange={setCityComboboxOpen}>
+                <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start">
                       <Plus className="w-4 h-4 mr-2" />
-                      {newCityName || "Add a city..."}
+                      Add a city...
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
-                      <CommandInput
-                        placeholder="Search or type city name..."
-                        value={newCityName}
-                        onValueChange={setNewCityName}
-                      />
+                      <CommandInput placeholder="Search or type city name..." />
                       <CommandList>
                         <CommandEmpty>
-                          {newCityName.trim() && (
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                              onClick={() => handleAddCity(newCityName)}
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Add "{newCityName}"
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={(e) => {
+                              const input = (e.target as HTMLElement).closest('[role="dialog"]')?.querySelector('input');
+                              if (input?.value) handleAddCity(input.value);
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add custom city
+                          </Button>
                         </CommandEmpty>
                         <CommandGroup>
                           {cities
-                            .filter((city) =>
-                              city.toLowerCase().includes(newCityName.toLowerCase())
+                            .filter(
+                              (city) =>
+                                !cityVisits.some(
+                                  (c) => c.city_name.toLowerCase() === city.toLowerCase()
+                                )
                             )
-                            .slice(0, 20)
+                            .slice(0, 30)
                             .map((city) => (
                               <CommandItem
                                 key={city}
@@ -692,9 +1144,7 @@ const CountryVisitDetailsDialog = ({
               </div>
 
               {cityVisits.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No cities recorded yet.
-                </p>
+                <p className="text-muted-foreground text-sm">No cities recorded yet.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {cityVisits.map((city) => (
