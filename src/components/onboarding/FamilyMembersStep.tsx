@@ -56,6 +56,13 @@ const FamilyMembersStep = ({ onMembersChange }: FamilyMembersStepProps) => {
       const avatar = AVATAR_EMOJIS[members.length % AVATAR_EMOJIS.length];
       const color = COLORS[members.length % COLORS.length];
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "You must be logged in", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("family_members")
         .insert([{
@@ -63,6 +70,7 @@ const FamilyMembersStep = ({ onMembersChange }: FamilyMembersStepProps) => {
           role: validated.role,
           avatar,
           color,
+          user_id: user.id,
         }])
         .select()
         .single();

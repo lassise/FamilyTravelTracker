@@ -92,6 +92,7 @@ export type Database = {
           created_at: string | null
           id: string
           notes: string | null
+          user_id: string | null
           visit_date: string | null
         }
         Insert: {
@@ -100,6 +101,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           notes?: string | null
+          user_id?: string | null
           visit_date?: string | null
         }
         Update: {
@@ -108,6 +110,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           notes?: string | null
+          user_id?: string | null
           visit_date?: string | null
         }
         Relationships: [
@@ -127,6 +130,7 @@ export type Database = {
           flag: string
           id: string
           name: string
+          user_id: string | null
         }
         Insert: {
           continent: string
@@ -134,6 +138,7 @@ export type Database = {
           flag: string
           id?: string
           name: string
+          user_id?: string | null
         }
         Update: {
           continent?: string
@@ -141,6 +146,7 @@ export type Database = {
           flag?: string
           id?: string
           name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -157,6 +163,7 @@ export type Database = {
           number_of_days: number | null
           trip_name: string | null
           updated_at: string | null
+          user_id: string | null
           visit_date: string | null
         }
         Insert: {
@@ -171,6 +178,7 @@ export type Database = {
           number_of_days?: number | null
           trip_name?: string | null
           updated_at?: string | null
+          user_id?: string | null
           visit_date?: string | null
         }
         Update: {
@@ -185,6 +193,7 @@ export type Database = {
           number_of_days?: number | null
           trip_name?: string | null
           updated_at?: string | null
+          user_id?: string | null
           visit_date?: string | null
         }
         Relationships: [
@@ -203,18 +212,21 @@ export type Database = {
           created_at: string | null
           family_member_id: string | null
           id: string
+          user_id: string | null
         }
         Insert: {
           country_id?: string | null
           created_at?: string | null
           family_member_id?: string | null
           id?: string
+          user_id?: string | null
         }
         Update: {
           country_id?: string | null
           created_at?: string | null
           family_member_id?: string | null
           id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -238,16 +250,19 @@ export type Database = {
           country_id: string | null
           created_at: string
           id: string
+          user_id: string | null
         }
         Insert: {
           country_id?: string | null
           created_at?: string
           id?: string
+          user_id?: string | null
         }
         Update: {
           country_id?: string | null
           created_at?: string
           id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -395,6 +410,7 @@ export type Database = {
           id: string
           name: string
           role: string
+          user_id: string | null
         }
         Insert: {
           avatar: string
@@ -403,6 +419,7 @@ export type Database = {
           id?: string
           name: string
           role: string
+          user_id?: string | null
         }
         Update: {
           avatar?: string
@@ -411,6 +428,7 @@ export type Database = {
           id?: string
           name?: string
           role?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -720,6 +738,7 @@ export type Database = {
           home_country_code: string
           id: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -727,6 +746,7 @@ export type Database = {
           home_country_code?: string
           id?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -734,6 +754,7 @@ export type Database = {
           home_country_code?: string
           id?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }

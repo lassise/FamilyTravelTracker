@@ -63,13 +63,20 @@ const FamilyMemberDialog = ({ member, onSuccess }: FamilyMemberDialogProps) => {
         if (error) throw error;
         toast({ title: "Family member updated successfully!" });
       } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast({ title: "You must be logged in", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
         const { error } = await supabase
           .from("family_members")
           .insert([{
             name: validated.name,
             role: validated.role,
             avatar: validated.avatar,
-            color: color
+            color: color,
+            user_id: user.id
           }]);
 
         if (error) throw error;

@@ -46,9 +46,14 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
       }
     } else {
       // Add visit
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "You must be logged in", variant: "destructive" });
+        return;
+      }
       const { error } = await supabase
         .from("country_visits")
-        .insert([{ country_id: countryId, family_member_id: memberId }]);
+        .insert([{ country_id: countryId, family_member_id: memberId, user_id: user.id }]);
 
       if (error) {
         toast({ title: "Error updating visit", variant: "destructive" });
