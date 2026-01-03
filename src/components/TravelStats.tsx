@@ -95,34 +95,29 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
   ];
 
   return (
-    <section className="py-16 bg-muted/30">
+    <section className="py-8 bg-muted/30">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Travel Achievements
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            Travel Highlights
           </h2>
-          <p className="text-muted-foreground text-lg">
-            Your family's incredible journey in numbers
+          <p className="text-muted-foreground text-sm">
+            Your family's journey in numbers
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {stats.map((stat, index) => (
-            <Card key={index} className="group hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/50">
-              <CardHeader className="pb-3">
-                <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${stat.gradient} flex items-center justify-center mb-3`}>
-                  <stat.icon className="w-6 h-6 text-white" />
+            <Card key={index} className="group hover:shadow-md transition-all duration-300 border hover:border-primary/30">
+              <CardContent className="p-3 text-center">
+                <div className={`w-8 h-8 rounded-md bg-gradient-to-br ${stat.gradient} flex items-center justify-center mx-auto mb-2`}>
+                  <stat.icon className="w-4 h-4 text-white" />
                 </div>
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2 text-foreground">
+                <div className="text-lg font-bold text-foreground">
                   {stat.value}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {stat.description}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stat.label}
                 </p>
               </CardContent>
             </Card>

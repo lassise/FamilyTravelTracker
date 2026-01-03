@@ -54,16 +54,16 @@ const ContinentFilter = ({ countries, familyMembers }: ContinentFilterProps) => 
             const allVisited = continentCountries.filter(isVisitedByAll).length;
 
             return (
-              <DropdownMenu key={continent}>
+              <DropdownMenu key={continent} modal={false}>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="outline" 
-                    className="w-full justify-between h-auto py-4 hover:bg-muted/50 hover:border-primary/50"
+                    className="w-full justify-between h-auto py-3 hover:bg-muted/50 hover:border-primary/50"
                   >
-                    <div className="flex items-center gap-3">
-                      <Globe2 className="w-5 h-5 text-primary" />
+                    <div className="flex items-center gap-2">
+                      <Globe2 className="w-4 h-4 text-primary" />
                       <div className="text-left">
-                        <div className="font-semibold text-foreground">{continent}</div>
+                        <div className="font-medium text-sm text-foreground">{continent}</div>
                         <div className="text-xs text-muted-foreground">
                           {continentCountries.length} countries
                         </div>
@@ -78,8 +78,9 @@ const ContinentFilter = ({ countries, familyMembers }: ContinentFilterProps) => 
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
-                  className="w-80 max-h-96 overflow-y-auto bg-background"
+                  className="w-80 max-h-80 overflow-y-auto bg-background z-50"
                   align="start"
+                  onCloseAutoFocus={(e) => e.preventDefault()}
                 >
                   <DropdownMenuLabel className="flex items-center justify-between">
                     <span>{continent}</span>
