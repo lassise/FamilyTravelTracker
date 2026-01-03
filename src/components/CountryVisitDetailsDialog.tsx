@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, MapPin, Plus, Trash2, Clock, X, Lock, Edit3 } from "lucide-react";
+import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -29,7 +29,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { getCitiesForCountry } from "@/lib/citiesData";
-import { differenceInDays, parseISO, isAfter } from "date-fns";
+import { differenceInDays, parseISO, isAfter, format } from "date-fns";
+import { DateRange } from "react-day-picker";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 // Calculate days between two dates (inclusive)
 const calculateDays = (startDate: string | null, endDate: string | null): number | null => {
@@ -259,14 +261,25 @@ const CountryVisitDetailsDialog = ({
 
         <ScrollArea className="h-[500px] pr-4">
           <div className="space-y-6">
+            {/* Manual Times Visited */}
+            <div className="p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Hash className="w-4 h-4 text-muted-foreground" />
+                <Label className="font-medium">Quick Entry</Label>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Just want to record how many times you visited? Add individual visits below for date tracking, or use the quick add.
+              </p>
+              <Button size="sm" onClick={handleAddVisit}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add Visit Record
+              </Button>
+            </div>
+
             {/* Visits Section */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">Visits</h3>
-                <Button size="sm" onClick={handleAddVisit}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Visit
-                </Button>
+                <h3 className="text-lg font-semibold">Visit Records ({visitDetails.length})</h3>
               </div>
 
               {visitDetails.length === 0 ? (
@@ -275,94 +288,139 @@ const CountryVisitDetailsDialog = ({
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {visitDetails.map((visit, index) => (
-                    <Card key={visit.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Visit #{visitDetails.length - index}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteVisit(visit.id)}
-                            className="text-destructive hover:text-destructive h-6 w-6 p-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        {(() => {
-                          const hasDateRange = visit.visit_date && visit.end_date;
-                          const isAutoCalculated = hasDateRange && calculateDays(visit.visit_date, visit.end_date) !== null;
-                          
-                          return (
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <Label className="text-xs">Start Date</Label>
-                                  <Input
-                                    type="date"
-                                    value={visit.visit_date || ""}
-                                    onChange={(e) =>
-                                      handleUpdateVisit(visit.id, "visit_date", e.target.value || null, visit)
-                                    }
-                                    className="h-8 text-sm"
+                  {visitDetails.map((visit, index) => {
+                    const dateRange: DateRange | undefined = 
+                      visit.visit_date || visit.end_date
+                        ? {
+                            from: visit.visit_date ? parseISO(visit.visit_date) : undefined,
+                            to: visit.end_date ? parseISO(visit.end_date) : undefined,
+                          }
+                        : undefined;
+                    
+                    const hasDateRange = visit.visit_date && visit.end_date;
+                    const isAutoCalculated = hasDateRange && calculateDays(visit.visit_date, visit.end_date) !== null;
+
+                    const handleDateRangeChange = async (range: DateRange | undefined) => {
+                      const startDate = range?.from ? format(range.from, "yyyy-MM-dd") : null;
+                      const endDate = range?.to ? format(range.to, "yyyy-MM-dd") : null;
+                      
+                      let updateData: Record<string, string | number | null> = {
+                        visit_date: startDate,
+                        end_date: endDate,
+                      };
+
+                      // Auto-calculate days if both dates present
+                      if (startDate && endDate) {
+                        const calculatedDays = calculateDays(startDate, endDate);
+                        if (calculatedDays) {
+                          updateData.number_of_days = calculatedDays;
+                        }
+                      }
+
+                      const { error } = await supabase
+                        .from("country_visit_details")
+                        .update(updateData)
+                        .eq("id", visit.id);
+
+                      if (error) {
+                        toast({ title: "Error updating dates", variant: "destructive" });
+                      } else {
+                        fetchData();
+                      }
+                    };
+
+                    return (
+                      <Card key={visit.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              Visit #{visitDetails.length - index}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteVisit(visit.id)}
+                              className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <Label className="text-xs mb-1 block">Travel Dates</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full justify-start text-left font-normal h-9"
+                                  >
+                                    <Calendar className="mr-2 h-4 w-4" />
+                                    {dateRange?.from ? (
+                                      dateRange.to ? (
+                                        <>
+                                          {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
+                                        </>
+                                      ) : (
+                                        format(dateRange.from, "MMM d, yyyy")
+                                      )
+                                    ) : (
+                                      <span className="text-muted-foreground">Pick travel dates</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarComponent
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={dateRange?.from}
+                                    selected={dateRange}
+                                    onSelect={handleDateRangeChange}
+                                    numberOfMonths={2}
+                                    className="pointer-events-auto"
                                   />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">End Date</Label>
-                                  <Input
-                                    type="date"
-                                    value={visit.end_date || ""}
-                                    onChange={(e) =>
-                                      handleUpdateVisit(visit.id, "end_date", e.target.value || null, visit)
-                                    }
-                                    className="h-8 text-sm"
-                                    min={visit.visit_date || undefined}
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <Label className="text-xs">Days</Label>
-                                  {isAutoCalculated ? (
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Lock className="w-3 h-3" />
-                                      Auto-calculated
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <Edit3 className="w-3 h-3" />
-                                      Manual entry
-                                    </span>
-                                  )}
-                                </div>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={visit.number_of_days || 1}
-                                  onChange={(e) =>
-                                    handleUpdateVisit(
-                                      visit.id,
-                                      "number_of_days",
-                                      parseInt(e.target.value) || 1
-                                    )
-                                  }
-                                  disabled={isAutoCalculated}
-                                  className={`h-8 text-sm ${isAutoCalculated ? "bg-muted cursor-not-allowed" : ""}`}
-                                />
-                                {!hasDateRange && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Add both dates to auto-calculate days
-                                  </p>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <Label className="text-xs">Days</Label>
+                                {isAutoCalculated ? (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    Auto-calculated
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Edit3 className="w-3 h-3" />
+                                    Manual entry
+                                  </span>
                                 )}
                               </div>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={visit.number_of_days || 1}
+                                onChange={(e) =>
+                                  handleUpdateVisit(
+                                    visit.id,
+                                    "number_of_days",
+                                    parseInt(e.target.value) || 1
+                                  )
+                                }
+                                disabled={isAutoCalculated}
+                                className={`h-8 text-sm ${isAutoCalculated ? "bg-muted cursor-not-allowed" : ""}`}
+                              />
+                              {!hasDateRange && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Select dates above or enter days manually
+                                </p>
+                              )}
                             </div>
-                          );
-                        })()}
-                      </CardContent>
-                    </Card>
-                  ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </div>
