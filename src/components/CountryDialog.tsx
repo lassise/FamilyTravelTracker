@@ -80,12 +80,19 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
         if (error) throw error;
         toast({ title: "Country updated successfully!" });
       } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast({ title: "You must be logged in", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
         const { data: newCountry, error } = await supabase
           .from("countries")
           .insert([{
             name: validated.name,
             flag: validated.flag,
-            continent: validated.continent
+            continent: validated.continent,
+            user_id: user.id
           }])
           .select()
           .single();
@@ -96,7 +103,8 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
         if (newCountry && selectedMembers.length > 0) {
           const visits = selectedMembers.map(memberId => ({
             country_id: newCountry.id,
-            family_member_id: memberId
+            family_member_id: memberId,
+            user_id: user.id
           }));
           
           const { error: visitsError } = await supabase

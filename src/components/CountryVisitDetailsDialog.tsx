@@ -529,6 +529,13 @@ const CountryVisitDetailsDialog = ({
 
     setSaving(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "You must be logged in", variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+
       // Insert all new visits
       for (const draft of newVisits) {
         const visitData = {
@@ -540,6 +547,7 @@ const CountryVisitDetailsDialog = ({
           visit_date: draft.visitDate,
           end_date: draft.endDate,
           number_of_days: draft.numberOfDays,
+          user_id: user.id,
         };
 
         const { error: visitError } = await supabase
@@ -553,6 +561,7 @@ const CountryVisitDetailsDialog = ({
           const cityInserts = draft.cities.map((city) => ({
             country_id: countryId,
             city_name: city,
+            user_id: user.id,
           }));
 
           // Check for duplicates first
@@ -644,9 +653,16 @@ const CountryVisitDetailsDialog = ({
       return;
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({ title: "You must be logged in", variant: "destructive" });
+      return;
+    }
+
     const { error } = await supabase.from("city_visits").insert({
       country_id: countryId,
       city_name: cityName.trim(),
+      user_id: user.id,
     });
 
     if (error) {

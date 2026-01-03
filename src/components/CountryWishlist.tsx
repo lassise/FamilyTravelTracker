@@ -45,9 +45,15 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
   const handleAddToWishlist = async (countryId: string) => {
     try {
       setIsAdding(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "You must be logged in", variant: "destructive" });
+        setIsAdding(false);
+        return;
+      }
       const { error } = await supabase
         .from("country_wishlist")
-        .insert({ country_id: countryId });
+        .insert({ country_id: countryId, user_id: user.id });
 
       if (error) throw error;
 

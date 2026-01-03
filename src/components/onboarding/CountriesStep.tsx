@@ -84,12 +84,20 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
 
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "You must be logged in", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
       const { data: newCountry, error } = await supabase
         .from("countries")
         .insert([{
           name: selectedCountry.name,
           flag: selectedCountry.flag,
           continent: selectedCountry.continent,
+          user_id: user.id,
         }])
         .select()
         .single();
@@ -101,6 +109,7 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
         const visits = selectedMembers.map((memberId) => ({
           country_id: newCountry.id,
           family_member_id: memberId,
+          user_id: user.id,
         }));
 
         await supabase.from("country_visits").insert(visits);
