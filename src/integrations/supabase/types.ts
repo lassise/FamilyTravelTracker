@@ -146,32 +146,44 @@ export type Database = {
       }
       country_visit_details: {
         Row: {
+          approximate_month: number | null
+          approximate_year: number | null
           country_id: string
           created_at: string | null
           end_date: string | null
           id: string
+          is_approximate: boolean | null
           notes: string | null
           number_of_days: number | null
+          trip_name: string | null
           updated_at: string | null
           visit_date: string | null
         }
         Insert: {
+          approximate_month?: number | null
+          approximate_year?: number | null
           country_id: string
           created_at?: string | null
           end_date?: string | null
           id?: string
+          is_approximate?: boolean | null
           notes?: string | null
           number_of_days?: number | null
+          trip_name?: string | null
           updated_at?: string | null
           visit_date?: string | null
         }
         Update: {
+          approximate_month?: number | null
+          approximate_year?: number | null
           country_id?: string
           created_at?: string | null
           end_date?: string | null
           id?: string
+          is_approximate?: boolean | null
           notes?: string | null
           number_of_days?: number | null
+          trip_name?: string | null
           updated_at?: string | null
           visit_date?: string | null
         }

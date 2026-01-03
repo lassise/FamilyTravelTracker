@@ -12,7 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -49,6 +51,9 @@ interface VisitDetail {
   end_date: string | null;
   number_of_days: number;
   notes: string | null;
+  approximate_month?: number | null;
+  approximate_year?: number | null;
+  is_approximate?: boolean;
 }
 
 interface CityVisit {
@@ -261,14 +266,14 @@ const CountryVisitDetailsDialog = ({
 
         <ScrollArea className="h-[500px] pr-4">
           <div className="space-y-6">
-            {/* Manual Times Visited */}
+            {/* Quick Entry */}
             <div className="p-4 border rounded-lg bg-muted/30">
               <div className="flex items-center gap-2 mb-2">
                 <Hash className="w-4 h-4 text-muted-foreground" />
-                <Label className="font-medium">Quick Entry</Label>
+                <Label className="font-medium">Add a Trip</Label>
               </div>
               <p className="text-xs text-muted-foreground mb-3">
-                Just want to record how many times you visited? Add individual visits below for date tracking, or use the quick add.
+                Add trips with exact dates or approximate timeframes (e.g., "4 days in June 2024").
               </p>
               <Button size="sm" onClick={handleAddVisit}>
                 <Plus className="w-4 h-4 mr-1" />
@@ -299,14 +304,18 @@ const CountryVisitDetailsDialog = ({
                     
                     const hasDateRange = visit.visit_date && visit.end_date;
                     const isAutoCalculated = hasDateRange && calculateDays(visit.visit_date, visit.end_date) !== null;
+                    const isApproximate = visit.is_approximate || false;
 
                     const handleDateRangeChange = async (range: DateRange | undefined) => {
                       const startDate = range?.from ? format(range.from, "yyyy-MM-dd") : null;
                       const endDate = range?.to ? format(range.to, "yyyy-MM-dd") : null;
                       
-                      let updateData: Record<string, string | number | null> = {
+                      let updateData: Record<string, string | number | null | boolean> = {
                         visit_date: startDate,
                         end_date: endDate,
+                        is_approximate: false,
+                        approximate_month: null,
+                        approximate_year: null,
                       };
 
                       // Auto-calculate days if both dates present
@@ -329,13 +338,84 @@ const CountryVisitDetailsDialog = ({
                       }
                     };
 
+                    const handleApproximateToggle = async (checked: boolean) => {
+                      const updateData: Record<string, string | number | null | boolean> = {
+                        is_approximate: checked,
+                      };
+                      
+                      if (checked) {
+                        // Clear exact dates when switching to approximate
+                        updateData.visit_date = null;
+                        updateData.end_date = null;
+                      } else {
+                        // Clear approximate fields when switching to exact
+                        updateData.approximate_month = null;
+                        updateData.approximate_year = null;
+                      }
+
+                      const { error } = await supabase
+                        .from("country_visit_details")
+                        .update(updateData)
+                        .eq("id", visit.id);
+
+                      if (error) {
+                        toast({ title: "Error updating visit", variant: "destructive" });
+                      } else {
+                        fetchData();
+                      }
+                    };
+
+                    const handleApproximateUpdate = async (field: string, value: number | string | null) => {
+                      const { error } = await supabase
+                        .from("country_visit_details")
+                        .update({ [field]: value })
+                        .eq("id", visit.id);
+
+                      if (error) {
+                        toast({ title: "Error updating visit", variant: "destructive" });
+                      } else {
+                        fetchData();
+                      }
+                    };
+
+                    const months = [
+                      { value: 1, label: "January" },
+                      { value: 2, label: "February" },
+                      { value: 3, label: "March" },
+                      { value: 4, label: "April" },
+                      { value: 5, label: "May" },
+                      { value: 6, label: "June" },
+                      { value: 7, label: "July" },
+                      { value: 8, label: "August" },
+                      { value: 9, label: "September" },
+                      { value: 10, label: "October" },
+                      { value: 11, label: "November" },
+                      { value: 12, label: "December" },
+                    ];
+
+                    const currentYear = new Date().getFullYear();
+                    const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
+
                     return (
                       <Card key={visit.id}>
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between mb-3">
-                            <span className="text-sm font-medium text-muted-foreground">
-                              Visit #{visitDetails.length - index}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-muted-foreground">
+                                Visit #{visitDetails.length - index}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor={`approx-${visit.id}`} className="text-xs text-muted-foreground cursor-pointer">
+                                  Approximate dates
+                                </Label>
+                                <Switch
+                                  id={`approx-${visit.id}`}
+                                  checked={isApproximate}
+                                  onCheckedChange={handleApproximateToggle}
+                                  className="scale-75"
+                                />
+                              </div>
+                            </div>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -345,46 +425,109 @@ const CountryVisitDetailsDialog = ({
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
+
+                          {/* Trip Name */}
+                          <div className="mb-3">
+                            <Label className="text-xs mb-1 block">Trip Name (optional)</Label>
+                            <Input
+                              type="text"
+                              placeholder="e.g., Trip with In-laws"
+                              value={visit.notes || ""}
+                              onChange={(e) => handleUpdateVisit(visit.id, "notes", e.target.value || null)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+
                           <div className="space-y-3">
-                            <div>
-                              <Label className="text-xs mb-1 block">Travel Dates</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className="w-full justify-start text-left font-normal h-9"
-                                  >
-                                    <Calendar className="mr-2 h-4 w-4" />
-                                    {dateRange?.from ? (
-                                      dateRange.to ? (
-                                        <>
-                                          {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
-                                        </>
-                                      ) : (
-                                        format(dateRange.from, "MMM d, yyyy")
-                                      )
-                                    ) : (
-                                      <span className="text-muted-foreground">Pick travel dates</span>
-                                    )}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <CalendarComponent
-                                    initialFocus
-                                    mode="range"
-                                    defaultMonth={dateRange?.from}
-                                    selected={dateRange}
-                                    onSelect={handleDateRangeChange}
-                                    numberOfMonths={2}
-                                    className="pointer-events-auto"
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
+                            {isApproximate ? (
+                              <>
+                                {/* Approximate Date Entry */}
+                                <div>
+                                  <Label className="text-xs mb-1 block flex items-center gap-1">
+                                    <CalendarDays className="w-3 h-3" />
+                                    Approximate Time
+                                  </Label>
+                                  <div className="flex gap-2">
+                                    <Select
+                                      value={visit.approximate_month?.toString() || ""}
+                                      onValueChange={(value) => handleApproximateUpdate("approximate_month", value ? parseInt(value) : null)}
+                                    >
+                                      <SelectTrigger className="h-8 text-sm flex-1">
+                                        <SelectValue placeholder="Month (optional)" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {months.map((month) => (
+                                          <SelectItem key={month.value} value={month.value.toString()}>
+                                            {month.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Select
+                                      value={visit.approximate_year?.toString() || ""}
+                                      onValueChange={(value) => handleApproximateUpdate("approximate_year", value ? parseInt(value) : null)}
+                                    >
+                                      <SelectTrigger className="h-8 text-sm w-28">
+                                        <SelectValue placeholder="Year" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {years.map((year) => (
+                                          <SelectItem key={year} value={year.toString()}>
+                                            {year}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Select approximate month and year of your trip
+                                  </p>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                {/* Exact Date Entry */}
+                                <div>
+                                  <Label className="text-xs mb-1 block">Travel Dates</Label>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        className="w-full justify-start text-left font-normal h-9"
+                                      >
+                                        <Calendar className="mr-2 h-4 w-4" />
+                                        {dateRange?.from ? (
+                                          dateRange.to ? (
+                                            <>
+                                              {format(dateRange.from, "MMM d, yyyy")} - {format(dateRange.to, "MMM d, yyyy")}
+                                            </>
+                                          ) : (
+                                            format(dateRange.from, "MMM d, yyyy")
+                                          )
+                                        ) : (
+                                          <span className="text-muted-foreground">Pick travel dates</span>
+                                        )}
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                      <CalendarComponent
+                                        initialFocus
+                                        mode="range"
+                                        defaultMonth={dateRange?.from}
+                                        selected={dateRange}
+                                        onSelect={handleDateRangeChange}
+                                        numberOfMonths={2}
+                                        className="pointer-events-auto"
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              </>
+                            )}
                             <div>
                               <div className="flex items-center justify-between mb-1">
                                 <Label className="text-xs">Days</Label>
-                                {isAutoCalculated ? (
+                                {!isApproximate && isAutoCalculated ? (
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Calendar className="w-3 h-3" />
                                     Auto-calculated
@@ -399,18 +542,31 @@ const CountryVisitDetailsDialog = ({
                               <Input
                                 type="number"
                                 min={1}
-                                value={visit.number_of_days || 1}
-                                onChange={(e) =>
+                                value={visit.number_of_days === 0 ? "" : visit.number_of_days || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
                                   handleUpdateVisit(
                                     visit.id,
                                     "number_of_days",
-                                    parseInt(e.target.value) || 1
-                                  )
-                                }
-                                disabled={isAutoCalculated}
-                                className={`h-8 text-sm ${isAutoCalculated ? "bg-muted cursor-not-allowed" : ""}`}
+                                    value === "" ? 1 : parseInt(value) || 1
+                                  );
+                                }}
+                                onBlur={(e) => {
+                                  // Ensure at least 1 on blur
+                                  if (!e.target.value || parseInt(e.target.value) < 1) {
+                                    handleUpdateVisit(visit.id, "number_of_days", 1);
+                                  }
+                                }}
+                                disabled={!isApproximate && isAutoCalculated}
+                                className={`h-8 text-sm ${!isApproximate && isAutoCalculated ? "bg-muted cursor-not-allowed" : ""}`}
+                                placeholder="Enter days"
                               />
-                              {!hasDateRange && (
+                              {isApproximate && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Enter how many days you spent on this trip
+                                </p>
+                              )}
+                              {!isApproximate && !hasDateRange && (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Select dates above or enter days manually
                                 </p>
