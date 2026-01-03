@@ -93,7 +93,8 @@ const Auth = () => {
       }
     } else {
       toast.success("Account created! Welcome to Family On The Fly!");
-      navigate("/");
+      // New users go to onboarding
+      navigate("/onboarding");
     }
   };
 
