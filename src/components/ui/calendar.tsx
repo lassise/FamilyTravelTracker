@@ -13,27 +13,27 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      captionLayout="buttons"
+      captionLayout="dropdown-buttons"
       fromYear={1950}
       toYear={currentYear + 5}
       className={cn("p-3 pointer-events-auto", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
-        caption: "flex justify-center pt-1 relative items-center h-9",
-        caption_label: "text-sm font-medium text-foreground",
-        caption_dropdowns: "hidden",
-        dropdown_month: "hidden",
-        dropdown_year: "hidden",
-        dropdown: "hidden",
-        vhidden: "hidden",
-        nav: "space-x-1 flex items-center",
+        month: "space-y-4 min-w-[280px]",
+        caption: "flex justify-center pt-1 relative items-center h-10 px-10",
+        caption_label: "hidden",
+        caption_dropdowns: "flex items-center gap-1",
+        dropdown_month: "relative inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-sm font-medium shadow-sm hover:bg-accent focus:outline-none",
+        dropdown_year: "relative inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-sm font-medium shadow-sm hover:bg-accent focus:outline-none",
+        dropdown: "absolute inset-0 w-full cursor-pointer opacity-0",
+        vhidden: "sr-only",
+        nav: "flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
         ),
-        nav_button_previous: "absolute left-1",
-        nav_button_next: "absolute right-1",
+        nav_button_previous: "absolute left-1 top-1/2 -translate-y-1/2",
+        nav_button_next: "absolute right-1 top-1/2 -translate-y-1/2",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell: "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
