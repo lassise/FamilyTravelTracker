@@ -498,6 +498,7 @@ const CountryVisitDetailsDialog = ({
   const [newVisits, setNewVisits] = useState<NewVisitDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const [expandedVisits, setExpandedVisits] = useState<Set<string>>(new Set());
+  const [tempDateRanges, setTempDateRanges] = useState<Record<string, DateRange | undefined>>({});
   const { toast } = useToast();
 
   const cities = getCitiesForCountry(countryCode);
@@ -814,13 +815,21 @@ const CountryVisitDetailsDialog = ({
                           }
                         : undefined;
 
+                    const displayedRange = tempDateRanges[visit.id] ?? dateRange;
+
                     const hasDateRange = visit.visit_date && visit.end_date;
                     const isAutoCalculated = hasDateRange && calculateDays(visit.visit_date, visit.end_date) !== null;
                     const isApproximate = visit.is_approximate || false;
 
                     const handleDateRangeChange = async (range: DateRange | undefined) => {
-                      const startDate = range?.from ? format(range.from, "yyyy-MM-dd") : null;
-                      const endDate = range?.to ? format(range.to, "yyyy-MM-dd") : null;
+                      setTempDateRanges((prev) => ({ ...prev, [visit.id]: range }));
+
+                      // In range mode, react-day-picker calls onSelect after *each* click.
+                      // Only persist once the user has picked both start + end.
+                      if (!range?.from || !range?.to) return;
+
+                      const startDate = format(range.from, "yyyy-MM-dd");
+                      const endDate = format(range.to, "yyyy-MM-dd");
 
                       let updateData: Record<string, string | number | null | boolean> = {
                         visit_date: startDate,
@@ -830,11 +839,9 @@ const CountryVisitDetailsDialog = ({
                         approximate_year: null,
                       };
 
-                      if (startDate && endDate) {
-                        const calculatedDays = calculateDays(startDate, endDate);
-                        if (calculatedDays) {
-                          updateData.number_of_days = calculatedDays;
-                        }
+                      const calculatedDays = calculateDays(startDate, endDate);
+                      if (calculatedDays) {
+                        updateData.number_of_days = calculatedDays;
                       }
 
                       const { error } = await supabase
@@ -845,6 +852,10 @@ const CountryVisitDetailsDialog = ({
                       if (error) {
                         toast({ title: "Error updating dates", variant: "destructive" });
                       } else {
+                        setTempDateRanges((prev) => {
+                          const { [visit.id]: _removed, ...rest } = prev;
+                          return rest;
+                        });
                         fetchData();
                       }
                     };
@@ -1018,21 +1029,30 @@ const CountryVisitDetailsDialog = ({
                                 ) : (
                                   <div>
                                     <Label className="text-xs mb-1 block">Travel Dates</Label>
-                                    <Popover>
+                                    <Popover
+                                      onOpenChange={(isOpen) => {
+                                        if (!isOpen) {
+                                          setTempDateRanges((prev) => {
+                                            const { [visit.id]: _removed, ...rest } = prev;
+                                            return rest;
+                                          });
+                                        }
+                                      }}
+                                    >
                                       <PopoverTrigger asChild>
                                         <Button
                                           variant="outline"
                                           className="w-full justify-start text-left font-normal h-9"
                                         >
                                           <Calendar className="mr-2 h-4 w-4" />
-                                          {dateRange?.from ? (
-                                            dateRange.to ? (
+                                          {displayedRange?.from ? (
+                                            displayedRange.to ? (
                                               <>
-                                                {format(dateRange.from, "MMM d, yyyy")} -{" "}
-                                                {format(dateRange.to, "MMM d, yyyy")}
+                                                {format(displayedRange.from, "MMM d, yyyy")} -{" "}
+                                                {format(displayedRange.to, "MMM d, yyyy")}
                                               </>
                                             ) : (
-                                              format(dateRange.from, "MMM d, yyyy")
+                                              format(displayedRange.from, "MMM d, yyyy")
                                             )
                                           ) : (
                                             <span className="text-muted-foreground">Pick travel dates</span>
@@ -1043,8 +1063,8 @@ const CountryVisitDetailsDialog = ({
                                         <CalendarComponent
                                           initialFocus
                                           mode="range"
-                                          defaultMonth={dateRange?.from}
-                                          selected={dateRange}
+                                          defaultMonth={displayedRange?.from}
+                                          selected={displayedRange}
                                           onSelect={handleDateRangeChange}
                                           numberOfMonths={2}
                                           className="pointer-events-auto"
