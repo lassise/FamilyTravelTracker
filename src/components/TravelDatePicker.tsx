@@ -93,7 +93,7 @@ export const TravelDatePicker = ({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 max-h-[85vh] overflow-auto" align="center" side="bottom" sideOffset={8}>
         <div className="p-3 border-b bg-muted/30">
           <div className="grid grid-cols-2 gap-3">
             <div className="p-2 rounded-md border border-border bg-background">
@@ -125,7 +125,8 @@ export const TravelDatePicker = ({
           selected={selectedRange}
           onSelect={handleRangeSelect}
           defaultMonth={localStartDate || localEndDate || new Date()}
-          className="pointer-events-auto"
+          className="pointer-events-auto p-4 scale-110 origin-top"
+          numberOfMonths={1}
         />
 
         <div className="p-3 border-t flex justify-end gap-2 bg-muted/30">

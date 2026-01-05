@@ -1039,16 +1039,16 @@ const CountryVisitDetailsDialog = ({
                       Add a city...
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
+                  <PopoverContent className="w-[280px] p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Search or type city name..." />
-                      <CommandList>
+                      <CommandList className="max-h-[200px] overflow-y-auto">
                         <CommandEmpty>
                           <Button
                             variant="ghost"
                             className="w-full justify-start"
                             onClick={(e) => {
-                              const input = (e.target as HTMLElement).closest('[role="dialog"]')?.querySelector('input');
+                              const input = (e.target as HTMLElement).closest('[cmdk-root]')?.querySelector('input');
                               if (input?.value) handleAddCity(input.value);
                             }}
                           >
@@ -1064,7 +1064,7 @@ const CountryVisitDetailsDialog = ({
                                   (c) => c.city_name.toLowerCase() === city.toLowerCase()
                                 )
                             )
-                            .slice(0, 30)
+                            .slice(0, 50)
                             .map((city) => (
                               <CommandItem
                                 key={city}
