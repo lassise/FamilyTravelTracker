@@ -2,3 +2,9 @@ project_id = "sqhikfqygphnemptxvoo"
 
 [functions.generate-itinerary]
 verify_jwt = true
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.generate-trip-suggestions]
+verify_jwt = false
