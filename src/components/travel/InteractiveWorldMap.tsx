@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Country } from '@/hooks/useFamilyData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Globe, MapPin } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 // Country to ISO 3166-1 alpha-3 mapping for Mapbox
 const countryToISO3: Record<string, string> = {
@@ -40,21 +40,26 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapToken, setMapToken] = useState<string | null>(null);
-  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
-  // Get visited country ISO codes
-  const visitedCountries = countries
-    .filter(c => c.visitedBy.length > 0)
-    .map(c => countryToISO3[c.name])
-    .filter(Boolean);
+  // Memoize country lists to prevent unnecessary recalculations
+  const visitedCountries = useMemo(() => 
+    countries
+      .filter(c => c.visitedBy.length > 0)
+      .map(c => countryToISO3[c.name])
+      .filter(Boolean),
+    [countries]
+  );
 
-  const wishlistCountries = countries
-    .filter(c => wishlist.includes(c.id))
-    .map(c => countryToISO3[c.name])
-    .filter(Boolean);
+  const wishlistCountries = useMemo(() => 
+    countries
+      .filter(c => wishlist.includes(c.id))
+      .map(c => countryToISO3[c.name])
+      .filter(Boolean),
+    [countries, wishlist]
+  );
 
   useEffect(() => {
-    // Fetch token from edge function
     const fetchToken = async () => {
       try {
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-mapbox-token`);
@@ -69,8 +74,9 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
     fetchToken();
   }, []);
 
+  // Initialize map once
   useEffect(() => {
-    if (!mapContainer.current || !mapToken) return;
+    if (!mapContainer.current || !mapToken || map.current) return;
 
     mapboxgl.accessToken = mapToken;
 
@@ -97,13 +103,11 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
         'horizon-blend': 0.2,
       });
 
-      // Add country fill layer for visited countries
       map.current?.addSource('countries', {
         type: 'vector',
         url: 'mapbox://mapbox.country-boundaries-v1',
       });
 
-      // Visited countries layer - primary color
       map.current?.addLayer({
         id: 'visited-countries',
         type: 'fill',
@@ -113,10 +117,9 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
           'fill-color': 'hsl(20, 90%, 58%)',
           'fill-opacity': 0.6,
         },
-        filter: ['in', 'iso_3166_1_alpha_3', ...visitedCountries],
+        filter: ['in', 'iso_3166_1_alpha_3', ''],
       });
 
-      // Wishlist countries layer - secondary color
       map.current?.addLayer({
         id: 'wishlist-countries',
         type: 'fill',
@@ -126,10 +129,9 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
           'fill-color': 'hsl(200, 85%, 55%)',
           'fill-opacity': 0.4,
         },
-        filter: ['in', 'iso_3166_1_alpha_3', ...wishlistCountries],
+        filter: ['in', 'iso_3166_1_alpha_3', ''],
       });
 
-      // Country borders
       map.current?.addLayer({
         id: 'country-borders',
         type: 'line',
@@ -140,11 +142,14 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
           'line-width': 0.5,
         },
       });
+
+      setIsMapReady(true);
     });
 
     // Slow rotation
     const secondsPerRevolution = 300;
     let userInteracting = false;
+    let animationId: number;
 
     function spinGlobe() {
       if (!map.current) return;
@@ -166,8 +171,17 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
 
     return () => {
       map.current?.remove();
+      map.current = null;
     };
-  }, [mapToken, visitedCountries, wishlistCountries]);
+  }, [mapToken]);
+
+  // Update filters when countries change (without re-creating map)
+  useEffect(() => {
+    if (!map.current || !isMapReady) return;
+
+    map.current.setFilter('visited-countries', ['in', 'iso_3166_1_alpha_3', ...visitedCountries]);
+    map.current.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
+  }, [visitedCountries, wishlistCountries, isMapReady]);
 
   if (!mapToken) {
     return (
