@@ -23,6 +23,7 @@ export const useFamilyData = () => {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [homeCountry, setHomeCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -62,6 +63,18 @@ export const useFamilyData = () => {
 
       if (wishlistError) throw wishlistError;
 
+      // Fetch home country from profile
+      const { data: { user } } = await supabase.auth.getUser();
+      let userHomeCountry: string | null = null;
+      if (user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("home_country")
+          .eq("id", user.id)
+          .single();
+        userHomeCountry = profileData?.home_country || null;
+      }
+
       // Calculate countries visited per family member
       const membersWithCount = membersData?.map((member) => {
         const visitCount = visitsData?.filter(
@@ -85,6 +98,7 @@ export const useFamilyData = () => {
       setFamilyMembers(membersWithCount);
       setCountries(countriesWithVisits);
       setWishlist(wishlistIds);
+      setHomeCountry(userHomeCountry);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -126,12 +140,15 @@ export const useFamilyData = () => {
   }, []);
 
   // Calculate total continents visited
-  const totalContinents = new Set(countries.map(c => c.continent)).size;
+  const totalContinents = new Set(
+    countries.filter(c => c.visitedBy.length > 0).map(c => c.continent)
+  ).size;
 
   return { 
     familyMembers, 
     countries, 
     wishlist,
+    homeCountry,
     loading, 
     refetch: fetchData,
     totalContinents 

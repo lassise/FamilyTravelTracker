@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Users, Globe, ArrowRight, ArrowLeft, Check, Plane } from "lucide-react";
+import { Users, Globe, ArrowRight, ArrowLeft, Check, Plane, Home } from "lucide-react";
 import FamilyMembersStep from "./FamilyMembersStep";
 import CountriesStep from "./CountriesStep";
+import HomeCountryStep from "./HomeCountryStep";
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -13,6 +14,7 @@ interface OnboardingWizardProps {
 const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [step, setStep] = useState(0);
   const [familyMembers, setFamilyMembers] = useState<Array<{ id: string; name: string }>>([]);
+  const [homeCountry, setHomeCountry] = useState<string | null>(null);
 
   const steps = [
     {
@@ -22,6 +24,16 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       component: (
         <FamilyMembersStep 
           onMembersChange={setFamilyMembers}
+        />
+      ),
+    },
+    {
+      title: "Where's Home?",
+      description: "Select your home country. It will be displayed on the map but won't count as a visited country.",
+      icon: Home,
+      component: (
+        <HomeCountryStep 
+          onHomeCountryChange={setHomeCountry}
         />
       ),
     },

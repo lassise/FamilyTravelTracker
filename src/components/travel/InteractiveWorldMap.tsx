@@ -34,9 +34,10 @@ const countryToISO3: Record<string, string> = {
 interface InteractiveWorldMapProps {
   countries: Country[];
   wishlist: string[];
+  homeCountry?: string | null;
 }
 
-const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) => {
+const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWorldMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapToken, setMapToken] = useState<string | null>(null);
@@ -57,6 +58,11 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
       .map(c => countryToISO3[c.name])
       .filter(Boolean),
     [countries, wishlist]
+  );
+
+  const homeCountryISO = useMemo(() => 
+    homeCountry ? countryToISO3[homeCountry] : null,
+    [homeCountry]
   );
 
   useEffect(() => {
@@ -87,6 +93,7 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
       zoom: 1.5,
       center: [30, 20],
       pitch: 20,
+      dragRotate: true,
     });
 
     map.current.addControl(
@@ -94,7 +101,9 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
       'top-right'
     );
 
-    map.current.scrollZoom.disable();
+    // Enable scroll zoom for better interaction
+    map.current.scrollZoom.enable();
+    map.current.dragPan.enable();
 
     map.current.on('style.load', () => {
       map.current?.setFog({
@@ -108,13 +117,27 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
         url: 'mapbox://mapbox.country-boundaries-v1',
       });
 
+      // Home country layer - purple/violet
+      map.current?.addLayer({
+        id: 'home-country',
+        type: 'fill',
+        source: 'countries',
+        'source-layer': 'country_boundaries',
+        paint: {
+          'fill-color': 'hsl(280, 70%, 50%)',
+          'fill-opacity': 0.5,
+        },
+        filter: ['in', 'iso_3166_1_alpha_3', ''],
+      });
+
+      // Visited countries layer - green
       map.current?.addLayer({
         id: 'visited-countries',
         type: 'fill',
         source: 'countries',
         'source-layer': 'country_boundaries',
         paint: {
-          'fill-color': 'hsl(20, 90%, 58%)',
+          'fill-color': 'hsl(142, 70%, 45%)',
           'fill-opacity': 0.6,
         },
         filter: ['in', 'iso_3166_1_alpha_3', ''],
@@ -146,29 +169,6 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
       setIsMapReady(true);
     });
 
-    // Slow rotation
-    const secondsPerRevolution = 300;
-    let userInteracting = false;
-    let animationId: number;
-
-    function spinGlobe() {
-      if (!map.current) return;
-      const zoom = map.current.getZoom();
-      if (!userInteracting && zoom < 3) {
-        const distancePerSecond = 360 / secondsPerRevolution;
-        const center = map.current.getCenter();
-        center.lng -= distancePerSecond / 60;
-        map.current.easeTo({ center, duration: 1000, easing: (n) => n });
-      }
-    }
-
-    map.current.on('mousedown', () => { userInteracting = true; });
-    map.current.on('mouseup', () => { userInteracting = false; spinGlobe(); });
-    map.current.on('touchend', () => { userInteracting = false; spinGlobe(); });
-    map.current.on('moveend', spinGlobe);
-
-    spinGlobe();
-
     return () => {
       map.current?.remove();
       map.current = null;
@@ -179,9 +179,10 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
   useEffect(() => {
     if (!map.current || !isMapReady) return;
 
+    map.current.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
     map.current.setFilter('visited-countries', ['in', 'iso_3166_1_alpha_3', ...visitedCountries]);
     map.current.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
-  }, [visitedCountries, wishlistCountries, isMapReady]);
+  }, [visitedCountries, wishlistCountries, homeCountryISO, isMapReady]);
 
   if (!mapToken) {
     return (
@@ -211,9 +212,15 @@ const InteractiveWorldMap = ({ countries, wishlist }: InteractiveWorldMapProps) 
           <Globe className="h-5 w-5 text-primary" />
           World Explorer
         </CardTitle>
-        <div className="flex gap-4 text-sm text-muted-foreground">
+        <div className="flex gap-4 text-sm text-muted-foreground flex-wrap">
+          {homeCountry && (
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded-full opacity-70" style={{ backgroundColor: 'hsl(280, 70%, 50%)' }} />
+              Home
+            </span>
+          )}
           <span className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-primary opacity-70" />
+            <div className="w-3 h-3 rounded-full opacity-70" style={{ backgroundColor: 'hsl(142, 70%, 45%)' }} />
             Visited ({visitedCountries.length})
           </span>
           <span className="flex items-center gap-1">

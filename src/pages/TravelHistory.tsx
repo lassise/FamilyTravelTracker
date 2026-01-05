@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TravelHistory = () => {
   const { user, loading: authLoading } = useAuth();
-  const { familyMembers, countries, wishlist, loading, refetch, totalContinents } = useFamilyData();
+  const { familyMembers, countries, wishlist, homeCountry, loading, refetch, totalContinents } = useFamilyData();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,7 +54,7 @@ const TravelHistory = () => {
 
         {/* Interactive World Map */}
         <div className="mb-8">
-          <InteractiveWorldMap countries={countries} wishlist={wishlist} />
+          <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} />
         </div>
 
         {/* Progress and Insights Row */}
