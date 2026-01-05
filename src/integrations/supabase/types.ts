@@ -1055,6 +1055,45 @@ export type Database = {
         }
         Relationships: []
       }
+      visit_family_members: {
+        Row: {
+          created_at: string | null
+          family_member_id: string
+          id: string
+          user_id: string
+          visit_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          family_member_id: string
+          id?: string
+          user_id: string
+          visit_id: string
+        }
+        Update: {
+          created_at?: string | null
+          family_member_id?: string
+          id?: string
+          user_id?: string
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visit_family_members_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visit_family_members_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "country_visit_details"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

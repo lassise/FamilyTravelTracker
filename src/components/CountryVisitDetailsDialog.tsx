@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, MapPin, Plus, Trash2, Clock, X, Edit3, Hash, CalendarDays, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -48,6 +49,12 @@ const calculateDays = (startDate: string | null, endDate: string | null): number
   return differenceInDays(end, start) + 1;
 };
 
+interface FamilyMember {
+  id: string;
+  name: string;
+  avatar: string;
+}
+
 // Local state interface for new visits being created
 interface NewVisitDraft {
   id: string;
@@ -59,6 +66,7 @@ interface NewVisitDraft {
   endDate: string | null;
   numberOfDays: number;
   cities: string[];
+  familyMemberIds: string[];
 }
 
 // Debounced input component for trip name
@@ -258,12 +266,14 @@ const NewVisitCard = ({
   draft,
   index,
   countryCode,
+  familyMembers,
   onUpdate,
   onRemove,
 }: {
   draft: NewVisitDraft;
   index: number;
   countryCode: string;
+  familyMembers: FamilyMember[];
   onUpdate: (id: string, updates: Partial<NewVisitDraft>) => void;
   onRemove: (id: string) => void;
 }) => {
@@ -300,6 +310,13 @@ const NewVisitCard = ({
       approximateMonth: null,
       approximateYear: null,
     });
+  };
+
+  const toggleFamilyMember = (memberId: string) => {
+    const newIds = draft.familyMemberIds.includes(memberId)
+      ? draft.familyMemberIds.filter((id) => id !== memberId)
+      : [...draft.familyMemberIds, memberId];
+    onUpdate(draft.id, { familyMemberIds: newIds });
   };
 
   return (
@@ -440,6 +457,31 @@ const NewVisitCard = ({
               }
             />
           </div>
+
+          {/* Family Members */}
+          {familyMembers.length > 0 && (
+            <div>
+              <Label className="text-xs mb-2 block flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                Who went on this trip? (optional)
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {familyMembers.map((member) => (
+                  <label
+                    key={member.id}
+                    className="flex items-center gap-1.5 text-xs cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={draft.familyMemberIds.includes(member.id)}
+                      onCheckedChange={() => toggleFamilyMember(member.id)}
+                    />
+                    <span>{member.avatar}</span>
+                    <span>{member.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -455,6 +497,8 @@ const CountryVisitDetailsDialog = ({
   const [open, setOpen] = useState(false);
   const [visitDetails, setVisitDetails] = useState<VisitDetail[]>([]);
   const [cityVisits, setCityVisits] = useState<CityVisit[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [visitFamilyMembers, setVisitFamilyMembers] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
   const [newVisits, setNewVisits] = useState<NewVisitDraft[]>([]);
   const [saving, setSaving] = useState(false);
@@ -466,7 +510,7 @@ const CountryVisitDetailsDialog = ({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [visitsResult, citiesResult] = await Promise.all([
+      const [visitsResult, citiesResult, familyResult] = await Promise.all([
         supabase
           .from("country_visit_details")
           .select("*")
@@ -477,13 +521,37 @@ const CountryVisitDetailsDialog = ({
           .select("*")
           .eq("country_id", countryId)
           .order("city_name", { ascending: true }),
+        supabase
+          .from("family_members")
+          .select("id, name, avatar")
+          .order("name", { ascending: true }),
       ]);
 
       if (visitsResult.error) throw visitsResult.error;
       if (citiesResult.error) throw citiesResult.error;
+      if (familyResult.error) throw familyResult.error;
 
       setVisitDetails(visitsResult.data || []);
       setCityVisits(citiesResult.data || []);
+      setFamilyMembers(familyResult.data || []);
+
+      // Fetch visit family member associations
+      if (visitsResult.data && visitsResult.data.length > 0) {
+        const visitIds = visitsResult.data.map((v) => v.id);
+        const { data: vfmData } = await supabase
+          .from("visit_family_members")
+          .select("visit_id, family_member_id")
+          .in("visit_id", visitIds);
+
+        if (vfmData) {
+          const mapping: Record<string, string[]> = {};
+          vfmData.forEach((item) => {
+            if (!mapping[item.visit_id]) mapping[item.visit_id] = [];
+            mapping[item.visit_id].push(item.family_member_id);
+          });
+          setVisitFamilyMembers(mapping);
+        }
+      }
     } catch (error) {
       console.error("Error fetching visit details:", error);
     } finally {
@@ -508,6 +576,7 @@ const CountryVisitDetailsDialog = ({
     endDate: null,
     numberOfDays: 1,
     cities: [],
+    familyMemberIds: [],
   });
 
   const handleAddNewVisitDraft = () => {
@@ -550,11 +619,28 @@ const CountryVisitDetailsDialog = ({
           user_id: user.id,
         };
 
-        const { error: visitError } = await supabase
+        const { data: insertedVisit, error: visitError } = await supabase
           .from("country_visit_details")
-          .insert(visitData);
+          .insert(visitData)
+          .select()
+          .single();
 
         if (visitError) throw visitError;
+
+        // Insert family member associations
+        if (draft.familyMemberIds.length > 0 && insertedVisit) {
+          const familyInserts = draft.familyMemberIds.map((memberId) => ({
+            visit_id: insertedVisit.id,
+            family_member_id: memberId,
+            user_id: user.id,
+          }));
+
+          const { error: familyError } = await supabase
+            .from("visit_family_members")
+            .insert(familyInserts);
+
+          if (familyError) console.error("Error saving family members:", familyError);
+        }
 
         // Insert cities for this visit
         if (draft.cities.length > 0) {
@@ -588,6 +674,44 @@ const CountryVisitDetailsDialog = ({
       toast({ title: "Error saving visits", variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleVisitFamilyMember = async (visitId: string, memberId: string) => {
+    const currentMembers = visitFamilyMembers[visitId] || [];
+    const isCurrentlySelected = currentMembers.includes(memberId);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (isCurrentlySelected) {
+        // Remove the association
+        await supabase
+          .from("visit_family_members")
+          .delete()
+          .eq("visit_id", visitId)
+          .eq("family_member_id", memberId);
+      } else {
+        // Add the association
+        await supabase
+          .from("visit_family_members")
+          .insert({
+            visit_id: visitId,
+            family_member_id: memberId,
+            user_id: user.id,
+          });
+      }
+
+      // Update local state
+      setVisitFamilyMembers((prev) => ({
+        ...prev,
+        [visitId]: isCurrentlySelected
+          ? currentMembers.filter((id) => id !== memberId)
+          : [...currentMembers, memberId],
+      }));
+    } catch (error) {
+      console.error("Error toggling family member:", error);
     }
   };
 
@@ -753,6 +877,7 @@ const CountryVisitDetailsDialog = ({
                       draft={draft}
                       index={index}
                       countryCode={countryCode}
+                      familyMembers={familyMembers}
                       onUpdate={handleUpdateNewVisitDraft}
                       onRemove={handleRemoveNewVisitDraft}
                     />
@@ -1014,6 +1139,31 @@ const CountryVisitDetailsDialog = ({
                                     onSave={(value) => handleUpdateVisit(visit.id, "number_of_days", value)}
                                   />
                                 </div>
+
+                                {/* Family Members */}
+                                {familyMembers.length > 0 && (
+                                  <div>
+                                    <Label className="text-xs mb-2 block flex items-center gap-1">
+                                      <Users className="w-3 h-3" />
+                                      Who went on this trip? (optional)
+                                    </Label>
+                                    <div className="flex flex-wrap gap-2">
+                                      {familyMembers.map((member) => (
+                                        <label
+                                          key={member.id}
+                                          className="flex items-center gap-1.5 text-xs cursor-pointer"
+                                        >
+                                          <Checkbox
+                                            checked={(visitFamilyMembers[visit.id] || []).includes(member.id)}
+                                            onCheckedChange={() => handleToggleVisitFamilyMember(visit.id, member.id)}
+                                          />
+                                          <span>{member.avatar}</span>
+                                          <span>{member.name}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </CardContent>
                           </CollapsibleContent>
