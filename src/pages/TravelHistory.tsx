@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFamilyData } from "@/hooks/useFamilyData";
@@ -18,34 +18,33 @@ import TripSuggestions from "@/components/travel/TripSuggestions";
 import TravelDNA from "@/components/travel/TravelDNA";
 import TravelStreaks from "@/components/travel/TravelStreaks";
 import CountryComparison from "@/components/travel/CountryComparison";
-import { Loader2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, BarChart3, Globe2, Trophy, Users, Map, Camera, Compass } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type TabKey = 'overview' | 'analytics' | 'achievements' | 'countries' | 'family' | 'memories';
+
+const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: 'overview', label: 'Overview', icon: Globe2 },
+  { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { key: 'achievements', label: 'Achievements', icon: Trophy },
+  { key: 'countries', label: 'Countries', icon: Map },
+  { key: 'memories', label: 'Memories', icon: Camera },
+  { key: 'family', label: 'Family', icon: Users },
+];
 
 const TravelHistory = () => {
   const { user, loading: authLoading } = useAuth();
   const { familyMembers, countries, wishlist, homeCountry, loading, refetch, totalContinents } = useFamilyData();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
-  // Extract home country code from homeCountry name
   const getHomeCountryCode = () => {
     if (!homeCountry) return 'US';
-    // Simple mapping for common countries
     const countryCodeMap: Record<string, string> = {
-      'united states': 'US',
-      'usa': 'US',
-      'canada': 'CA',
-      'united kingdom': 'GB',
-      'uk': 'GB',
-      'australia': 'AU',
-      'germany': 'DE',
-      'france': 'FR',
-      'italy': 'IT',
-      'spain': 'ES',
-      'japan': 'JP',
-      'china': 'CN',
-      'india': 'IN',
-      'brazil': 'BR',
-      'mexico': 'MX',
+      'united states': 'US', 'usa': 'US', 'canada': 'CA', 'united kingdom': 'GB',
+      'uk': 'GB', 'australia': 'AU', 'germany': 'DE', 'france': 'FR',
+      'italy': 'IT', 'spain': 'ES', 'japan': 'JP', 'china': 'CN',
+      'india': 'IN', 'brazil': 'BR', 'mexico': 'MX',
     };
     return countryCodeMap[homeCountry.toLowerCase()] || 'US';
   };
@@ -69,107 +68,120 @@ const TravelHistory = () => {
     );
   }
 
+  const visitedCountriesCount = countries.filter(c => c.visitedBy.length > 0).length;
+
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-8">
-        {/* Quick Stats Dashboard - Hero Section */}
+      <div className="container mx-auto px-4 py-6">
+        {/* Quick Stats - Always visible */}
         <QuickStatsDashboard 
-          totalCountries={countries.filter(c => c.visitedBy.length > 0).length}
+          totalCountries={visitedCountriesCount}
           totalContinents={totalContinents}
           familyMembers={familyMembers}
         />
 
-        {/* Interactive World Map */}
-        <div className="mb-8">
-          <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} />
+        {/* Tab Navigation */}
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border -mx-4 px-4 mt-6">
+          <nav className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
+                    activeTab === tab.key
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Travel DNA and Streaks - New insights row */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <TravelDNA 
-            countries={countries} 
-            homeCountryCode={getHomeCountryCode()}
-          />
-          <TravelStreaks />
-        </div>
+        {/* Tab Content */}
+        <div className="mt-6">
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} />
+              <div className="grid lg:grid-cols-2 gap-6">
+                <TravelDNA countries={countries} homeCountryCode={getHomeCountryCode()} />
+                <TravelStreaks />
+              </div>
+            </div>
+          )}
 
-        {/* Progress and Insights Row */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <ContinentProgressRings countries={countries} />
-          <CountryComparison countries={countries} />
-        </div>
+          {activeTab === 'analytics' && (
+            <div className="space-y-6">
+              <div className="grid lg:grid-cols-2 gap-6">
+                <ContinentProgressRings countries={countries} />
+                <CountryComparison countries={countries} />
+              </div>
+              <TravelHeatmapCalendar />
+            </div>
+          )}
 
-        {/* Heatmap Calendar */}
-        <div className="mb-8">
-          <TravelHeatmapCalendar />
-        </div>
+          {activeTab === 'achievements' && (
+            <AchievementsGoals 
+              countries={countries} 
+              familyMembers={familyMembers}
+              totalContinents={totalContinents}
+            />
+          )}
 
-        {/* Achievements and Goals */}
-        <div className="mb-8">
-          <AchievementsGoals 
-            countries={countries} 
-            familyMembers={familyMembers}
-            totalContinents={totalContinents}
-          />
-        </div>
-
-        {/* Tabs for Timeline, Photos, and Suggestions */}
-        <Tabs defaultValue="timeline" className="mb-8">
-          <TabsList className="grid w-full grid-cols-3 max-w-md mx-auto">
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="photos">Photos</TabsTrigger>
-            <TabsTrigger value="suggestions">Next Trip</TabsTrigger>
-          </TabsList>
-          <TabsContent value="timeline" className="mt-6">
-            <TravelTimeline countries={countries} />
-          </TabsContent>
-          <TabsContent value="photos" className="mt-6">
-            <PhotoGallery countries={countries} />
-          </TabsContent>
-          <TabsContent value="suggestions" className="mt-6">
-            <TripSuggestions countries={countries} wishlist={wishlist} />
-          </TabsContent>
-        </Tabs>
-
-        {/* Country Tracker */}
-        <CountryTracker 
-          countries={countries} 
-          familyMembers={familyMembers}
-          onUpdate={refetch}
-        />
-
-        {/* Wishlist Section */}
-        <section className="py-12">
-          <CountryWishlist 
-            countries={countries}
-            wishlist={wishlist}
-            onUpdate={refetch}
-          />
-        </section>
-        
-        {/* Family Members Section */}
-        <section className="py-12">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Family Members
-            </h2>
-            <p className="text-muted-foreground mb-4">
-              Track each family member's travel adventures
-            </p>
-            <FamilyMemberDialog onSuccess={refetch} />
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {familyMembers.map((member) => (
-              <FamilyMember 
-                key={member.id} 
-                {...member} 
-                countries={countries}
-                onUpdate={refetch} 
+          {activeTab === 'countries' && (
+            <div className="space-y-8">
+              <CountryTracker 
+                countries={countries} 
+                familyMembers={familyMembers}
+                onUpdate={refetch}
               />
-            ))}
-          </div>
-        </section>
+              <CountryWishlist 
+                countries={countries}
+                wishlist={wishlist}
+                onUpdate={refetch}
+              />
+            </div>
+          )}
+
+          {activeTab === 'memories' && (
+            <div className="space-y-6">
+              <TravelTimeline countries={countries} />
+              <PhotoGallery countries={countries} />
+              <TripSuggestions countries={countries} wishlist={wishlist} />
+            </div>
+          )}
+
+          {activeTab === 'family' && (
+            <div>
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  Family Members
+                </h2>
+                <p className="text-muted-foreground mb-4">
+                  Track each family member's travel adventures
+                </p>
+                <FamilyMemberDialog onSuccess={refetch} />
+              </div>
+              
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {familyMembers.map((member) => (
+                  <FamilyMember 
+                    key={member.id} 
+                    {...member} 
+                    countries={countries}
+                    onUpdate={refetch} 
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </AppLayout>
   );
