@@ -734,6 +734,48 @@ export type Database = {
           },
         ]
       }
+      share_profiles: {
+        Row: {
+          created_at: string
+          custom_headline: string | null
+          id: string
+          is_public: boolean | null
+          share_token: string
+          show_map: boolean | null
+          show_photos: boolean | null
+          show_stats: boolean | null
+          show_wishlist: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_headline?: string | null
+          id?: string
+          is_public?: boolean | null
+          share_token?: string
+          show_map?: boolean | null
+          show_photos?: boolean | null
+          show_stats?: boolean | null
+          show_wishlist?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_headline?: string | null
+          id?: string
+          is_public?: boolean | null
+          share_token?: string
+          show_map?: boolean | null
+          show_photos?: boolean | null
+          show_stats?: boolean | null
+          show_wishlist?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       travel_goals: {
         Row: {
           completed_at: string | null

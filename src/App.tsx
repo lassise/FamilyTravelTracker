@@ -11,6 +11,9 @@ import NewTrip from "./pages/NewTrip";
 import TripDetail from "./pages/TripDetail";
 import TravelHistory from "./pages/TravelHistory";
 import Onboarding from "./pages/Onboarding";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Highlights from "./pages/Highlights";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +33,9 @@ const App = () => (
             <Route path="/trips/new" element={<NewTrip />} />
             <Route path="/trips/:tripId" element={<TripDetail />} />
             <Route path="/travel-history" element={<TravelHistory />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/highlights/:token" element={<Highlights />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
