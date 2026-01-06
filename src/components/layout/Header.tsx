@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,10 @@ import {
   Settings,
   Map,
   Luggage,
-  Globe
+  Globe,
+  History,
+  Share2,
+  ChevronDown
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -48,10 +52,17 @@ const Header = () => {
       .slice(0, 2);
   };
 
-  const navLinks = [
+  // Primary nav - focused on travel history
+  const primaryLinks = [
     { href: "/", label: "Home", icon: Globe },
+    { href: "/travel-history", label: "Travel History", icon: History },
+  ];
+
+  // Trip planning links (moved to dropdown)
+  const tripPlanningLinks = [
     { href: "/trips", label: "My Trips", icon: Luggage },
-    { href: "/explore", label: "Explore", icon: Map },
+    { href: "/trips/new", label: "Plan New Trip", icon: Plus },
+    { href: "/explore", label: "Explore Destinations", icon: Map },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -71,7 +82,7 @@ const Header = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map((link) => (
+          {primaryLinks.map((link) => (
             <Link
               key={link.href}
               to={link.href}
@@ -84,6 +95,40 @@ const Header = () => {
               {link.label}
             </Link>
           ))}
+          
+          {/* Trip Planning Dropdown */}
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className={`px-4 py-2 text-sm font-medium ${
+                    ['/trips', '/trips/new', '/explore'].some(p => location.pathname.startsWith(p))
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Trip Planning
+                  <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-48">
+                {tripPlanningLinks.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <DropdownMenuItem 
+                      key={link.href} 
+                      onClick={() => navigate(link.href)}
+                      className="cursor-pointer"
+                    >
+                      <Icon className="mr-2 h-4 w-4" />
+                      {link.label}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </nav>
 
         {/* Actions */}
@@ -93,7 +138,7 @@ const Header = () => {
             {searchOpen ? (
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Search trips, places..."
+                  placeholder="Search countries, trips..."
                   className="w-64"
                   autoFocus
                   onBlur={() => setSearchOpen(false)}
@@ -119,16 +164,6 @@ const Header = () => {
 
           {user ? (
             <>
-              {/* Create Trip Button */}
-              <Button
-                onClick={() => navigate("/trips/new")}
-                size="sm"
-                className="hidden sm:flex"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Trip
-              </Button>
-
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -162,6 +197,22 @@ const Header = () => {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    Trip Planning
+                  </DropdownMenuLabel>
+                  {tripPlanningLinks.map((link) => {
+                    const Icon = link.icon;
+                    return (
+                      <DropdownMenuItem 
+                        key={link.href} 
+                        onClick={() => navigate(link.href)}
+                      >
+                        <Icon className="mr-2 h-4 w-4" />
+                        {link.label}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
@@ -190,9 +241,10 @@ const Header = () => {
                   <Input placeholder="Search..." className="pl-9" />
                 </div>
 
-                {/* Mobile Nav Links */}
+                {/* Primary Nav Links */}
                 <nav className="flex flex-col gap-1">
-                  {navLinks.map((link) => {
+                  <p className="text-xs font-medium text-muted-foreground px-4 mb-1">Explore</p>
+                  {primaryLinks.map((link) => {
                     const Icon = link.icon;
                     return (
                       <Link
@@ -213,16 +265,30 @@ const Header = () => {
                 </nav>
 
                 {user && (
-                  <Button
-                    onClick={() => {
-                      navigate("/trips/new");
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create New Trip
-                  </Button>
+                  <>
+                    {/* Trip Planning Links */}
+                    <nav className="flex flex-col gap-1 border-t border-border pt-4">
+                      <p className="text-xs font-medium text-muted-foreground px-4 mb-1">Trip Planning</p>
+                      {tripPlanningLinks.map((link) => {
+                        const Icon = link.icon;
+                        return (
+                          <Link
+                            key={link.href}
+                            to={link.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                              isActive(link.href)
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            <Icon className="h-5 w-5" />
+                            {link.label}
+                          </Link>
+                        );
+                      })}
+                    </nav>
+                  </>
                 )}
               </div>
             </SheetContent>
