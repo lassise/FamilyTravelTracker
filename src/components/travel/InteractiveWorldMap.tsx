@@ -128,9 +128,9 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/light-v11',
       projection: 'globe',
-      zoom: homeCountryISO ? 3 : 1.5,
+      zoom: homeCountryISO ? 1.8 : 1.2,
       center: initialCenter,
-      pitch: 20,
+      pitch: 15,
       dragRotate: true,
     });
 
