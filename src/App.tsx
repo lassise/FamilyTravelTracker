@@ -14,6 +14,7 @@ import Onboarding from "./pages/Onboarding";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Highlights from "./pages/Highlights";
+import Explore from "./pages/Explore";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/highlights/:token" element={<Highlights />} />
+            <Route path="/explore" element={<Explore />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

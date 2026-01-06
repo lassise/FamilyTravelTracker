@@ -18,6 +18,8 @@ import TripSuggestions from "@/components/travel/TripSuggestions";
 import TravelDNA from "@/components/travel/TravelDNA";
 import TravelStreaks from "@/components/travel/TravelStreaks";
 import CountryComparison from "@/components/travel/CountryComparison";
+import BucketListTracker from "@/components/travel/BucketListTracker";
+import TravelMilestones from "@/components/travel/TravelMilestones";
 import { Loader2, BarChart3, Globe2, Trophy, Users, Map, Camera, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -72,43 +74,64 @@ const TravelHistory = () => {
 
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-6">
-        {/* Quick Stats - Always visible */}
-        <QuickStatsDashboard 
-          totalCountries={visitedCountriesCount}
-          totalContinents={totalContinents}
-          familyMembers={familyMembers}
-        />
-
-        {/* Tab Navigation */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border -mx-4 px-4 mt-6">
-          <nav className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all",
-                    activeTab === tab.key
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+      <div className="min-h-screen">
+        {/* Sticky Header with Stats + Navigation */}
+        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
+          <div className="container mx-auto px-4 py-4">
+            {/* Compact Stats Row */}
+            <div className="flex items-center justify-between mb-3">
+              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Travel History
+              </h1>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Globe2 className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-foreground">{visitedCountriesCount}</span>
+                  <span className="text-muted-foreground hidden sm:inline">countries</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Map className="h-4 w-4 text-secondary" />
+                  <span className="font-semibold text-foreground">{totalContinents}</span>
+                  <span className="text-muted-foreground hidden sm:inline">continents</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-accent" />
+                  <span className="font-semibold text-foreground">{familyMembers.length}</span>
+                  <span className="text-muted-foreground hidden sm:inline">travelers</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Tab Navigation */}
+            <nav className="flex gap-1 overflow-x-auto scrollbar-hide -mb-4 pb-4">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
+                      activeTab === tab.key
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
         </div>
 
         {/* Tab Content */}
-        <div className="mt-6">
+        <div className="container mx-auto px-4 py-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} />
+              <TravelMilestones countries={countries} familyMembers={familyMembers} totalContinents={totalContinents} />
               <div className="grid lg:grid-cols-2 gap-6">
                 <TravelDNA countries={countries} homeCountryCode={getHomeCountryCode()} />
                 <TravelStreaks />
@@ -127,11 +150,14 @@ const TravelHistory = () => {
           )}
 
           {activeTab === 'achievements' && (
-            <AchievementsGoals 
-              countries={countries} 
-              familyMembers={familyMembers}
-              totalContinents={totalContinents}
-            />
+            <div className="space-y-6">
+              <AchievementsGoals 
+                countries={countries} 
+                familyMembers={familyMembers}
+                totalContinents={totalContinents}
+              />
+              <BucketListTracker />
+            </div>
           )}
 
           {activeTab === 'countries' && (
