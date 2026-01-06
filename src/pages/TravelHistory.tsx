@@ -15,6 +15,9 @@ import AchievementsGoals from "@/components/travel/AchievementsGoals";
 import PhotoGallery from "@/components/travel/PhotoGallery";
 import TravelHeatmapCalendar from "@/components/travel/TravelHeatmapCalendar";
 import TripSuggestions from "@/components/travel/TripSuggestions";
+import TravelDNA from "@/components/travel/TravelDNA";
+import TravelStreaks from "@/components/travel/TravelStreaks";
+import CountryComparison from "@/components/travel/CountryComparison";
 import { Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -22,6 +25,30 @@ const TravelHistory = () => {
   const { user, loading: authLoading } = useAuth();
   const { familyMembers, countries, wishlist, homeCountry, loading, refetch, totalContinents } = useFamilyData();
   const navigate = useNavigate();
+
+  // Extract home country code from homeCountry name
+  const getHomeCountryCode = () => {
+    if (!homeCountry) return 'US';
+    // Simple mapping for common countries
+    const countryCodeMap: Record<string, string> = {
+      'united states': 'US',
+      'usa': 'US',
+      'canada': 'CA',
+      'united kingdom': 'GB',
+      'uk': 'GB',
+      'australia': 'AU',
+      'germany': 'DE',
+      'france': 'FR',
+      'italy': 'IT',
+      'spain': 'ES',
+      'japan': 'JP',
+      'china': 'CN',
+      'india': 'IN',
+      'brazil': 'BR',
+      'mexico': 'MX',
+    };
+    return countryCodeMap[homeCountry.toLowerCase()] || 'US';
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -57,9 +84,23 @@ const TravelHistory = () => {
           <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} />
         </div>
 
+        {/* Travel DNA and Streaks - New insights row */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <TravelDNA 
+            countries={countries} 
+            homeCountryCode={getHomeCountryCode()}
+          />
+          <TravelStreaks />
+        </div>
+
         {/* Progress and Insights Row */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <ContinentProgressRings countries={countries} />
+          <CountryComparison countries={countries} />
+        </div>
+
+        {/* Heatmap Calendar */}
+        <div className="mb-8">
           <TravelHeatmapCalendar />
         </div>
 

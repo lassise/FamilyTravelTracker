@@ -41,15 +41,22 @@ interface Goal {
 }
 
 const ACHIEVEMENTS: Achievement[] = [
-  { key: 'first_country', name: 'First Steps', description: 'Visit your first country', icon: Globe, color: 'bg-primary', requirement: 1, type: 'countries' },
-  { key: 'five_countries', name: 'Explorer', description: 'Visit 5 countries', icon: Map, color: 'bg-secondary', requirement: 5, type: 'countries' },
-  { key: 'ten_countries', name: 'Adventurer', description: 'Visit 10 countries', icon: Plane, color: 'bg-accent', requirement: 10, type: 'countries' },
-  { key: 'twenty_countries', name: 'Globetrotter', description: 'Visit 20 countries', icon: Star, color: 'bg-primary', requirement: 20, type: 'countries' },
-  { key: 'thirty_countries', name: 'World Traveler', description: 'Visit 30 countries', icon: Award, color: 'bg-secondary', requirement: 30, type: 'countries' },
-  { key: 'fifty_countries', name: 'Legendary Explorer', description: 'Visit 50 countries', icon: Crown, color: 'bg-accent', requirement: 50, type: 'countries' },
-  { key: 'three_continents', name: 'Continental', description: 'Visit 3 continents', icon: Medal, color: 'bg-primary', requirement: 3, type: 'continents' },
-  { key: 'five_continents', name: 'Global Citizen', description: 'Visit 5 continents', icon: Trophy, color: 'bg-secondary', requirement: 5, type: 'continents' },
-  { key: 'all_continents', name: 'World Conqueror', description: 'Visit all 7 continents', icon: Gem, color: 'bg-accent', requirement: 7, type: 'continents' },
+  // Country milestones
+  { key: 'first_country', name: 'First Steps', description: 'Visit your first country', icon: Globe, color: 'bg-emerald-500', requirement: 1, type: 'countries' },
+  { key: 'five_countries', name: 'Explorer', description: 'Visit 5 countries', icon: Map, color: 'bg-blue-500', requirement: 5, type: 'countries' },
+  { key: 'ten_countries', name: 'Adventurer', description: 'Visit 10 countries', icon: Plane, color: 'bg-cyan-500', requirement: 10, type: 'countries' },
+  { key: 'twenty_countries', name: 'Globetrotter', description: 'Visit 20 countries', icon: Star, color: 'bg-purple-500', requirement: 20, type: 'countries' },
+  { key: 'twentyfive_countries', name: 'Quarter Century', description: 'Visit 25 countries', icon: Medal, color: 'bg-amber-500', requirement: 25, type: 'countries' },
+  { key: 'thirty_countries', name: 'World Traveler', description: 'Visit 30 countries', icon: Award, color: 'bg-orange-500', requirement: 30, type: 'countries' },
+  { key: 'forty_countries', name: 'Elite Explorer', description: 'Visit 40 countries', icon: Crown, color: 'bg-rose-500', requirement: 40, type: 'countries' },
+  { key: 'fifty_countries', name: 'Legendary', description: 'Visit 50 countries', icon: Gem, color: 'bg-violet-500', requirement: 50, type: 'countries' },
+  { key: 'hundred_countries', name: 'Century Club', description: 'Visit 100 countries', icon: Trophy, color: 'bg-gradient-to-r from-amber-500 to-yellow-500', requirement: 100, type: 'countries' },
+  // Continent milestones
+  { key: 'two_continents', name: 'Continental Start', description: 'Visit 2 continents', icon: Globe, color: 'bg-teal-500', requirement: 2, type: 'continents' },
+  { key: 'three_continents', name: 'Continental', description: 'Visit 3 continents', icon: Map, color: 'bg-indigo-500', requirement: 3, type: 'continents' },
+  { key: 'five_continents', name: 'Global Citizen', description: 'Visit 5 continents', icon: Plane, color: 'bg-pink-500', requirement: 5, type: 'continents' },
+  { key: 'six_continents', name: 'Almost There', description: 'Visit 6 continents', icon: Star, color: 'bg-fuchsia-500', requirement: 6, type: 'continents' },
+  { key: 'all_continents', name: 'World Conqueror', description: 'Visit all 7 continents', icon: Crown, color: 'bg-gradient-to-r from-purple-500 to-pink-500', requirement: 7, type: 'continents' },
 ];
 
 const AchievementsGoals = ({ countries, familyMembers, totalContinents }: AchievementsGoalsProps) => {
