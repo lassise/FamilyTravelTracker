@@ -161,6 +161,7 @@ export type Database = {
           is_approximate: boolean | null
           notes: string | null
           number_of_days: number | null
+          trip_group_id: string | null
           trip_name: string | null
           updated_at: string | null
           user_id: string | null
@@ -176,6 +177,7 @@ export type Database = {
           is_approximate?: boolean | null
           notes?: string | null
           number_of_days?: number | null
+          trip_group_id?: string | null
           trip_name?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -191,6 +193,7 @@ export type Database = {
           is_approximate?: boolean | null
           notes?: string | null
           number_of_days?: number | null
+          trip_group_id?: string | null
           trip_name?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -849,6 +852,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      travel_preferences: {
+        Row: {
+          accommodation_preference: string[] | null
+          avoid_preferences: string[] | null
+          budget_preference: string | null
+          created_at: string
+          disliked_countries: string[] | null
+          id: string
+          interests: string[] | null
+          liked_countries: string[] | null
+          pace_preference: string | null
+          travel_style: string[] | null
+          travel_with: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accommodation_preference?: string[] | null
+          avoid_preferences?: string[] | null
+          budget_preference?: string | null
+          created_at?: string
+          disliked_countries?: string[] | null
+          id?: string
+          interests?: string[] | null
+          liked_countries?: string[] | null
+          pace_preference?: string | null
+          travel_style?: string[] | null
+          travel_with?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accommodation_preference?: string[] | null
+          avoid_preferences?: string[] | null
+          budget_preference?: string | null
+          created_at?: string
+          disliked_countries?: string[] | null
+          id?: string
+          interests?: string[] | null
+          liked_countries?: string[] | null
+          pace_preference?: string | null
+          travel_style?: string[] | null
+          travel_with?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       travel_settings: {
         Row: {

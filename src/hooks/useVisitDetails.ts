@@ -9,6 +9,7 @@ export interface VisitDetail {
   number_of_days: number | null;
   notes: string | null;
   trip_name: string | null;
+  trip_group_id: string | null;
   approximate_year: number | null;
   approximate_month: number | null;
   is_approximate: boolean | null;

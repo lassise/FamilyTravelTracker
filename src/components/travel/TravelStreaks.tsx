@@ -1,13 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Flame, Calendar, TrendingUp, Zap, Clock, Target } from "lucide-react";
+import { Flame, Calendar, TrendingUp, Zap, Clock, Target, Globe, Plane, Trophy } from "lucide-react";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
-import { differenceInDays, parseISO, getYear, format } from "date-fns";
+import { differenceInDays, parseISO, getYear, format, isWithinInterval, addDays } from "date-fns";
 
 const TravelStreaks = () => {
   const { visitDetails } = useVisitDetails();
   
-  // Calculate streaks and time-based stats
   const stats = calculateStats();
   
   function calculateStats() {
@@ -16,6 +15,7 @@ const TravelStreaks = () => {
       .map(v => ({
         ...v,
         date: parseISO(v.visit_date!),
+        endDate: v.end_date ? parseISO(v.end_date) : parseISO(v.visit_date!),
         year: getYear(parseISO(v.visit_date!))
       }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -23,7 +23,7 @@ const TravelStreaks = () => {
     // Days since last adventure
     const mostRecentVisit = visitsWithDates[visitsWithDates.length - 1];
     const daysSinceLastTrip = mostRecentVisit 
-      ? differenceInDays(new Date(), mostRecentVisit.date)
+      ? differenceInDays(new Date(), mostRecentVisit.endDate)
       : null;
     
     // Get unique years with travel
@@ -34,7 +34,6 @@ const TravelStreaks = () => {
     let maxStreak = 0;
     const currentYear = new Date().getFullYear();
     
-    // Check backward from current year
     for (let year = currentYear; year >= Math.min(...yearsWithTravel, currentYear - 20); year--) {
       if (yearsWithTravel.includes(year)) {
         currentStreak++;
@@ -44,7 +43,6 @@ const TravelStreaks = () => {
       }
     }
     
-    // Calculate longest streak in history
     let tempStreak = 0;
     yearsWithTravel.forEach((year, index) => {
       if (index === 0 || year === yearsWithTravel[index - 1] + 1) {
@@ -52,6 +50,66 @@ const TravelStreaks = () => {
         maxStreak = Math.max(maxStreak, tempStreak);
       } else {
         tempStreak = 1;
+      }
+    });
+    
+    // Calculate consecutive days abroad (longest streak)
+    let maxConsecutiveDaysAbroad = 0;
+    let currentConsecutiveDays = 0;
+    
+    // Merge overlapping/adjacent trips to calculate consecutive days
+    const sortedVisits = [...visitsWithDates].sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    if (sortedVisits.length > 0) {
+      let mergedPeriods: { start: Date; end: Date }[] = [];
+      let currentPeriod = { start: sortedVisits[0].date, end: sortedVisits[0].endDate };
+      
+      for (let i = 1; i < sortedVisits.length; i++) {
+        const visit = sortedVisits[i];
+        // If this visit starts within 1 day of current period end, extend it
+        if (differenceInDays(visit.date, currentPeriod.end) <= 1) {
+          currentPeriod.end = visit.endDate > currentPeriod.end ? visit.endDate : currentPeriod.end;
+        } else {
+          mergedPeriods.push(currentPeriod);
+          currentPeriod = { start: visit.date, end: visit.endDate };
+        }
+      }
+      mergedPeriods.push(currentPeriod);
+      
+      // Find the longest continuous period
+      mergedPeriods.forEach(period => {
+        const days = differenceInDays(period.end, period.start) + 1;
+        if (days > maxConsecutiveDaysAbroad) {
+          maxConsecutiveDaysAbroad = days;
+        }
+      });
+
+      // Check if currently abroad
+      const today = new Date();
+      const latestPeriod = mergedPeriods[mergedPeriods.length - 1];
+      if (latestPeriod && today >= latestPeriod.start && today <= latestPeriod.end) {
+        currentConsecutiveDays = differenceInDays(today, latestPeriod.start) + 1;
+      }
+    }
+
+    // Most countries visited in one trip (by trip_group_id or trip_name)
+    const tripGroups: Map<string, Set<string>> = new Map();
+    visitsWithDates.forEach(visit => {
+      const tripKey = visit.trip_group_id || visit.trip_name || visit.visit_date;
+      if (tripKey) {
+        if (!tripGroups.has(tripKey)) {
+          tripGroups.set(tripKey, new Set());
+        }
+        tripGroups.get(tripKey)!.add(visit.country_id);
+      }
+    });
+    
+    let maxCountriesInOneTrip = 0;
+    let bestMultiCountryTrip = "";
+    tripGroups.forEach((countries, tripName) => {
+      if (countries.size > maxCountriesInOneTrip) {
+        maxCountriesInOneTrip = countries.size;
+        bestMultiCountryTrip = tripName;
       }
     });
     
@@ -70,11 +128,21 @@ const TravelStreaks = () => {
     
     const thisYearCountries = countriesPerYear[currentYear]?.size || 0;
     
-    // Total trips (visits) count
+    // Total trips count
     const totalTrips = visitDetails.length;
     
-    // Months until year end - motivation for goals
+    // Unique trips (by trip_name or trip_group_id)
+    const uniqueTrips = new Set(
+      visitDetails
+        .filter(v => v.trip_name || v.trip_group_id)
+        .map(v => v.trip_group_id || v.trip_name)
+    ).size;
+    
+    // Months until year end
     const monthsLeft = 12 - new Date().getMonth();
+    
+    // Total days abroad
+    const totalDaysAbroad = visitDetails.reduce((sum, v) => sum + (v.number_of_days || 0), 0);
     
     return {
       daysSinceLastTrip,
@@ -84,12 +152,17 @@ const TravelStreaks = () => {
       bestYear,
       thisYearCountries,
       totalTrips,
+      uniqueTrips,
       monthsLeft,
       mostRecentVisit,
+      maxConsecutiveDaysAbroad,
+      currentConsecutiveDays,
+      maxCountriesInOneTrip,
+      bestMultiCountryTrip,
+      totalDaysAbroad,
     };
   }
   
-  // Determine urgency level for "days since" display
   const getUrgencyColor = (days: number | null) => {
     if (days === null) return "text-muted-foreground";
     if (days <= 30) return "text-emerald-500";
@@ -112,11 +185,11 @@ const TravelStreaks = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
           <Flame className="h-5 w-5 text-orange-500" />
-          Travel Streaks & Timing
+          Travel Streaks & Records
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Days Since Last Adventure - Hero stat */}
+        {/* Days Since Last Adventure */}
         <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -134,6 +207,51 @@ const TravelStreaks = () => {
             {getUrgencyMessage(stats.daysSinceLastTrip)}
           </p>
         </div>
+
+        {/* Records Row */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Longest Trip */}
+          <div className="p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2 mb-1">
+              <Trophy className="w-4 h-4 text-yellow-500" />
+              <span className="text-xs text-muted-foreground">Longest Trip</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-foreground">{stats.maxConsecutiveDaysAbroad}</span>
+              <span className="text-xs text-muted-foreground">days</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Consecutive days abroad
+            </p>
+          </div>
+
+          {/* Most Countries One Trip */}
+          <div className="p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2 mb-1">
+              <Globe className="w-4 h-4 text-blue-500" />
+              <span className="text-xs text-muted-foreground">Multi-Country Record</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-foreground">{stats.maxCountriesInOneTrip}</span>
+              <span className="text-xs text-muted-foreground">countries</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              In one trip
+            </p>
+          </div>
+        </div>
+
+        {/* Currently Abroad Indicator */}
+        {stats.currentConsecutiveDays > 0 && (
+          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+            <div className="flex items-center gap-2">
+              <Plane className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                Currently Abroad: Day {stats.currentConsecutiveDays}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Streaks Row */}
         <div className="grid grid-cols-2 gap-3">
@@ -200,11 +318,16 @@ const TravelStreaks = () => {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
+          <div className="text-center p-2 rounded-lg bg-muted/20">
+            <Plane className="w-4 h-4 mx-auto mb-1 text-blue-500" />
+            <p className="text-lg font-bold text-foreground">{stats.totalDaysAbroad}</p>
+            <p className="text-xs text-muted-foreground">Days Abroad</p>
+          </div>
           <div className="text-center p-2 rounded-lg bg-muted/20">
             <Zap className="w-4 h-4 mx-auto mb-1 text-yellow-500" />
             <p className="text-lg font-bold text-foreground">{stats.totalTrips}</p>
-            <p className="text-xs text-muted-foreground">Total Trips</p>
+            <p className="text-xs text-muted-foreground">Visits</p>
           </div>
           <div className="text-center p-2 rounded-lg bg-muted/20">
             <Calendar className="w-4 h-4 mx-auto mb-1 text-blue-500" />
