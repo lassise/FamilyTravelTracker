@@ -40,6 +40,12 @@ const TravelHistory = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
+  // Reset scroll to top when tab changes
+  const handleTabChange = (tab: TabKey) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
   const getHomeCountryCode = () => {
     if (!homeCountry) return 'US';
     const countryCodeMap: Record<string, string> = {
@@ -76,8 +82,8 @@ const TravelHistory = () => {
     <AppLayout>
       <div className="min-h-screen">
         {/* Sticky Header with Stats + Navigation */}
-        <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
-          <div className="container mx-auto px-4 py-4">
+        <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
+          <div className="container mx-auto px-4 py-3">
             {/* Compact Stats Row */}
             <div className="flex items-center justify-between mb-3">
               <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
@@ -109,7 +115,7 @@ const TravelHistory = () => {
                 return (
                   <button
                     key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
+                    onClick={() => handleTabChange(tab.key)}
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
                       activeTab === tab.key
