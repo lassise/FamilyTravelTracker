@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,8 +12,43 @@ serve(async (req) => {
   }
 
   try {
+    // Require authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', suggestions: [], recommendations: [] }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify JWT
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token', suggestions: [], recommendations: [] }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
     const body = await req.json();
     const { request_type, preferences, visited_countries, wishlistCountries, visitedContinents, visitedCountries } = body;
+
+    // Validate request_type
+    const validRequestTypes = ['recommendations', 'quick_itinerary', 'suggestions', undefined];
+    if (request_type && !validRequestTypes.includes(request_type)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request_type', suggestions: [], recommendations: [] }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Handle recommendations request
     if (request_type === "recommendations") {
@@ -78,7 +114,25 @@ Return ONLY valid JSON, no markdown or explanation.`;
     if (request_type === "quick_itinerary") {
       const { destination, days, preferences: userPrefs } = body;
       
-      const prompt = `Create a ${days}-day travel itinerary for ${destination}.
+      // Validate inputs
+      if (!destination || typeof destination !== 'string' || destination.length > 100) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid destination' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      if (!days || typeof days !== 'number' || days < 1 || days > 30) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid days (must be 1-30)' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Sanitize destination
+      const sanitizedDestination = destination.replace(/[<>]/g, '').substring(0, 100).trim();
+      
+      const prompt = `Create a ${days}-day travel itinerary for ${sanitizedDestination}.
 
 Traveler Preferences:
 - Travel Style: ${userPrefs?.travel_style?.join(', ') || 'balanced'}

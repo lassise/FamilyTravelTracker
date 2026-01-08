@@ -4,7 +4,7 @@ project_id = "sqhikfqygphnemptxvoo"
 verify_jwt = true
 
 [functions.get-mapbox-token]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-trip-suggestions]
-verify_jwt = false
+verify_jwt = true
