@@ -97,9 +97,17 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
             return (
               <Card 
                 key={country.id}
-                className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/30"
+                className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden"
               >
-                <CardHeader className="pb-3">
+                {/* Flag Banner */}
+                <div className="h-8 w-full relative overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center text-[100px] leading-none opacity-80 blur-[2px]">
+                    {country.flag}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/90" />
+                </div>
+                
+                <CardHeader className="pb-3 pt-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <span className="text-3xl">{country.flag}</span>
