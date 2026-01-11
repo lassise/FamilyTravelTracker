@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Check, X } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStateVisits } from '@/hooks/useStateVisits';
 import { useFamilyData, Country } from '@/hooks/useFamilyData';
@@ -231,23 +231,21 @@ const StateMapDialog = ({ open, onOpenChange, country }: StateMapDialogProps) =>
               <Badge variant="secondary">
                 {visitedCount} / {totalCount} visited
               </Badge>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
+              <div className="flex gap-3 text-xs">
+                <button
+                  type="button"
                   onClick={() => setSelectedStates(new Set(stateEntries.map(([code]) => code)))}
+                  className="text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
                 >
-                  <Check className="h-4 w-4 mr-1" />
-                  All
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                  Select all
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSelectedStates(new Set())}
+                  className="text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
                 >
-                  <X className="h-4 w-4 mr-1" />
-                  Clear
-                </Button>
+                  Clear all
+                </button>
               </div>
             </div>
 
@@ -274,12 +272,12 @@ const StateMapDialog = ({ open, onOpenChange, country }: StateMapDialogProps) =>
               </div>
             </ScrollArea>
 
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 pt-4 border-t flex justify-end gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
+              <Button onClick={handleSave} disabled={isSaving} size="lg" className="px-8">
+                {isSaving ? 'Saving...' : 'Save States'}
               </Button>
             </div>
           </div>
