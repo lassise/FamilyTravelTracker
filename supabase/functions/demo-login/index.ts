@@ -10,6 +10,76 @@ const corsHeaders = {
 const DEMO_EMAIL = "demo@familyonthefly.app";
 const DEMO_PASSWORD = "demo-user-2024!";
 
+// Rate limiting configuration
+const RATE_LIMIT_MAX_REQUESTS = 10; // 10 demo logins per hour per IP
+const RATE_LIMIT_WINDOW_MINUTES = 60;
+
+// Check rate limit based on IP address
+async function checkIPRateLimit(
+  serviceClient: any,
+  clientIp: string,
+  functionName: string,
+  maxRequests: number,
+  windowMinutes: number
+): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+
+  // Check existing rate limit record
+  const { data: rateLimitData, error: fetchError } = await serviceClient
+    .from('api_rate_limits')
+    .select('*')
+    .eq('user_id', clientIp) // Using user_id field to store IP
+    .eq('function_name', functionName)
+    .single();
+
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    console.error('Rate limit check error:', fetchError);
+    // Allow request on error to not block legitimate users
+    return { allowed: true };
+  }
+
+  if (rateLimitData) {
+    const recordWindowStart = new Date(rateLimitData.window_start);
+    
+    // Check if within current window and over limit
+    if (recordWindowStart >= windowStart && rateLimitData.request_count >= maxRequests) {
+      const resetTime = recordWindowStart.getTime() + windowMinutes * 60 * 1000;
+      const retryAfterSeconds = Math.ceil((resetTime - Date.now()) / 1000);
+      return { allowed: false, retryAfterSeconds };
+    }
+    
+    // Update the record
+    if (recordWindowStart < windowStart) {
+      // Window expired, reset counter
+      await serviceClient
+        .from('api_rate_limits')
+        .update({ 
+          request_count: 1, 
+          window_start: new Date().toISOString() 
+        })
+        .eq('id', rateLimitData.id);
+    } else {
+      // Increment counter
+      await serviceClient
+        .from('api_rate_limits')
+        .update({ 
+          request_count: rateLimitData.request_count + 1 
+        })
+        .eq('id', rateLimitData.id);
+    }
+  } else {
+    // Create new rate limit record
+    await serviceClient.from('api_rate_limits').insert({
+      user_id: clientIp,
+      function_name: functionName,
+      request_count: 1,
+      window_start: new Date().toISOString()
+    });
+  }
+
+  return { allowed: true };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -20,10 +90,44 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Create admin client to manage demo user
+    // Create admin client to manage demo user and check rate limits
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
+
+    // Get client IP for rate limiting
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+                  || req.headers.get('x-real-ip') 
+                  || 'unknown';
+
+    // Check rate limit
+    if (clientIp !== 'unknown') {
+      const rateLimit = await checkIPRateLimit(
+        adminClient,
+        clientIp,
+        'demo-login',
+        RATE_LIMIT_MAX_REQUESTS,
+        RATE_LIMIT_WINDOW_MINUTES
+      );
+
+      if (!rateLimit.allowed) {
+        console.log(`Rate limit exceeded for IP: ${clientIp.substring(0, 8)}...`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Too many demo login attempts. Please try again later.',
+            retryAfter: rateLimit.retryAfterSeconds 
+          }),
+          {
+            headers: { 
+              ...corsHeaders, 
+              "Content-Type": "application/json",
+              "Retry-After": String(rateLimit.retryAfterSeconds || 60)
+            },
+            status: 429,
+          }
+        );
+      }
+    }
 
     // Check if demo user exists, if not create it
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
@@ -64,6 +168,8 @@ serve(async (req) => {
       console.error("Error signing in demo user:", signInError);
       throw new Error("Failed to sign in demo user");
     }
+
+    console.log(`Demo login successful for IP: ${clientIp.substring(0, 8)}...`);
 
     return new Response(
       JSON.stringify({
