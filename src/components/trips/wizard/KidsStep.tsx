@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TripFormData } from "../TripWizard";
-import { Baby, Plus, X } from "lucide-react";
+import { Baby, Plus, X, Users } from "lucide-react";
 
 interface KidsStepProps {
   formData: TripFormData;
@@ -31,6 +31,24 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
   };
 
   const hasYoungKids = formData.kidsAges.some(age => age <= 4);
+
+  // If not traveling with kids, show a simple message
+  if (!formData.travelingWithKids) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Users className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Adults-Only Trip</h3>
+          <p className="text-muted-foreground max-w-sm mx-auto">
+            Great! We'll tailor recommendations for an adult travel experience. 
+            You can proceed to the next step.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -79,6 +97,12 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
               </Badge>
             ))}
           </div>
+        )}
+
+        {formData.kidsAges.length === 0 && (
+          <p className="text-sm text-amber-600 dark:text-amber-400">
+            Please add at least one child's age to continue
+          </p>
         )}
       </div>
 

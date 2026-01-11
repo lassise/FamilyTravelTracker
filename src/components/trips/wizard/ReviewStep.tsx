@@ -29,6 +29,7 @@ const INTEREST_LABELS: Record<string, string> = {
   "walking": "Walking Tours",
   "arts": "Arts & Crafts",
   "playgrounds": "Playgrounds",
+  "golf": "Golf",
 };
 
 const NAP_LABELS: Record<string, string> = {
@@ -50,6 +51,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
   };
 
   const getTripDuration = () => {
+    if (!formData.startDate || !formData.endDate) return null;
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -76,30 +78,50 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
           </div>
         </div>
 
-        <div className="flex items-start gap-3">
-          <Calendar className="h-5 w-5 text-primary mt-0.5" />
-          <div>
-            <div className="font-medium">Dates</div>
-            <div className="text-muted-foreground">
-              {formatDate(formData.startDate)} - {formatDate(formData.endDate)}
-              <span className="text-sm ml-2">({getTripDuration()})</span>
+        {formData.hasDates && formData.startDate && formData.endDate ? (
+          <div className="flex items-start gap-3">
+            <Calendar className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="font-medium">Dates</div>
+              <div className="text-muted-foreground">
+                {formatDate(formData.startDate)} - {formatDate(formData.endDate)}
+                {getTripDuration() && <span className="text-sm ml-2">({getTripDuration()})</span>}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div>
+              <div className="font-medium">Dates</div>
+              <div className="text-muted-foreground italic">Still deciding on dates</div>
+            </div>
+          </div>
+        )}
 
-        <div className="flex items-start gap-3">
-          <Baby className="h-5 w-5 text-primary mt-0.5" />
-          <div>
-            <div className="font-medium">Kids</div>
-            <div className="flex flex-wrap gap-1 mt-1">
-              {formData.kidsAges.map((age, i) => (
-                <Badge key={i} variant="secondary">
-                  {age} {age === 1 ? "year" : "years"}
-                </Badge>
-              ))}
+        {formData.travelingWithKids && formData.kidsAges.length > 0 ? (
+          <div className="flex items-start gap-3">
+            <Baby className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="font-medium">Kids</div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {formData.kidsAges.map((age, i) => (
+                  <Badge key={i} variant="secondary">
+                    {age} {age === 1 ? "year" : "years"}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            <Baby className="h-5 w-5 text-muted-foreground mt-0.5" />
+            <div>
+              <div className="font-medium">Travelers</div>
+              <div className="text-muted-foreground">Adults only</div>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-start gap-3">
           <Heart className="h-5 w-5 text-primary mt-0.5" />

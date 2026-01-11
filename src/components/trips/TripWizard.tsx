@@ -18,6 +18,9 @@ export interface TripFormData {
   destination: string;
   startDate: string;
   endDate: string;
+  hasDates: boolean;
+  hasLodging: boolean;
+  travelingWithKids: boolean;
   kidsAges: number[];
   interests: string[];
   pacePreference: string;
@@ -46,6 +49,9 @@ const TripWizard = () => {
     destination: "",
     startDate: "",
     endDate: "",
+    hasDates: true,
+    hasLodging: false,
+    travelingWithKids: true,
     kidsAges: [],
     interests: [],
     pacePreference: "moderate",
@@ -64,9 +70,14 @@ const TripWizard = () => {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.destination && formData.startDate && formData.endDate;
+        // Destination required, dates only if they said they have them
+        if (!formData.destination) return false;
+        if (formData.hasDates && (!formData.startDate || !formData.endDate)) return false;
+        return true;
       case 2:
-        return formData.kidsAges.length > 0;
+        // Kids ages only required if traveling with kids
+        if (formData.travelingWithKids && formData.kidsAges.length === 0) return false;
+        return true;
       case 3:
         return formData.interests.length > 0;
       case 4:
