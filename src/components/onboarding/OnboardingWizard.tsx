@@ -9,12 +9,14 @@ import HomeCountryStep from "./HomeCountryStep";
 import WelcomeFeaturesStep from "./WelcomeFeaturesStep";
 import TravelPreferencesStep from "./TravelPreferencesStep";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
 const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
+  const { refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
   const [familyMembers, setFamilyMembers] = useState<Array<{ id: string; name: string }>>([]);
   const [homeCountry, setHomeCountry] = useState<string | null>(null);
@@ -82,6 +84,11 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       
       // Also set localStorage as fallback
       localStorage.setItem("onboarding_complete", "true");
+      
+      // Refresh the profile in context so needsOnboarding updates
+      await refreshProfile();
+      
+      // Navigate to the app
       onComplete();
     } catch (error) {
       console.error("Error completing onboarding:", error);
