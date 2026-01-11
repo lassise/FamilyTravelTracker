@@ -3,8 +3,13 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Country } from '@/hooks/useFamilyData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Globe } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Globe, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useStateVisits } from '@/hooks/useStateVisits';
+import { countriesWithStates, countryNameToCode, getStatesForCountry } from '@/lib/statesData';
+import StateMapDialog from './StateMapDialog';
+
 // Country to ISO 3166-1 alpha-3 mapping for Mapbox
 const countryToISO3: Record<string, string> = {
   'Afghanistan': 'AFG', 'Albania': 'ALB', 'Algeria': 'DZA', 'Argentina': 'ARG',
@@ -31,6 +36,13 @@ const countryToISO3: Record<string, string> = {
   'Uruguay': 'URY', 'Guyana': 'GUY', 'Suriname': 'SUR',
 };
 
+// ISO3 to ISO2 mapping for state lookups
+const iso3ToIso2: Record<string, string> = {
+  'USA': 'US', 'CAN': 'CA', 'AUS': 'AU', 'BRA': 'BR', 'MEX': 'MX',
+  'IND': 'IN', 'DEU': 'DE', 'GBR': 'GB', 'FRA': 'FR', 'ITA': 'IT',
+  'ESP': 'ES', 'JPN': 'JP', 'CHN': 'CN',
+};
+
 interface InteractiveWorldMapProps {
   countries: Country[];
   wishlist: string[];
@@ -42,6 +54,10 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapToken, setMapToken] = useState<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
+  const [stateDialogOpen, setStateDialogOpen] = useState(false);
+  
+  const { stateVisits, getStateVisitCount } = useStateVisits();
 
   // Memoize country lists to prevent unnecessary recalculations
   const visitedCountries = useMemo(() => 
@@ -49,6 +65,15 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
       .filter(c => c.visitedBy.length > 0)
       .map(c => countryToISO3[c.name])
       .filter(Boolean),
+    [countries]
+  );
+
+  // Countries that support state-level tracking and are visited
+  const countriesWithStateTracking = useMemo(() => 
+    countries.filter(c => {
+      const code = countryNameToCode[c.name];
+      return c.visitedBy.length > 0 && code && countriesWithStates.includes(code);
+    }),
     [countries]
   );
 
@@ -60,7 +85,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
     [countries, wishlist]
   );
 
-  const homeCountryISO = useMemo(() => 
+  const homeCountryISO = useMemo(() =>
     homeCountry ? countryToISO3[homeCountry] : null,
     [homeCountry]
   );
@@ -215,6 +240,36 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
         },
       });
 
+      // Add click handler for countries with state tracking
+      map.current?.on('click', 'visited-countries', (e) => {
+        if (!e.features?.[0]) return;
+        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
+        const iso2 = iso3ToIso2[iso3];
+        
+        if (iso2 && countriesWithStates.includes(iso2)) {
+          const clickedCountry = countries.find(c => countryToISO3[c.name] === iso3);
+          if (clickedCountry) {
+            setSelectedCountry(clickedCountry);
+            setStateDialogOpen(true);
+          }
+        }
+      });
+
+      // Change cursor on hover for clickable countries
+      map.current?.on('mouseenter', 'visited-countries', (e) => {
+        if (!e.features?.[0]) return;
+        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
+        const iso2 = iso3ToIso2[iso3];
+        
+        if (iso2 && countriesWithStates.includes(iso2)) {
+          map.current!.getCanvas().style.cursor = 'pointer';
+        }
+      });
+
+      map.current?.on('mouseleave', 'visited-countries', () => {
+        map.current!.getCanvas().style.cursor = '';
+      });
+
       setIsMapReady(true);
     });
 
@@ -222,7 +277,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
       map.current?.remove();
       map.current = null;
     };
-  }, [mapToken, initialCenter, homeCountryISO]);
+  }, [mapToken, initialCenter, homeCountryISO, countries]);
 
   // Update filters when countries change (without re-creating map)
   useEffect(() => {
@@ -283,7 +338,48 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
           <div ref={mapContainer} className="h-[450px] w-full" />
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-card/20 to-transparent" />
         </div>
+        
+        {/* Countries with state tracking */}
+        {countriesWithStateTracking.length > 0 && (
+          <div className="p-4 border-t border-border">
+            <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              Click visited countries below to track states/regions:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {countriesWithStateTracking.map(country => {
+                const code = countryNameToCode[country.name];
+                const states = getStatesForCountry(code);
+                const stateCount = getStateVisitCount(code);
+                const totalStates = states ? Object.keys(states).length : 0;
+                
+                return (
+                  <Badge
+                    key={country.id}
+                    variant="outline"
+                    className="cursor-pointer hover:bg-primary/10 transition-colors"
+                    onClick={() => {
+                      setSelectedCountry(country);
+                      setStateDialogOpen(true);
+                    }}
+                  >
+                    {country.flag} {country.name}
+                    {stateCount > 0 && (
+                      <span className="ml-1 text-primary">({stateCount}/{totalStates})</span>
+                    )}
+                  </Badge>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </CardContent>
+      
+      <StateMapDialog
+        open={stateDialogOpen}
+        onOpenChange={setStateDialogOpen}
+        country={selectedCountry}
+      />
     </Card>
   );
 };

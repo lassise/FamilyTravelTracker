@@ -779,6 +779,54 @@ export type Database = {
         }
         Relationships: []
       }
+      state_visits: {
+        Row: {
+          country_code: string
+          country_id: string | null
+          created_at: string | null
+          family_member_id: string | null
+          id: string
+          state_code: string
+          state_name: string
+          user_id: string | null
+        }
+        Insert: {
+          country_code: string
+          country_id?: string | null
+          created_at?: string | null
+          family_member_id?: string | null
+          id?: string
+          state_code: string
+          state_name: string
+          user_id?: string | null
+        }
+        Update: {
+          country_code?: string
+          country_id?: string | null
+          created_at?: string | null
+          family_member_id?: string | null
+          id?: string
+          state_code?: string
+          state_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "state_visits_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "state_visits_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       travel_goals: {
         Row: {
           completed_at: string | null
