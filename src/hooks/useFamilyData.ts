@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface FamilyMember {
   id: string;
@@ -20,13 +21,23 @@ export interface Country {
 }
 
 export const useFamilyData = () => {
+  const { user } = useAuth();
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [homeCountry, setHomeCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      setFamilyMembers([]);
+      setCountries([]);
+      setWishlist([]);
+      setHomeCountry(null);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       // Fetch family members
@@ -64,16 +75,12 @@ export const useFamilyData = () => {
       if (wishlistError) throw wishlistError;
 
       // Fetch home country from profile
-      const { data: { user } } = await supabase.auth.getUser();
-      let userHomeCountry: string | null = null;
-      if (user) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("home_country")
-          .eq("id", user.id)
-          .single();
-        userHomeCountry = profileData?.home_country || null;
-      }
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("home_country")
+        .eq("id", user.id)
+        .single();
+      const userHomeCountry = profileData?.home_country || null;
 
       // Calculate countries visited per family member
       const membersWithCount = membersData?.map((member) => {
@@ -104,7 +111,7 @@ export const useFamilyData = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchData();
@@ -137,7 +144,7 @@ export const useFamilyData = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user, fetchData]);
 
   // Calculate total continents visited
   const totalContinents = new Set(
