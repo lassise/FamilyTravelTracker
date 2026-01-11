@@ -10,6 +10,7 @@ import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 // Lazy load all pages for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Auth = lazy(() => import("./pages/Auth"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Trips = lazy(() => import("./pages/Trips"));
 const NewTrip = lazy(() => import("./pages/NewTrip"));
 const TripDetail = lazy(() => import("./pages/TripDetail"));
@@ -45,6 +46,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/trips" element={<Trips />} />
               <Route path="/trips/new" element={<NewTrip />} />
