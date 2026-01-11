@@ -12,7 +12,8 @@ import {
   ShoppingBag,
   Footprints,
   Palette,
-  Gamepad2
+  Gamepad2,
+  Target
 } from "lucide-react";
 
 interface InterestsStepProps {
@@ -33,6 +34,7 @@ const INTERESTS = [
   { id: "walking", label: "Walking Tours", icon: Footprints },
   { id: "arts", label: "Arts & Crafts", icon: Palette },
   { id: "playgrounds", label: "Playgrounds & Play Areas", icon: Gamepad2 },
+  { id: "golf", label: "Golf", icon: Target },
 ];
 
 export const InterestsStep = ({ formData, updateFormData }: InterestsStepProps) => {

@@ -13,12 +13,13 @@ const Onboarding = () => {
       navigate("/auth");
     } else if (!loading && user && profile !== null && !needsOnboarding) {
       // Already completed onboarding, redirect to main app
-      navigate("/travel-history");
+      navigate("/");
     }
   }, [user, loading, profile, needsOnboarding, navigate]);
 
   const handleComplete = () => {
-    navigate("/travel-history");
+    // Navigate to dashboard after onboarding
+    navigate("/");
   };
 
   if (loading || profile === null) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, X } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -9,14 +10,22 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const PWAInstallPrompt = () => {
+  const { needsOnboarding, loading } = useAuth();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // Don't show during onboarding
+    if (loading || needsOnboarding) return;
+    
     // Check if already installed
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
     if (isStandalone) return;
+
+    // Check if permanently dismissed
+    const permanentlyDismissed = localStorage.getItem("pwa-prompt-dismissed-permanently");
+    if (permanentlyDismissed === "true") return;
 
     // Check if dismissed recently
     const dismissed = localStorage.getItem("pwa-prompt-dismissed");
@@ -45,7 +54,7 @@ const PWAInstallPrompt = () => {
 
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+  }, [loading, needsOnboarding]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -62,6 +71,11 @@ const PWAInstallPrompt = () => {
   const handleDismiss = () => {
     setShowPrompt(false);
     localStorage.setItem("pwa-prompt-dismissed", Date.now().toString());
+  };
+
+  const handleDismissPermanently = () => {
+    setShowPrompt(false);
+    localStorage.setItem("pwa-prompt-dismissed-permanently", "true");
   };
 
   if (!showPrompt) return null;
@@ -100,6 +114,12 @@ const PWAInstallPrompt = () => {
               Install Now
             </Button>
           )}
+          <button
+            onClick={handleDismissPermanently}
+            className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Don't show again
+          </button>
         </CardContent>
       </Card>
     </div>
