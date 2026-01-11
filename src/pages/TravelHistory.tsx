@@ -18,7 +18,7 @@ import TravelStreaks from "@/components/travel/TravelStreaks";
 import CountryComparison from "@/components/travel/CountryComparison";
 import EnhancedBucketList from "@/components/travel/EnhancedBucketList";
 import TravelMilestones from "@/components/travel/TravelMilestones";
-import DemoBanner from "@/components/DemoBanner";
+
 import { Loader2, BarChart3, Globe2, Trophy, Map, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +78,6 @@ const TravelHistory = () => {
 
   return (
     <AppLayout>
-      <DemoBanner userEmail={user?.email} />
       <div className="min-h-screen">
         {/* Sticky Header with Stats + Navigation */}
         <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-md border-b border-border shadow-sm">
