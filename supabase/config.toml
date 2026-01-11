@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.generate-trip-suggestions]
 verify_jwt = true
+
+[functions.demo-login]
+verify_jwt = false
