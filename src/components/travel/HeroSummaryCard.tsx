@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Globe2, Users, Plane, Calendar } from "lucide-react";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
+import { useVisitDetails } from "@/hooks/useVisitDetails";
 
 interface HeroSummaryCardProps {
   countries: Country[];
@@ -9,8 +10,22 @@ interface HeroSummaryCardProps {
 }
 
 const HeroSummaryCard = ({ countries, familyMembers, totalContinents }: HeroSummaryCardProps) => {
+  const { visitDetails } = useVisitDetails();
   const visitedCountries = countries.filter(c => c.visitedBy.length > 0);
-  const earliestYear = 2020; // Could be calculated from visit_details if available
+  
+  // Calculate the earliest year from visit details
+  const earliestYear = visitDetails.reduce((earliest, visit) => {
+    let year: number | null = null;
+    if (visit.visit_date) {
+      year = new Date(visit.visit_date).getFullYear();
+    } else if (visit.approximate_year) {
+      year = visit.approximate_year;
+    }
+    if (year && (!earliest || year < earliest)) {
+      return year;
+    }
+    return earliest;
+  }, null as number | null);
 
   const stats = [
     {
@@ -34,13 +49,13 @@ const HeroSummaryCard = ({ countries, familyMembers, totalContinents }: HeroSumm
       color: "text-accent",
       bgColor: "bg-accent/10",
     },
-    {
+    ...(earliestYear ? [{
       icon: Calendar,
       value: `'${earliestYear.toString().slice(-2)}`,
       label: "Since",
       color: "text-muted-foreground",
       bgColor: "bg-muted",
-    },
+    }] : []),
   ];
 
   return (

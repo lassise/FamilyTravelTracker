@@ -13,10 +13,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Trophy, Target, Star, Globe, Map, Plane, Award, Medal, 
-  Crown, Gem, Plus, Check, Calendar, Trash2, ChevronDown, Lock, Sparkles
+  Crown, Gem, Plus, Calendar, Trash2, ChevronDown, Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import FlippableAchievementCard from './FlippableAchievementCard';
 
 interface EnhancedAchievementsProps {
   countries: Country[];
@@ -196,59 +197,17 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
               const isEarned = earnedAchievements.includes(achievement.key);
               const isNewlyEarned = newlyEarnedKey === achievement.key;
               const current = achievement.type === 'countries' ? visitedCountries : totalContinents;
-              const progress = Math.min((current / achievement.requirement) * 100, 100);
               const rarity = rarityStyles[achievement.rarity];
               
               return (
-                <div 
+                <FlippableAchievementCard
                   key={achievement.key}
-                  className={cn(
-                    "relative flex flex-col items-center p-3 rounded-lg transition-all border",
-                    isEarned 
-                      ? `bg-muted ${rarity.border} ${rarity.glow}` 
-                      : 'bg-muted/30 border-transparent opacity-60 hover:opacity-80',
-                    isNewlyEarned && 'animate-scale-in ring-2 ring-primary ring-offset-2'
-                  )}
-                  title={isEarned ? `${achievement.name}: ${achievement.description}` : achievement.hint}
-                >
-                  {/* Rarity badge */}
-                  {isEarned && achievement.rarity !== 'common' && (
-                    <Badge className={cn("absolute -top-1.5 -right-1.5 text-[10px] px-1.5 py-0", rarity.badge)}>
-                      {achievement.rarity}
-                    </Badge>
-                  )}
-                  
-                  <div className={cn(
-                    "p-2 rounded-full relative",
-                    isEarned ? achievement.color : 'bg-muted'
-                  )}>
-                    {isEarned ? (
-                      <achievement.icon className="h-5 w-5 text-primary-foreground" />
-                    ) : (
-                      <Lock className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    {isNewlyEarned && (
-                      <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-amber-400 animate-pulse" />
-                    )}
-                  </div>
-                  
-                  <span className="text-xs font-medium text-foreground mt-2 text-center leading-tight">
-                    {achievement.name}
-                  </span>
-                  
-                  {!isEarned && (
-                    <div className="w-full mt-2">
-                      <Progress value={progress} className="h-1" />
-                      <p className="text-[10px] text-muted-foreground text-center mt-1">
-                        {current}/{achievement.requirement}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {isEarned && (
-                    <Check className="absolute top-1 right-1 h-3.5 w-3.5 text-accent" />
-                  )}
-                </div>
+                  achievement={achievement}
+                  isEarned={isEarned}
+                  isNewlyEarned={isNewlyEarned}
+                  current={current}
+                  rarityStyles={rarity}
+                />
               );
             })}
           </div>

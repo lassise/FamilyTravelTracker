@@ -340,39 +340,55 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
         </div>
         
         {/* Countries with state tracking */}
-        {countriesWithStateTracking.length > 0 && (
-          <div className="p-4 border-t border-border">
-            <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
-              <MapPin className="h-4 w-4" />
-              Click visited countries below to track states/regions:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {countriesWithStateTracking.map(country => {
+        <div className="p-4 border-t border-border">
+          <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+            <MapPin className="h-4 w-4" />
+            {countriesWithStateTracking.length > 0 
+              ? "Track states/regions for visited countries:"
+              : "Mark a country as visited to track states/regions"
+            }
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {countriesWithStateTracking.length > 0 ? (
+              countriesWithStateTracking.map(country => {
                 const code = countryNameToCode[country.name];
                 const states = getStatesForCountry(code);
                 const stateCount = getStateVisitCount(code);
                 const totalStates = states ? Object.keys(states).length : 0;
+                const isUSA = country.name === 'United States';
                 
                 return (
                   <Badge
                     key={country.id}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-primary/10 transition-colors"
+                    variant={isUSA ? "default" : "outline"}
+                    className={`cursor-pointer transition-colors ${
+                      isUSA 
+                        ? "bg-primary hover:bg-primary/90" 
+                        : "hover:bg-primary/10"
+                    }`}
                     onClick={() => {
                       setSelectedCountry(country);
                       setStateDialogOpen(true);
                     }}
                   >
                     {country.flag} {country.name}
-                    {stateCount > 0 && (
-                      <span className="ml-1 text-primary">({stateCount}/{totalStates})</span>
+                    {stateCount > 0 ? (
+                      <span className={`ml-1 ${isUSA ? "text-primary-foreground" : "text-primary"}`}>
+                        ({stateCount}/{totalStates})
+                      </span>
+                    ) : (
+                      <span className="ml-1 opacity-70">({totalStates} states)</span>
                     )}
                   </Badge>
                 );
-              })}
-            </div>
+              })
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                Countries like USA, Canada, Australia, and more support state-level tracking
+              </p>
+            )}
           </div>
-        )}
+        </div>
       </CardContent>
       
       <StateMapDialog

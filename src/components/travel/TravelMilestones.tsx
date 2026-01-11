@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { 
   Trophy, Star, Globe, Map, Plane, Flag,
-  Milestone, Award, Crown, Zap, Target, Rocket
+  Milestone, Award, Crown, Zap, Rocket, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,102 @@ const TravelMilestones = ({ countries, familyMembers, totalContinents }: TravelM
   const achievedCount = milestones.filter(m => m.achieved).length;
   const nextMilestone = milestones.find(m => !m.achieved);
 
+  // Flippable milestone card component
+  const FlippableMilestoneCard = ({ milestone }: { milestone: MilestoneData }) => {
+    const [isFlipped, setIsFlipped] = useState(false);
+    const Icon = milestone.icon;
+    const progress = Math.min((milestone.current / milestone.threshold) * 100, 100);
+
+    return (
+      <div
+        className="relative h-[120px] cursor-pointer"
+        onClick={() => setIsFlipped(!isFlipped)}
+        style={{ perspective: '1000px' }}
+      >
+        <div
+          className="absolute inset-0 transition-transform duration-500"
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          }}
+        >
+          {/* Front of card */}
+          <div
+            className={cn(
+              "absolute inset-0 p-3 rounded-lg text-center flex flex-col items-center",
+              milestone.achieved
+                ? "bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/30"
+                : "bg-muted/30 border border-transparent opacity-60"
+            )}
+            style={{ backfaceVisibility: 'hidden' }}
+          >
+            <div className={cn(
+              "inline-flex p-2 rounded-full mb-2",
+              milestone.achieved ? "bg-primary/20" : "bg-muted"
+            )}>
+              <Icon className={cn(
+                "h-5 w-5",
+                milestone.achieved ? milestone.color : "text-muted-foreground"
+              )} />
+            </div>
+            <h4 className={cn(
+              "text-xs font-semibold mb-0.5",
+              milestone.achieved ? "text-foreground" : "text-muted-foreground"
+            )}>
+              {milestone.title}
+            </h4>
+            <p className="text-[10px] text-muted-foreground mt-auto">Tap for details</p>
+            {milestone.achieved && (
+              <div className="absolute -top-1 -right-1">
+                <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                  <Star className="h-2.5 w-2.5 text-primary-foreground fill-primary-foreground" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Back of card */}
+          <div
+            className={cn(
+              "absolute inset-0 p-3 rounded-lg text-center flex flex-col items-center justify-center border",
+              milestone.achieved
+                ? "bg-gradient-to-br from-secondary/10 to-primary/10 border-primary/30"
+                : "bg-muted/50 border-border"
+            )}
+            style={{
+              backfaceVisibility: 'hidden',
+              transform: 'rotateY(180deg)',
+            }}
+          >
+            <Icon className={cn("h-4 w-4 mb-1", milestone.achieved ? milestone.color : "text-muted-foreground")} />
+            <h4 className="text-xs font-semibold text-foreground mb-1">{milestone.title}</h4>
+            <p className="text-[10px] text-muted-foreground leading-relaxed mb-2">
+              {milestone.description}
+            </p>
+            {milestone.achieved ? (
+              <span className="text-[10px] text-accent flex items-center gap-1">
+                <Check className="h-3 w-3" />
+                Achieved!
+              </span>
+            ) : (
+              <>
+                <div className="w-full h-1 bg-muted rounded-full overflow-hidden mb-1">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-secondary"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {milestone.current}/{milestone.threshold} {milestone.category}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card className="bg-card border-border">
       <CardHeader>
@@ -89,46 +186,9 @@ const TravelMilestones = ({ countries, familyMembers, totalContinents }: TravelM
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {milestones.map((milestone) => {
-            const Icon = milestone.icon;
-            return (
-              <div
-                key={milestone.id}
-                className={cn(
-                  "relative p-3 rounded-lg text-center transition-all",
-                  milestone.achieved 
-                    ? "bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/30" 
-                    : "bg-muted/30 border border-transparent opacity-60"
-                )}
-              >
-                <div className={cn(
-                  "inline-flex p-2 rounded-full mb-2",
-                  milestone.achieved ? "bg-primary/20" : "bg-muted"
-                )}>
-                  <Icon className={cn(
-                    "h-5 w-5",
-                    milestone.achieved ? milestone.color : "text-muted-foreground"
-                  )} />
-                </div>
-                <h4 className={cn(
-                  "text-xs font-semibold mb-0.5",
-                  milestone.achieved ? "text-foreground" : "text-muted-foreground"
-                )}>
-                  {milestone.title}
-                </h4>
-                <p className="text-[10px] text-muted-foreground line-clamp-2">
-                  {milestone.description}
-                </p>
-                {milestone.achieved && (
-                  <div className="absolute -top-1 -right-1">
-                    <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
-                      <Star className="h-2.5 w-2.5 text-primary-foreground fill-primary-foreground" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {milestones.map((milestone) => (
+            <FlippableMilestoneCard key={milestone.id} milestone={milestone} />
+          ))}
         </div>
       </CardContent>
     </Card>
