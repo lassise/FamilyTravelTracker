@@ -1,9 +1,97 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Rate limiting configuration
+const RATE_LIMIT_MAX_REQUESTS = 20; // 20 requests per hour
+const RATE_LIMIT_WINDOW_MINUTES = 60; // 1 hour window
+
+// Rate limit record type
+interface RateLimitRecord {
+  id: string;
+  user_id: string;
+  function_name: string;
+  request_count: number;
+  window_start: string;
+  created_at: string;
+}
+
+// Check rate limit for user
+const checkRateLimit = async (
+  supabase: SupabaseClient,
+  userId: string,
+  functionName: string,
+  maxRequests: number,
+  windowMinutes: number
+): Promise<{ allowed: boolean; retryAfter?: number; remaining?: number }> => {
+  const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+  
+  try {
+    // Check for existing rate limit record
+    const { data, error } = await supabase
+      .from('api_rate_limits')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('function_name', functionName)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Rate limit check error:', error.message);
+      // Allow request on error to prevent blocking users
+      return { allowed: true };
+    }
+    
+    const record = data as RateLimitRecord | null;
+    
+    if (!record) {
+      // First request - create new record
+      await supabase.from('api_rate_limits').insert({
+        user_id: userId,
+        function_name: functionName,
+        request_count: 1,
+        window_start: new Date().toISOString()
+      } as RateLimitRecord);
+      return { allowed: true, remaining: maxRequests - 1 };
+    }
+    
+    // Check if window has expired
+    const recordWindowStart = new Date(record.window_start);
+    if (recordWindowStart < windowStart) {
+      // Window expired - reset counter
+      await supabase
+        .from('api_rate_limits')
+        .update({ 
+          request_count: 1, 
+          window_start: new Date().toISOString() 
+        } as Partial<RateLimitRecord>)
+        .eq('id', record.id);
+      return { allowed: true, remaining: maxRequests - 1 };
+    }
+    
+    // Check if limit exceeded
+    if (record.request_count >= maxRequests) {
+      const resetTime = new Date(record.window_start).getTime() + windowMinutes * 60 * 1000;
+      const retryAfter = Math.ceil((resetTime - Date.now()) / 1000);
+      console.log(`Rate limit exceeded for user ${userId} on ${functionName}. Retry after ${retryAfter}s`);
+      return { allowed: false, retryAfter, remaining: 0 };
+    }
+    
+    // Increment counter
+    await supabase
+      .from('api_rate_limits')
+      .update({ request_count: record.request_count + 1 } as Partial<RateLimitRecord>)
+      .eq('id', record.id);
+      
+    return { allowed: true, remaining: maxRequests - record.request_count - 1 };
+  } catch (err) {
+    console.error('Rate limit error:', err);
+    // Allow request on error
+    return { allowed: true };
+  }
 };
 
 serve(async (req) => {
@@ -21,6 +109,12 @@ serve(async (req) => {
       );
     }
 
+    // Create Supabase client with service role for rate limiting
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     // Verify JWT
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -37,6 +131,31 @@ serve(async (req) => {
     }
 
     console.log('Authenticated user:', user.id);
+
+    // Check rate limit
+    const rateLimit = await checkRateLimit(
+      serviceClient, 
+      user.id, 
+      'generate-trip-suggestions', 
+      RATE_LIMIT_MAX_REQUESTS, 
+      RATE_LIMIT_WINDOW_MINUTES
+    );
+    
+    if (!rateLimit.allowed) {
+      return new Response(JSON.stringify({ 
+        error: 'Rate limit exceeded. Please try again later.',
+        retryAfter: rateLimit.retryAfter,
+        suggestions: [],
+        recommendations: []
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': rateLimit.retryAfter?.toString() || '3600'
+        },
+      });
+    }
 
     const body = await req.json();
     const { request_type, preferences, visited_countries, wishlistCountries, visitedContinents, visitedCountries } = body;
