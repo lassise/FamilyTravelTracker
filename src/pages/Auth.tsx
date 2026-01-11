@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plane, Loader2 } from "lucide-react";
+import { Plane, Loader2, Play } from "lucide-react";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Please enter a valid email address");
@@ -18,6 +20,7 @@ const Auth = () => {
   const { user, signIn, signUp, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("signin");
 
   // Form states
@@ -93,8 +96,43 @@ const Auth = () => {
       }
     } else {
       toast.success("Account created! Welcome to Family On The Fly!");
-      // New users go to onboarding
       navigate("/onboarding");
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/demo-login`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Demo login failed");
+      }
+
+      if (data.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        toast.success(data.message || "Welcome to the demo!");
+        navigate("/travel-history");
+      }
+    } catch (error) {
+      console.error("Demo login error:", error);
+      toast.error(error instanceof Error ? error.message : "Demo login failed");
+    } finally {
+      setDemoLoading(false);
     }
   };
 
@@ -233,6 +271,36 @@ const Auth = () => {
                 </form>
               </TabsContent>
             </Tabs>
+
+            <div className="relative my-6">
+              <Separator />
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                or
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              onClick={handleDemoLogin}
+              disabled={demoLoading || loading}
+            >
+              {demoLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading demo...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4" />
+                  Try Demo (No account needed)
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Explore with pre-populated sample data
+            </p>
           </CardContent>
         </Card>
 
