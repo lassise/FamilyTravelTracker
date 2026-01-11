@@ -3,10 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFamilyData } from "@/hooks/useFamilyData";
 import AppLayout from "@/components/layout/AppLayout";
-import FamilyMember from "@/components/FamilyMember";
 import CountryTracker from "@/components/CountryTracker";
 import CountryWishlist from "@/components/CountryWishlist";
-import FamilyMemberDialog from "@/components/FamilyMemberDialog";
 import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
 import AnalyticsInsightCard from "@/components/travel/AnalyticsInsightCard";
@@ -21,11 +19,10 @@ import CountryComparison from "@/components/travel/CountryComparison";
 import EnhancedBucketList from "@/components/travel/EnhancedBucketList";
 import TravelMilestones from "@/components/travel/TravelMilestones";
 import DemoBanner from "@/components/DemoBanner";
-import { Loader2, BarChart3, Globe2, Trophy, Users, Map, Camera } from "lucide-react";
+import { Loader2, BarChart3, Globe2, Trophy, Map, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 
-type TabKey = 'overview' | 'analytics' | 'achievements' | 'countries' | 'family' | 'memories';
+type TabKey = 'overview' | 'analytics' | 'achievements' | 'countries' | 'memories';
 
 const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'overview', label: 'Overview', icon: Globe2 },
@@ -33,14 +30,13 @@ const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
   { key: 'achievements', label: 'Achievements', icon: Trophy },
   { key: 'memories', label: 'Memories', icon: Camera },
-  { key: 'family', label: 'Family', icon: Users },
 ];
 
 const TravelHistory = () => {
   const { user, loading: authLoading } = useAuth();
   const { familyMembers, countries, wishlist, homeCountry, loading, refetch, totalContinents } = useFamilyData();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabKey>('countries');
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   // Reset scroll to top when tab changes
   const handleTabChange = (tab: TabKey) => {
@@ -102,11 +98,6 @@ const TravelHistory = () => {
                   <Map className="h-4 w-4 text-secondary" />
                   <span className="font-semibold text-foreground">{totalContinents}</span>
                   <span className="text-muted-foreground hidden sm:inline">continents</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Users className="h-4 w-4 text-accent" />
-                  <span className="font-semibold text-foreground">{familyMembers.length}</span>
-                  <span className="text-muted-foreground hidden sm:inline">travelers</span>
                 </div>
               </div>
             </div>
@@ -190,31 +181,6 @@ const TravelHistory = () => {
               <TravelTimeline countries={countries} />
               <PhotoGallery countries={countries} />
               <TripSuggestions countries={countries} wishlist={wishlist} />
-            </div>
-          )}
-
-          {activeTab === 'family' && (
-            <div>
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  Family Members
-                </h2>
-                <p className="text-muted-foreground mb-4">
-                  Track each family member's travel adventures
-                </p>
-                <FamilyMemberDialog onSuccess={refetch} />
-              </div>
-              
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {familyMembers.map((member) => (
-                  <FamilyMember 
-                    key={member.id} 
-                    {...member} 
-                    countries={countries}
-                    onUpdate={refetch} 
-                  />
-                ))}
-              </div>
             </div>
           )}
         </div>

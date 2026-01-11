@@ -176,10 +176,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
                       countryName={country.name}
                       countryCode={countryCode}
                       onUpdate={handleUpdate}
-                    />
-                    <CountryDialog
-                      country={country}
-                      onSuccess={handleUpdate}
+                      buttonLabel="Trips"
                     />
                     <Button
                       variant="outline"

@@ -10,14 +10,16 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFamilyData } from "@/hooks/useFamilyData";
-import { Loader2, User, Share2, Copy, ExternalLink, Globe, Camera, MapPin, Sparkles, Zap } from "lucide-react";
+import { Loader2, User, Share2, Copy, ExternalLink, Globe, Camera, MapPin, Users } from "lucide-react";
 import TravelPreferencesSection from "@/components/profile/TravelPreferencesSection";
 import TravelRecommendations from "@/components/travel/TravelRecommendations";
 import QuickAIPlanner from "@/components/travel/QuickAIPlanner";
+import FamilyMember from "@/components/FamilyMember";
+import FamilyMemberDialog from "@/components/FamilyMemberDialog";
 
 const Profile = () => {
   const { user, profile, loading: authLoading, updateProfile } = useAuth();
-  const { countries, totalContinents } = useFamilyData();
+  const { countries, familyMembers, totalContinents, refetch } = useFamilyData();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -148,11 +150,46 @@ const Profile = () => {
 
   return (
     <AppLayout>
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="flex items-center gap-3 mb-8">
           <User className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold text-foreground">Profile</h1>
         </div>
+
+        {/* Family Members Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Family Members
+                </CardTitle>
+                <CardDescription>Track each family member's travel adventures</CardDescription>
+              </div>
+              <FamilyMemberDialog onSuccess={refetch} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {familyMembers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No family members added yet. Add your first traveler!</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {familyMembers.map((member) => (
+                  <FamilyMember 
+                    key={member.id} 
+                    {...member} 
+                    countries={countries}
+                    onUpdate={refetch} 
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Left Column */}

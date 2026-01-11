@@ -20,6 +20,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Highlights = lazy(() => import("./pages/Highlights"));
 const Explore = lazy(() => import("./pages/Explore"));
+const YearWrapped = lazy(() => import("./pages/YearWrapped"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/highlights/:token" element={<Highlights />} />
               <Route path="/explore" element={<Explore />} />
+              <Route path="/year-wrapped" element={<YearWrapped />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

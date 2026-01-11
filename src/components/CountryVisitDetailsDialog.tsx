@@ -162,6 +162,7 @@ interface CountryVisitDetailsDialogProps {
   countryName: string;
   countryCode: string;
   onUpdate: () => void;
+  buttonLabel?: string;
 }
 
 // City picker component
@@ -493,6 +494,7 @@ const CountryVisitDetailsDialog = ({
   countryName,
   countryCode,
   onUpdate,
+  buttonLabel = "Details",
 }: CountryVisitDetailsDialogProps) => {
   const [open, setOpen] = useState(false);
   const [visitDetails, setVisitDetails] = useState<VisitDetail[]>([]);
@@ -833,7 +835,7 @@ const CountryVisitDetailsDialog = ({
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="text-xs">
           <Calendar className="w-3 h-3 mr-1" />
-          Details
+          {buttonLabel}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh]">
