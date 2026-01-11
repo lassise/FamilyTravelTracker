@@ -41,6 +41,7 @@ const INTEREST_OPTIONS = [
   { label: "Shopping", emoji: "🛍️" },
   { label: "Nightlife", emoji: "🌃" },
   { label: "Sports & Activities", emoji: "⚽" },
+  { label: "Golf", emoji: "⛳" },
 ];
 
 const ACCOMMODATION_OPTIONS = [

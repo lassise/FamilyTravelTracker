@@ -28,10 +28,31 @@ export const getAllCountries = (): CountryOption[] => {
   })).sort((a, b) => a.name.localeCompare(b.name));
 };
 
-// Search countries by name
+// Country aliases for common alternative names
+const countryAliases: Record<string, string[]> = {
+  'GB': ['england', 'uk', 'britain', 'great britain', 'scotland', 'wales', 'northern ireland'],
+  'US': ['usa', 'america', 'united states of america'],
+  'AE': ['uae', 'emirates', 'dubai', 'abu dhabi'],
+  'KR': ['south korea', 'korea'],
+  'CZ': ['czechia'],
+  'NL': ['holland'],
+};
+
+// Search countries by name (including aliases)
 export const searchCountries = (query: string): CountryOption[] => {
   const lowercaseQuery = query.toLowerCase();
-  return getAllCountries().filter(country => 
-    country.name.toLowerCase().includes(lowercaseQuery)
-  );
+  const allCountries = getAllCountries();
+  
+  return allCountries.filter(country => {
+    // Check if the country name matches
+    if (country.name.toLowerCase().includes(lowercaseQuery)) {
+      return true;
+    }
+    // Check if any alias matches
+    const aliases = countryAliases[country.code];
+    if (aliases) {
+      return aliases.some(alias => alias.includes(lowercaseQuery));
+    }
+    return false;
+  });
 };
