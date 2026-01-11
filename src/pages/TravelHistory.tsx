@@ -8,20 +8,21 @@ import CountryTracker from "@/components/CountryTracker";
 import CountryWishlist from "@/components/CountryWishlist";
 import FamilyMemberDialog from "@/components/FamilyMemberDialog";
 import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
-import QuickStatsDashboard from "@/components/travel/QuickStatsDashboard";
-import ContinentProgressRings from "@/components/travel/ContinentProgressRings";
+import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
+import AnalyticsInsightCard from "@/components/travel/AnalyticsInsightCard";
 import TravelTimeline from "@/components/travel/TravelTimeline";
-import AchievementsGoals from "@/components/travel/AchievementsGoals";
+import EnhancedAchievements from "@/components/travel/EnhancedAchievements";
 import PhotoGallery from "@/components/travel/PhotoGallery";
 import TravelHeatmapCalendar from "@/components/travel/TravelHeatmapCalendar";
 import TripSuggestions from "@/components/travel/TripSuggestions";
 import TravelDNA from "@/components/travel/TravelDNA";
 import TravelStreaks from "@/components/travel/TravelStreaks";
 import CountryComparison from "@/components/travel/CountryComparison";
-import BucketListTracker from "@/components/travel/BucketListTracker";
+import EnhancedBucketList from "@/components/travel/EnhancedBucketList";
 import TravelMilestones from "@/components/travel/TravelMilestones";
-import { Loader2, BarChart3, Globe2, Trophy, Users, Map, Camera, Compass } from "lucide-react";
+import { Loader2, BarChart3, Globe2, Trophy, Users, Map, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type TabKey = 'overview' | 'analytics' | 'achievements' | 'countries' | 'family' | 'memories';
 
@@ -136,6 +137,7 @@ const TravelHistory = () => {
         <div className="container mx-auto px-4 py-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              <HeroSummaryCard countries={countries} familyMembers={familyMembers} totalContinents={totalContinents} />
               <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} />
               <TravelMilestones countries={countries} familyMembers={familyMembers} totalContinents={totalContinents} />
               <div className="grid lg:grid-cols-2 gap-6">
@@ -147,22 +149,22 @@ const TravelHistory = () => {
 
           {activeTab === 'analytics' && (
             <div className="space-y-6">
+              <AnalyticsInsightCard countries={countries} />
               <div className="grid lg:grid-cols-2 gap-6">
-                <ContinentProgressRings countries={countries} />
                 <CountryComparison countries={countries} />
+                <TravelHeatmapCalendar />
               </div>
-              <TravelHeatmapCalendar />
             </div>
           )}
 
           {activeTab === 'achievements' && (
             <div className="space-y-6">
-              <AchievementsGoals 
+              <EnhancedAchievements 
                 countries={countries} 
                 familyMembers={familyMembers}
                 totalContinents={totalContinents}
               />
-              <BucketListTracker />
+              <EnhancedBucketList />
             </div>
           )}
 
