@@ -20,6 +20,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<{ error: Error | null }>;
   needsOnboarding: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +42,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(data);
     }
     return data;
+  };
+
+  // Function to refresh profile after onboarding completion
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchProfile(user.id);
+    }
   };
 
   useEffect(() => {
@@ -143,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOut,
         updateProfile,
         needsOnboarding,
+        refreshProfile,
       }}
     >
       {children}

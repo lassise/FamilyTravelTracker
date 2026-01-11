@@ -1,10 +1,22 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Check, Home, Search } from "lucide-react";
+import { Home, Search, Check, ChevronsUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface HomeCountryStepProps {
   onHomeCountryChange: (country: string | null) => void;
@@ -13,7 +25,7 @@ interface HomeCountryStepProps {
 const HomeCountryStep = ({ onHomeCountryChange }: HomeCountryStepProps) => {
   const [countries, setCountries] = useState<{ id: string; name: string; flag: string }[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const fetchCountries = async () => {
@@ -50,6 +62,7 @@ const HomeCountryStep = ({ onHomeCountryChange }: HomeCountryStepProps) => {
   const handleSelectCountry = async (countryName: string) => {
     setSelectedCountry(countryName);
     onHomeCountryChange(countryName);
+    setOpen(false);
 
     // Save to profile
     const { data: { user } } = await supabase.auth.getUser();
@@ -61,51 +74,71 @@ const HomeCountryStep = ({ onHomeCountryChange }: HomeCountryStepProps) => {
     }
   };
 
-  const filteredCountries = countries.filter((country) =>
-    country.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const selectedCountryData = countries.find(c => c.name === selectedCountry);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Home className="w-4 h-4" />
         <span className="text-sm">Select your home country - it will be shown on the map but won't count towards your travel stats.</span>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search countries..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      <div className="space-y-2">
+        <Label htmlFor="home-country">Home Country</Label>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-full justify-between h-12 text-left font-normal"
+            >
+              {selectedCountryData ? (
+                <span className="flex items-center gap-2">
+                  <span className="text-xl">{selectedCountryData.flag}</span>
+                  <span>{selectedCountryData.name}</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Select a country...</span>
+              )}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Search countries..." />
+              <CommandList>
+                <CommandEmpty>No country found.</CommandEmpty>
+                <CommandGroup className="max-h-[300px] overflow-auto">
+                  {countries.map((country) => (
+                    <CommandItem
+                      key={country.id}
+                      value={country.name}
+                      onSelect={() => handleSelectCountry(country.name)}
+                      className="cursor-pointer"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedCountry === country.name ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <span className="mr-2 text-lg">{country.flag}</span>
+                      <span>{country.name}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       </div>
 
-      <ScrollArea className="h-[240px] rounded-md border p-2">
-        <div className="grid grid-cols-2 gap-2">
-          {filteredCountries.map((country) => (
-            <Button
-              key={country.id}
-              variant={selectedCountry === country.name ? "default" : "outline"}
-              className="justify-start h-auto py-2 px-3"
-              onClick={() => handleSelectCountry(country.name)}
-            >
-              <span className="mr-2 text-lg">{country.flag}</span>
-              <span className="truncate text-sm">{country.name}</span>
-              {selectedCountry === country.name && (
-                <Check className="ml-auto h-4 w-4 flex-shrink-0" />
-              )}
-            </Button>
-          ))}
-        </div>
-      </ScrollArea>
-
       {selectedCountry && (
-        <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-          <Home className="w-4 h-4 text-primary" />
+        <div className="flex items-center gap-2 p-4 bg-primary/10 rounded-lg border border-primary/20">
+          <Home className="w-5 h-5 text-primary" />
           <span className="text-sm">
-            Home country: <strong>{selectedCountry}</strong>
+            Home country set to: <strong>{selectedCountry}</strong>
           </span>
         </div>
       )}
