@@ -3,13 +3,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import { 
   Plane, 
   Plus, 
-  Search, 
   Menu, 
-  X,
   User,
   LogOut,
   Settings,
@@ -25,7 +22,6 @@ const Header = () => {
   const { user, profile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -104,35 +100,6 @@ const Header = () => {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Search - Desktop only */}
-          <div className="hidden sm:block relative">
-            {searchOpen ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Search countries, trips..."
-                  className="w-64"
-                  autoFocus
-                  onBlur={() => setSearchOpen(false)}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSearchOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSearchOpen(true)}
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
           {/* Hamburger Menu - Combined menu for all screens */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>

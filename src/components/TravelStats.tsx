@@ -1,5 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Globe, Award, TrendingUp, Users, Plane, Target, Calendar } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Globe, Award, Users, Plane, Target, Calendar, MapPin, Repeat } from "lucide-react";
 import type { FamilyMember } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
 
@@ -25,8 +25,28 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
       )
     : null;
 
+  // Calculate most visited country (by trip count) and most days spent
+  const countryVisitCounts = visitDetails.reduce((acc, v) => {
+    acc[v.country_id] = (acc[v.country_id] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const countryDaysCounts = visitDetails.reduce((acc, v) => {
+    acc[v.country_id] = (acc[v.country_id] || 0) + (v.number_of_days || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Most visited country by number of trips
+  const mostVisitedCountryId = Object.entries(countryVisitCounts)
+    .sort(([, a], [, b]) => b - a)[0];
+  const mostVisitedTrips = mostVisitedCountryId ? mostVisitedCountryId[1] : 0;
+
+  // Country with most collective days
+  const mostDaysCountryId = Object.entries(countryDaysCounts)
+    .sort(([, a], [, b]) => b - a)[0];
+  const mostDaysTotal = mostDaysCountryId ? mostDaysCountryId[1] : 0;
+
   // Calculate percentiles based on countries visited
-  // Source: Research shows most people visit 3-10 countries in their lifetime
   const getGlobalPercentile = (countries: number): number => {
     if (countries >= 50) return 99;
     if (countries >= 40) return 97;
@@ -52,28 +72,42 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
       icon: Calendar,
       label: "Days Abroad",
       value: `${totalDaysAbroad}`,
-      description: `Total days spent outside the USA exploring the world`,
+      description: `Total days spent exploring the world`,
       gradient: "from-amber-500 to-orange-500",
+    },
+    {
+      icon: Repeat,
+      label: "Most Visited",
+      value: mostVisitedTrips > 0 ? `${mostVisitedTrips} trips` : "—",
+      description: mostVisitedTrips > 0 ? `Your most frequently visited destination` : "Log trip details to see",
+      gradient: "from-rose-500 to-pink-500",
+    },
+    {
+      icon: MapPin,
+      label: "Longest Stay",
+      value: mostDaysTotal > 0 ? `${mostDaysTotal} days` : "—",
+      description: mostDaysTotal > 0 ? `Most collective time in one country` : "Add trip durations to see",
+      gradient: "from-teal-500 to-cyan-500",
     },
     {
       icon: Globe,
       label: "Global Ranking",
       value: `Top ${100 - globalPercentile}%`,
-      description: `You've traveled more than ${globalPercentile}% of the global population`,
+      description: `You've traveled more than ${globalPercentile}% of people`,
       gradient: "from-blue-500 to-cyan-500",
     },
     {
       icon: Target,
       label: "World Coverage",
       value: `${worldCoveragePercent}%`,
-      description: `Visited ${totalCountries} out of 195 UN-recognized countries`,
+      description: `Visited ${totalCountries} of 195 countries`,
       gradient: "from-purple-500 to-pink-500",
     },
     {
       icon: Award,
-      label: "Continental Explorer",
+      label: "Continents",
       value: `${continentCoveragePercent}%`,
-      description: `Explored ${totalContinents} of 7 continents worldwide`,
+      description: `Explored ${totalContinents} of 7 continents`,
       gradient: "from-orange-500 to-red-500",
     },
     {
@@ -81,15 +115,15 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
       label: "Family Average",
       value: `${avgCountriesPerMember.toFixed(1)}`,
       description: mostTraveledMember 
-        ? `Average countries per person (Top traveler: ${mostTraveledMember.name})`
-        : "Average countries per family member",
+        ? `Top traveler: ${mostTraveledMember.name}`
+        : "Countries per member",
       gradient: "from-green-500 to-emerald-500",
     },
     {
       icon: Users,
-      label: "Family Goal Progress",
+      label: "Family Goal",
       value: `${((totalCountries / 195) * 100).toFixed(0)}%`,
-      description: `On track to visit all countries together`,
+      description: `Progress to all countries`,
       gradient: "from-indigo-500 to-blue-500",
     },
   ];
@@ -106,7 +140,7 @@ const TravelStats = ({ totalCountries, totalContinents, familyMembers }: TravelS
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {stats.map((stat, index) => (
             <Card key={index} className="group hover:shadow-md transition-all duration-300 border hover:border-primary/30">
               <CardContent className="p-3 text-center">

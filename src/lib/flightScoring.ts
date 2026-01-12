@@ -28,6 +28,12 @@ export interface FlightResult {
   itineraries: FlightItinerary[];
 }
 
+export interface PreferenceMatch {
+  type: "positive" | "negative";
+  label: string;
+  detail?: string;
+}
+
 export interface ScoredFlight extends FlightResult {
   score: number;
   breakdown: ScoreBreakdown;
@@ -37,6 +43,8 @@ export interface ScoredFlight extends FlightResult {
   familyStressScore?: number;
   delayRisk: "low" | "medium" | "high";
   hiddenCosts: HiddenCost[];
+  preferenceMatches: PreferenceMatch[];
+  bookingUrl?: string;
 }
 
 export interface ScoreBreakdown {
@@ -425,6 +433,71 @@ export const scoreFlights = (
       }
     }
 
+    // Generate preference matches (positives and negatives)
+    const preferenceMatches: PreferenceMatch[] = [];
+    
+    // Positive matches
+    if (isNonstop && preferences.prefer_nonstop) {
+      preferenceMatches.push({ type: "positive", label: "Non-stop", detail: "Matches your preference" });
+    } else if (isNonstop) {
+      preferenceMatches.push({ type: "positive", label: "Non-stop flight" });
+    }
+    
+    if (breakdown.departureTime > 80) {
+      preferenceMatches.push({ type: "positive", label: "Preferred departure time" });
+    }
+    
+    const airline = AIRLINES.find(a => (firstSegment?.airline || "").startsWith(a.code));
+    if (airline && preferences.preferred_airlines.includes(airline.name)) {
+      preferenceMatches.push({ type: "positive", label: `${airline.name}`, detail: "Your preferred airline" });
+    }
+    
+    if (breakdown.airlineReliability > 85) {
+      preferenceMatches.push({ type: "positive", label: "Highly reliable", detail: `${breakdown.airlineReliability}% reliability` });
+    }
+    
+    if (travelTime <= minTime + 30) {
+      preferenceMatches.push({ type: "positive", label: "Short travel time" });
+    }
+    
+    if (breakdown.price > 90) {
+      preferenceMatches.push({ type: "positive", label: "Great price", detail: "Among the cheapest" });
+    }
+    
+    // Negative matches
+    if (!isNonstop && preferences.prefer_nonstop) {
+      preferenceMatches.push({ type: "negative", label: "Has stops", detail: "You prefer non-stop" });
+    }
+    
+    const depHourCheck = getHour(firstSegment?.departureTime);
+    if ((depHourCheck >= 21 || depHourCheck < 5) && !preferences.red_eye_allowed) {
+      preferenceMatches.push({ type: "negative", label: "Red-eye flight", detail: "You prefer to avoid" });
+    }
+    
+    if (airline && preferences.avoided_airlines.includes(airline.name)) {
+      preferenceMatches.push({ type: "negative", label: `${airline.name}`, detail: "Airline you avoid" });
+    }
+    
+    if (breakdown.layoverQuality < 60) {
+      preferenceMatches.push({ type: "negative", label: "Limited airport", detail: "Connection airport has fewer amenities" });
+    }
+    
+    if (preferences.family_mode) {
+      const stressScore = calculateFamilyStressScore(flight, preferences);
+      if (stressScore > 50) {
+        preferenceMatches.push({ type: "negative", label: "High family stress", detail: "Tight connections or late arrivals" });
+      } else if (stressScore < 20) {
+        preferenceMatches.push({ type: "positive", label: "Family-friendly", detail: "Good timing and connections" });
+      }
+    }
+
+    // Build booking URL (Google Flights redirect)
+    const departureAirport = firstSegment?.departureAirport || "";
+    const arrivalAirport = lastSegment?.arrivalAirport || "";
+    const bookingUrl = departureAirport && arrivalAirport
+      ? `https://www.google.com/travel/flights?q=flights%20${departureAirport}%20to%20${arrivalAirport}`
+      : undefined;
+
     const scoredFlight: ScoredFlight = {
       ...flight,
       score: breakdown.total,
@@ -437,6 +510,8 @@ export const scoreFlights = (
         : undefined,
       delayRisk: estimateDelayRisk(flight),
       hiddenCosts: detectHiddenCosts(flight, preferences),
+      preferenceMatches,
+      bookingUrl,
     };
 
     scoredFlight.explanation = generateExplanation(scoredFlight, preferences);

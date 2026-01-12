@@ -87,13 +87,15 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
     [countries]
   );
 
-  // Countries that support state-level tracking and are visited
+  // Countries that support state-level tracking (visited OR home country)
   const countriesWithStateTracking = useMemo(() => 
     countries.filter(c => {
       const code = countryNameToCode[c.name];
-      return c.visitedBy.length > 0 && code && countriesWithStates.includes(code);
+      const isHomeCountry = c.name === homeCountry;
+      const isVisited = c.visitedBy.length > 0;
+      return (isVisited || isHomeCountry) && code && countriesWithStates.includes(code);
     }),
-    [countries]
+    [countries, homeCountry]
   );
 
   const wishlistCountries = useMemo(() => 
@@ -259,7 +261,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
         },
       });
 
-      // Add click handler for countries with state tracking
+      // Add click handler for countries with state tracking (visited countries)
       map.current?.on('click', 'visited-countries', (e) => {
         if (!e.features?.[0]) return;
         const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
@@ -272,6 +274,36 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
             setStateDialogOpen(true);
           }
         }
+      });
+
+      // Add click handler for home country (separate layer)
+      map.current?.on('click', 'home-country', (e) => {
+        if (!e.features?.[0]) return;
+        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
+        const iso2 = iso3ToIso2[iso3];
+        
+        if (iso2 && countriesWithStates.includes(iso2)) {
+          const clickedCountry = countries.find(c => countryToISO3[c.name] === iso3);
+          if (clickedCountry) {
+            setSelectedCountry(clickedCountry);
+            setStateDialogOpen(true);
+          }
+        }
+      });
+
+      // Change cursor on hover for home country (if it has state tracking)
+      map.current?.on('mouseenter', 'home-country', (e) => {
+        if (!e.features?.[0]) return;
+        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
+        const iso2 = iso3ToIso2[iso3];
+        
+        if (iso2 && countriesWithStates.includes(iso2)) {
+          map.current!.getCanvas().style.cursor = 'pointer';
+        }
+      });
+
+      map.current?.on('mouseleave', 'home-country', () => {
+        map.current!.getCanvas().style.cursor = '';
       });
 
       // Change cursor on hover for clickable countries

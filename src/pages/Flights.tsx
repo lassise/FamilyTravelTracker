@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { 
   PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, Car, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
-  Info, Armchair
+  Info, Armchair, CheckCircle2, XCircle, ExternalLink
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -518,6 +518,24 @@ const Flights = () => {
                   {/* Explanation */}
                   <p className="text-sm text-muted-foreground mb-3 italic">{flight.explanation}</p>
 
+                  {/* Preference Matches - Positives and Negatives */}
+                  {flight.preferenceMatches && flight.preferenceMatches.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {flight.preferenceMatches.filter(m => m.type === "positive").map((match, i) => (
+                        <Badge key={`pos-${i}`} variant="outline" className="text-xs border-green-500/50 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          {match.label}
+                        </Badge>
+                      ))}
+                      {flight.preferenceMatches.filter(m => m.type === "negative").map((match, i) => (
+                        <Badge key={`neg-${i}`} variant="outline" className="text-xs border-red-500/50 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400">
+                          <XCircle className="h-3 w-3 mr-1" />
+                          {match.label}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Flight segments */}
                   {flight.itineraries?.map((itinerary, itIdx) => (
                     <div key={itIdx} className="space-y-2 mb-2">
@@ -540,19 +558,30 @@ const Flights = () => {
                               <p className="text-xs text-muted-foreground">{seg.arrivalAirport}</p>
                             </div>
                           </div>
-                          <Button size="sm">Select</Button>
+                          {flight.bookingUrl ? (
+                            <Button 
+                              size="sm" 
+                              onClick={() => window.open(flight.bookingUrl, '_blank')}
+                              className="gap-1"
+                            >
+                              Book <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          ) : (
+                            <Button 
+                              size="sm" 
+                              onClick={() => {
+                                const searchUrl = `https://www.google.com/travel/flights?q=flights%20${seg.departureAirport}%20to%20${seg.arrivalAirport}`;
+                                window.open(searchUrl, '_blank');
+                              }}
+                              className="gap-1"
+                            >
+                              Book <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
                   ))}
-
-                  {/* Warnings - preferences not matched */}
-                  {flight.warnings.length > 0 && (
-                    <div className="mt-2 p-2 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">⚠️ Some preferences not matched:</p>
-                      {flight.warnings.map((w, i) => <p key={i} className="text-xs text-amber-600 dark:text-amber-500">• {w}</p>)}
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             ))}
