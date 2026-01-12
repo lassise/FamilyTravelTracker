@@ -12,6 +12,7 @@ import {
   getCountryMetadataByName 
 } from "@/lib/countryMetadata";
 import { format, differenceInDays, parseISO } from "date-fns";
+import GeographicDetailsDialog, { GeographicType } from "./GeographicDetailsDialog";
 
 interface TravelDNAProps {
   countries: Country[];
@@ -235,11 +236,18 @@ const TravelDNA = ({ countries, homeCountryCode = 'US' }: TravelDNAProps) => {
     },
   ];
   
-  const geographicBadges = [
-    { label: "Island Nations", count: insights.islandCount, icon: Waves, color: "bg-cyan-500/20 text-cyan-600" },
-    { label: "Landlocked", count: insights.landlockedCount, icon: Mountain, color: "bg-amber-500/20 text-amber-600" },
-    { label: "G7 Countries", count: insights.g7Count, max: 7, icon: Sparkles, color: "bg-purple-500/20 text-purple-600" },
-    { label: "G20 Countries", count: insights.g20Count, max: 20, icon: Globe, color: "bg-blue-500/20 text-blue-600" },
+  const geographicBadges: { 
+    label: string; 
+    count: number; 
+    icon: typeof Waves; 
+    color: string; 
+    type: GeographicType;
+    max?: number;
+  }[] = [
+    { label: "Island Nations", count: insights.islandCount, icon: Waves, color: "bg-cyan-500/20 text-cyan-600 hover:bg-cyan-500/30 cursor-pointer", type: "islands" },
+    { label: "Landlocked", count: insights.landlockedCount, icon: Mountain, color: "bg-amber-500/20 text-amber-600 hover:bg-amber-500/30 cursor-pointer", type: "landlocked" },
+    { label: "G7 Countries", count: insights.g7Count, max: 7, icon: Sparkles, color: "bg-purple-500/20 text-purple-600 hover:bg-purple-500/30 cursor-pointer", type: "g7" },
+    { label: "G20 Countries", count: insights.g20Count, max: 20, icon: Globe, color: "bg-blue-500/20 text-blue-600 hover:bg-blue-500/30 cursor-pointer", type: "g20" },
   ];
 
   return (
@@ -276,14 +284,19 @@ const TravelDNA = ({ countries, homeCountryCode = 'US' }: TravelDNAProps) => {
           <h4 className="text-sm font-medium text-foreground">Geographic Diversity</h4>
           <div className="flex flex-wrap gap-2">
             {geographicBadges.map((badge, index) => (
-              <Badge 
+              <GeographicDetailsDialog 
                 key={index}
-                variant="secondary"
-                className={`${badge.color} flex items-center gap-1.5 px-3 py-1.5`}
+                type={badge.type}
+                countries={countries}
               >
-                <badge.icon className="w-3.5 h-3.5" />
-                {badge.label}: {badge.count}{badge.max ? `/${badge.max}` : ''}
-              </Badge>
+                <Badge 
+                  variant="secondary"
+                  className={`${badge.color} flex items-center gap-1.5 px-3 py-1.5 transition-colors`}
+                >
+                  <badge.icon className="w-3.5 h-3.5" />
+                  {badge.label}: {badge.count}{badge.max ? `/${badge.max}` : ''}
+                </Badge>
+              </GeographicDetailsDialog>
             ))}
           </div>
         </div>
