@@ -47,7 +47,7 @@ const PersonalTravelSummary = ({
           <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="text-lg font-semibold mb-2">No Profile Linked</h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            To see your personal travel statistics, link yourself to a family member in your profile settings or during onboarding.
+            Complete onboarding to start tracking your travels, or link yourself in profile settings.
           </p>
         </CardContent>
       </Card>

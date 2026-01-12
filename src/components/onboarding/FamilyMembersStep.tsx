@@ -16,13 +16,14 @@ const memberSchema = z.object({
 
 interface FamilyMembersStepProps {
   onMembersChange: (members: Array<{ id: string; name: string }>) => void;
+  onSoloMode?: (isSolo: boolean) => void;
 }
 
-const ROLE_SUGGESTIONS = ["Dad", "Mom", "Son", "Daughter", "Grandpa", "Grandma", "Uncle", "Aunt"];
-const AVATAR_EMOJIS = ["👨", "👩", "👦", "👧", "👴", "👵", "🧑", "👶"];
+const ROLE_SUGGESTIONS = ["Me", "Partner", "Son", "Daughter", "Dad", "Mom", "Friend"];
+const AVATAR_EMOJIS = ["🧑", "👨", "👩", "👦", "👧", "👴", "👵", "👶"];
 const COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F"];
 
-const FamilyMembersStep = ({ onMembersChange }: FamilyMembersStepProps) => {
+const FamilyMembersStep = ({ onMembersChange, onSoloMode }: FamilyMembersStepProps) => {
   const [members, setMembers] = useState<Array<{ id: string; name: string; role: string; avatar: string; color: string }>>([]);
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("");
@@ -35,7 +36,8 @@ const FamilyMembersStep = ({ onMembersChange }: FamilyMembersStepProps) => {
 
   useEffect(() => {
     onMembersChange(members.map(m => ({ id: m.id, name: m.name })));
-  }, [members, onMembersChange]);
+    onSoloMode?.(members.length <= 1);
+  }, [members, onMembersChange, onSoloMode]);
 
   const fetchMembers = async () => {
     const { data, error } = await supabase
@@ -139,12 +141,14 @@ const FamilyMembersStep = ({ onMembersChange }: FamilyMembersStepProps) => {
 
       <Button onClick={handleAddMember} disabled={loading || !newName.trim()} className="w-full">
         <Plus className="w-4 h-4 mr-2" />
-        Add Family Member
+        Add Traveler
       </Button>
 
       {members.length > 0 && (
         <div className="space-y-2 mt-4">
-          <Label className="text-muted-foreground">Your Family ({members.length})</Label>
+          <Label className="text-muted-foreground">
+            {members.length === 1 ? "Traveler" : `Travelers (${members.length})`}
+          </Label>
           <div className="grid gap-2">
             {members.map((member) => (
               <Card key={member.id}>
@@ -179,7 +183,8 @@ const FamilyMembersStep = ({ onMembersChange }: FamilyMembersStepProps) => {
       {members.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Add family members to track their travels</p>
+          <p>Add yourself to start tracking your travels</p>
+          <p className="text-sm mt-1">You can add more people later if you want</p>
         </div>
       )}
     </div>

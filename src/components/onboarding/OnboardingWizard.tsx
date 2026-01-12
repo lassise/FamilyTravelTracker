@@ -23,35 +23,43 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [homeCountry, setHomeCountry] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [isSoloTraveler, setIsSoloTraveler] = useState(false);
 
-  const steps = [
+  // Build steps dynamically based on solo/family mode
+  const baseSteps = [
     {
-      title: "Welcome to Family On The Fly!",
-      description: "Your family's travel companion for tracking adventures around the world.",
+      title: "Welcome to Your Travel Companion!",
+      description: "Track your adventures around the world — solo or with family.",
       icon: Sparkles,
       component: <WelcomeFeaturesStep />,
     },
     {
       title: "Who's Traveling?",
-      description: "Add the family members you'll be tracking travels for.",
+      description: "Add yourself and anyone else you'd like to track travels for.",
       icon: Users,
       component: (
         <FamilyMembersStep 
           onMembersChange={setFamilyMembers}
+          onSoloMode={setIsSoloTraveler}
         />
       ),
     },
-    {
-      title: "Which One Is You?",
-      description: "Select yourself so we can show your personal travel stats.",
-      icon: UserCheck,
-      component: (
-        <SelectYourselfStep 
-          familyMembers={familyMembers}
-          onSelect={setSelectedMemberId}
-        />
-      ),
-    },
+  ];
+
+  // Only show "Select Yourself" step if there's more than one family member
+  const selectYourselfStep = familyMembers.length > 1 ? [{
+    title: "Which One Is You?",
+    description: "Select yourself so we can show your personal travel stats.",
+    icon: UserCheck,
+    component: (
+      <SelectYourselfStep 
+        familyMembers={familyMembers}
+        onSelect={setSelectedMemberId}
+      />
+    ),
+  }] : [];
+
+  const remainingSteps = [
     {
       title: "Where's Home?",
       description: "Select your home country. It will be displayed on the map but won't count as visited.",
@@ -70,7 +78,7 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     },
     {
       title: "Countries You've Visited",
-      description: "Add countries your family has already explored. You can add details later.",
+      description: "Add countries you've already explored. You can add details later.",
       icon: Globe,
       component: (
         <CountriesStep 
@@ -79,6 +87,8 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       ),
     },
   ];
+
+  const steps = [...baseSteps, ...selectYourselfStep, ...remainingSteps];
 
   const currentStep = steps[step];
   const progress = ((step + 1) / steps.length) * 100;
@@ -91,7 +101,11 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       if (user) {
         // Update profile with onboarding complete and linked member
         const updateData: any = { onboarding_completed: true };
-        if (selectedMemberId) {
+        
+        // Auto-link if solo traveler with exactly one member, or use selected member
+        if (familyMembers.length === 1) {
+          updateData.linked_family_member_id = familyMembers[0].id;
+        } else if (selectedMemberId) {
           updateData.linked_family_member_id = selectedMemberId;
         }
         
@@ -143,7 +157,7 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
             <Plane className="w-6 h-6 text-primary-foreground" />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Family On The Fly
+            Travel Tracker
           </h1>
         </div>
 

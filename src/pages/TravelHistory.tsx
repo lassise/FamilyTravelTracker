@@ -41,7 +41,10 @@ const TravelHistory = () => {
   const { visitedCountries, totalCountries: personalTotalCountries, continentsVisited: personalContinents, linkedMember, loading: personalLoading } = usePersonalTravelData();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  const [viewMode, setViewMode] = useState<ViewMode>('family');
+  // Default to personal view if solo (1 or fewer family members), otherwise family view
+  const [viewMode, setViewMode] = useState<ViewMode>(() => 
+    familyMembers.length <= 1 ? 'personal' : 'family'
+  );
 
   // Reset scroll to top when tab changes
   const handleTabChange = (tab: TabKey) => {
@@ -98,36 +101,43 @@ const TravelHistory = () => {
         {/* Sticky Header with Stats + Navigation */}
         <div className="sticky top-16 z-40 bg-background border-b border-border shadow-sm">
           <div className="container mx-auto px-4 py-3">
-            {/* View Mode Toggle */}
+            {/* View Mode Toggle - only show if there are multiple travelers */}
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setViewMode('family')}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                    viewMode === 'family'
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
-                  <Users className="h-4 w-4" />
-                  <span className="hidden sm:inline">Family Travel</span>
-                  <span className="sm:hidden">Family</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('personal')}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                    viewMode === 'personal'
-                      ? "bg-secondary text-secondary-foreground shadow-md"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  )}
-                >
+              {familyMembers.length > 1 ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setViewMode('personal')}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                      viewMode === 'personal'
+                        ? "bg-secondary text-secondary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">My Travel</span>
+                    <span className="sm:hidden">Me</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('family')}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                      viewMode === 'family'
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">All Travelers</span>
+                    <span className="sm:hidden">All</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground">
                   <User className="h-4 w-4" />
-                  <span className="hidden sm:inline">My Travel</span>
-                  <span className="sm:hidden">Me</span>
-                </button>
-              </div>
+                  <span>My Travel</span>
+                </div>
+              )}
               
               <div className="flex items-center gap-4 text-sm">
                 {viewMode === 'family' ? (
@@ -300,7 +310,7 @@ const TravelHistory = () => {
                       <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                       <h3 className="text-lg font-semibold mb-2">No Profile Linked</h3>
                       <p className="text-muted-foreground max-w-md mx-auto">
-                        To see your personal travel history, link yourself to a family member in your profile settings.
+                        To see your travel history, complete onboarding or link yourself in profile settings.
                       </p>
                     </div>
                   ) : (
