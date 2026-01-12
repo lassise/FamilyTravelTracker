@@ -26,6 +26,9 @@ export interface FlightResult {
   price: number;
   currency: string;
   itineraries: FlightItinerary[];
+  departureAirport?: string;
+  isAlternateOrigin?: boolean;
+  minSavingsRequired?: number;
 }
 
 export interface PreferenceMatch {
@@ -45,6 +48,7 @@ export interface ScoredFlight extends FlightResult {
   hiddenCosts: HiddenCost[];
   preferenceMatches: PreferenceMatch[];
   bookingUrl?: string;
+  savingsFromPrimary?: number;
 }
 
 export interface ScoreBreakdown {

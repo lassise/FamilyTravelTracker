@@ -10,15 +10,22 @@ export interface HomeAirport {
   isPrimary: boolean;
 }
 
+export interface AlternateAirport {
+  code: string;
+  name: string;
+  minSavings: number; // Minimum savings required to consider this airport
+}
+
 export type PreferencePriority = "non_negotiable" | "strong" | "nice_to_have";
 
 export interface FlightPreferences {
   id?: string;
   home_airports: HomeAirport[];
+  alternate_airports: AlternateAirport[]; // New: airports user is willing to drive to for savings
   preferred_airlines: string[];
   avoided_airlines: string[];
   preferred_alliances: string[];
-  seat_preference: string[]; // Changed to array for multiple selection
+  seat_preference: string[];
   needs_window_for_car_seat: boolean;
   cabin_class: "economy" | "premium_economy" | "business" | "first";
   max_stops: number;
@@ -30,9 +37,6 @@ export interface FlightPreferences {
   red_eye_allowed: boolean;
   family_mode: boolean;
   family_min_connection_minutes: number;
-  willing_to_drive_further: boolean;
-  max_extra_drive_minutes: number;
-  min_savings_for_further_airport: number;
   default_checked_bags: number;
   carry_on_only: boolean;
   search_mode: "cash" | "points" | "hybrid";
@@ -46,10 +50,11 @@ export interface FlightPreferences {
 
 const defaultPreferences: FlightPreferences = {
   home_airports: [],
+  alternate_airports: [],
   preferred_airlines: [],
   avoided_airlines: [],
   preferred_alliances: [],
-  seat_preference: [], // Empty array = no preference
+  seat_preference: [],
   needs_window_for_car_seat: false,
   cabin_class: "economy",
   max_stops: 0,
@@ -61,9 +66,6 @@ const defaultPreferences: FlightPreferences = {
   red_eye_allowed: false,
   family_mode: false,
   family_min_connection_minutes: 90,
-  willing_to_drive_further: true,
-  max_extra_drive_minutes: 60,
-  min_savings_for_further_airport: 200,
   default_checked_bags: 0,
   carry_on_only: false,
   search_mode: "cash",
@@ -145,9 +147,15 @@ export const useFlightPreferences = () => {
           homeAirports = profileHomeAirports;
         }
         
+        // Parse alternate_airports - stored alongside home_airports or separately
+        let alternateAirports: AlternateAirport[] = [];
+        // For now, we'll store alternate_airports in the same JSON field or as a separate concept
+        // Since DB doesn't have this field yet, we'll initialize empty
+        
         setPreferences({
           id: data.id,
           home_airports: homeAirports,
+          alternate_airports: alternateAirports,
           preferred_airlines: data.preferred_airlines || [],
           avoided_airlines: data.avoided_airlines || [],
           preferred_alliances: data.preferred_alliances || [],
@@ -165,13 +173,10 @@ export const useFlightPreferences = () => {
           red_eye_allowed: data.red_eye_allowed || false,
           family_mode: data.family_mode || false,
           family_min_connection_minutes: data.family_min_connection_minutes || 90,
-          willing_to_drive_further: data.willing_to_drive_further ?? true,
-          max_extra_drive_minutes: data.max_extra_drive_minutes || 60,
-          min_savings_for_further_airport: data.min_savings_for_further_airport || 200,
           default_checked_bags: data.default_checked_bags || 0,
           carry_on_only: data.carry_on_only || false,
           search_mode: (data.search_mode as "cash" | "points" | "hybrid") || "cash",
-          // Priority settings - stored in local state only for now
+          // Priority settings
           nonstop_priority: "strong",
           departure_time_priority: "nice_to_have",
           airline_priority: "nice_to_have",

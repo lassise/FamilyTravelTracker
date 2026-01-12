@@ -7,209 +7,93 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+interface AlternateAirport {
+  code: string;
+  name: string;
+  minSavings: number;
+}
+
+interface SearchRequest {
+  origin: string;
+  destination: string;
+  departureDate: string;
+  returnDate?: string;
+  passengers: number;
+  tripType: 'roundtrip' | 'oneway';
+  alternateAirports?: AlternateAirport[];
+}
+
+async function searchFlightsFromOrigin(
+  origin: string,
+  destination: string,
+  departureDate: string,
+  returnDate: string | undefined,
+  passengers: number,
+  tripType: string,
+  serpApiKey: string,
+  isAlternate: boolean = false,
+  minSavings: number = 0
+): Promise<{ flights: any[]; error?: string }> {
+  const searchParams = new URLSearchParams({
+    api_key: serpApiKey,
+    engine: 'google_flights',
+    departure_id: origin,
+    arrival_id: destination,
+    outbound_date: departureDate,
+    adults: String(passengers),
+    currency: 'USD',
+    hl: 'en',
+    type: tripType === 'roundtrip' ? '1' : '2',
+  });
+  
+  if (returnDate && tripType === 'roundtrip') {
+    searchParams.append('return_date', returnDate);
   }
 
+  console.log(`Searching flights from ${origin} -> ${destination}`);
+
   try {
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('Missing or invalid Authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Create Supabase client and verify JWT
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    
-    if (claimsError || !claimsData?.claims) {
-      console.error('Invalid authentication token:', claimsError?.message);
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const userId = claimsData.claims.sub;
-    console.log('Authenticated user:', userId);
-
-    const { origin, destination, departureDate, returnDate, passengers, tripType } = await req.json();
-
-    console.log(`User ${userId} searching flights: ${origin} -> ${destination}, ${departureDate}${returnDate ? ` - ${returnDate}` : ''}, ${passengers} passengers`);
-
-    const serpApiKey = Deno.env.get('SERPAPI_KEY');
-    
-    // If no API key configured
-    if (!serpApiKey) {
-      console.log('No SerpAPI key configured');
-      return new Response(JSON.stringify({ 
-        error: 'Flight search not configured',
-        errorCode: 'NO_API_KEY',
-        message: 'SerpAPI key is not configured. Please add your SERPAPI_KEY to enable flight search.',
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // SerpAPI Google Flights endpoint
-    const searchParams = new URLSearchParams({
-      api_key: serpApiKey,
-      engine: 'google_flights',
-      departure_id: origin,
-      arrival_id: destination,
-      outbound_date: departureDate,
-      adults: String(passengers),
-      currency: 'USD',
-      hl: 'en',
-      type: tripType === 'roundtrip' ? '1' : '2', // 1 = round trip, 2 = one way
+    const response = await fetch(`https://serpapi.com/search.json?${searchParams.toString()}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
     });
-    
-    if (returnDate && tripType === 'roundtrip') {
-      searchParams.append('return_date', returnDate);
-    }
 
-    console.log(`Calling SerpAPI Google Flights: ${origin} -> ${destination}`);
-
-    let response;
-    try {
-      response = await fetch(`https://serpapi.com/search.json?${searchParams.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-    } catch (fetchError) {
-      console.error('Network error calling SerpAPI:', fetchError);
-      return new Response(JSON.stringify({ 
-        error: 'Failed to connect to flight search API',
-        errorCode: 'NETWORK_ERROR',
-        message: 'Unable to reach SerpAPI. Please check your internet connection.',
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    let responseText = '';
-    try {
-      responseText = await response.text();
-    } catch (e) {
-      console.log('Could not read response text');
-      return new Response(JSON.stringify({ 
-        error: 'Failed to read API response',
-        errorCode: 'RESPONSE_ERROR',
-        message: 'The flight API returned an unreadable response.',
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Check if response is ok
     if (!response.ok) {
-      console.error('SerpAPI HTTP error:', response.status, responseText.substring(0, 500));
-      
-      return new Response(JSON.stringify({ 
-        error: `Flight API returned error (HTTP ${response.status})`,
-        errorCode: 'API_ERROR',
-        message: `SerpAPI returned an error. This could mean the API key is invalid or you've exceeded rate limits.`,
-        details: responseText.substring(0, 200),
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.error(`SerpAPI HTTP error for ${origin}:`, response.status);
+      return { flights: [], error: `HTTP ${response.status}` };
     }
-    
-    // Handle empty responses
+
+    const responseText = await response.text();
     if (!responseText || responseText.trim() === '') {
-      console.log('SerpAPI returned empty response');
-      return new Response(JSON.stringify({ 
-        error: 'No data returned from flight API',
-        errorCode: 'EMPTY_RESPONSE',
-        message: 'SerpAPI returned no data for this search.',
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return { flights: [], error: 'Empty response' };
     }
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse SerpAPI response:', responseText.substring(0, 500));
-      return new Response(JSON.stringify({ 
-        error: 'Invalid response from flight API',
-        errorCode: 'PARSE_ERROR',
-        message: 'SerpAPI returned malformed data.',
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Check for SerpAPI errors
+    const data = JSON.parse(responseText);
     if (data.error) {
-      console.error('SerpAPI error response:', data.error);
-      return new Response(JSON.stringify({ 
-        error: data.error,
-        errorCode: 'API_ERROR',
-        message: `SerpAPI error: ${data.error}`,
-        flights: [] 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return { flights: [], error: data.error };
     }
 
-    // SerpAPI returns flights in different structures
     const bestFlights = data.best_flights || [];
     const otherFlights = data.other_flights || [];
     const allFlights = [...bestFlights, ...otherFlights];
 
-    // If no flights found
-    if (allFlights.length === 0) {
-      console.log('SerpAPI returned no flights for this route');
-      return new Response(JSON.stringify({ 
-        flights: [],
-        message: 'No flights found for this route and date. Try different dates or airports.',
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log(`Found ${allFlights.length} flight options (${bestFlights.length} best, ${otherFlights.length} other) for user ${userId}`);
-
-    // Transform SerpAPI response to our format
+    // Transform flights and tag with origin info
     const flights = allFlights.map((flight: any, index: number) => {
       const flightLegs = flight.flights || [];
-      
-      // Calculate total duration from layovers info or sum of flight durations
       const totalDuration = flight.total_duration || flightLegs.reduce((sum: number, leg: any) => sum + (leg.duration || 0), 0);
-      
-      // Determine number of stops
       const stops = flightLegs.length - 1;
       
       return {
-        id: `serpapi-${index}-${Date.now()}`,
+        id: `serpapi-${origin}-${index}-${Date.now()}`,
         price: flight.price || 0,
         currency: 'USD',
         totalDuration,
         stops,
         isBestFlight: index < bestFlights.length,
         carbonEmissions: flight.carbon_emissions?.this_flight,
+        departureAirport: origin,
+        isAlternateOrigin: isAlternate,
+        minSavingsRequired: minSavings,
         itineraries: [{
           segments: flightLegs.map((leg: any) => ({
             departureAirport: leg.departure_airport?.id || origin,
@@ -239,13 +123,138 @@ serve(async (req) => {
       };
     });
 
+    return { flights };
+  } catch (error) {
+    console.error(`Error searching flights from ${origin}:`, error);
+    return { flights: [], error: String(error) };
+  }
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error('Invalid authentication token:', claimsError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log('Authenticated user:', userId);
+
+    const { 
+      origin, 
+      destination, 
+      departureDate, 
+      returnDate, 
+      passengers, 
+      tripType,
+      alternateAirports = []
+    }: SearchRequest = await req.json();
+
+    console.log(`User ${userId} searching flights: ${origin} -> ${destination}, ${departureDate}${returnDate ? ` - ${returnDate}` : ''}, ${passengers} passengers`);
+    if (alternateAirports.length > 0) {
+      console.log(`Also checking ${alternateAirports.length} alternate airports:`, alternateAirports.map(a => a.code).join(', '));
+    }
+
+    const serpApiKey = Deno.env.get('SERPAPI_KEY');
+    
+    if (!serpApiKey) {
+      console.log('No SerpAPI key configured');
+      return new Response(JSON.stringify({ 
+        error: 'Flight search not configured',
+        errorCode: 'NO_API_KEY',
+        message: 'SerpAPI key is not configured. Please add your SERPAPI_KEY to enable flight search.',
+        flights: [] 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Search from primary origin
+    const primarySearch = searchFlightsFromOrigin(
+      origin, destination, departureDate, returnDate, passengers, tripType, serpApiKey, false, 0
+    );
+
+    // Search from alternate airports in parallel
+    const alternateSearches = alternateAirports.map(alt => 
+      searchFlightsFromOrigin(
+        alt.code, destination, departureDate, returnDate, passengers, tripType, serpApiKey, true, alt.minSavings
+      )
+    );
+
+    // Wait for all searches to complete
+    const [primaryResult, ...alternateResults] = await Promise.all([primarySearch, ...alternateSearches]);
+
+    // Combine all flights
+    let allFlights = [...primaryResult.flights];
+    
+    // Find cheapest primary flight for comparison
+    const cheapestPrimary = primaryResult.flights.length > 0 
+      ? Math.min(...primaryResult.flights.map((f: any) => f.price))
+      : Infinity;
+
+    // Add alternate flights that meet savings threshold
+    alternateResults.forEach((result, index) => {
+      if (result.flights.length > 0) {
+        const altAirport = alternateAirports[index];
+        const qualifyingFlights = result.flights.filter((f: any) => {
+          const savings = cheapestPrimary - f.price;
+          return savings >= altAirport.minSavings;
+        });
+        
+        console.log(`${altAirport.code}: ${result.flights.length} flights found, ${qualifyingFlights.length} meet $${altAirport.minSavings} savings threshold`);
+        allFlights = [...allFlights, ...qualifyingFlights];
+      }
+    });
+
+    // Sort by price
+    allFlights.sort((a: any, b: any) => a.price - b.price);
+
+    if (allFlights.length === 0) {
+      console.log('No flights found for any origin');
+      return new Response(JSON.stringify({ 
+        flights: [],
+        message: 'No flights found for this route and date. Try different dates or airports.',
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`Found ${allFlights.length} total flight options for user ${userId}`);
+
     return new Response(JSON.stringify({ 
-      flights,
+      flights: allFlights,
       searchMetadata: {
-        departure: data.search_parameters?.departure_id,
-        arrival: data.search_parameters?.arrival_id,
-        outboundDate: data.search_parameters?.outbound_date,
-        returnDate: data.search_parameters?.return_date,
+        primaryOrigin: origin,
+        alternateOrigins: alternateAirports.map(a => a.code),
+        destination,
+        outboundDate: departureDate,
+        returnDate,
+        cheapestPrimaryPrice: cheapestPrimary === Infinity ? null : cheapestPrimary,
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

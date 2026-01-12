@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlternateAirportsSection } from "@/components/flights/AlternateAirportsSection";
 import { 
-  PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, Car, 
+  PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
   Info, Armchair, CheckCircle2, XCircle, ExternalLink
 } from "lucide-react";
@@ -155,6 +156,7 @@ const Flights = () => {
           returnDate: tripType === "roundtrip" ? returnDate : null,
           passengers,
           tripType,
+          alternateAirports: preferences.alternate_airports,
         },
       });
 
@@ -486,8 +488,22 @@ const Flights = () => {
               {isDemo && <Badge variant="secondary" className="ml-2">Sample Data</Badge>}
             </h2>
             {flights.map((flight, idx) => (
-              <Card key={flight.id} className={idx === 0 ? "border-primary" : ""}>
+              <Card key={flight.id} className={`${idx === 0 ? "border-primary" : ""} ${flight.isAlternateOrigin ? "border-l-4 border-l-green-500" : ""}`}>
                 <CardContent className="p-4">
+                  {/* Alternate Airport Badge */}
+                  {flight.isAlternateOrigin && flight.departureAirport && (
+                    <div className="flex items-center gap-2 mb-2 p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
+                      <Badge className="bg-green-600 hover:bg-green-700 text-white">
+                        From {flight.departureAirport}
+                      </Badge>
+                      {flight.savingsFromPrimary && flight.savingsFromPrimary > 0 && (
+                        <span className="text-sm text-green-700 dark:text-green-400 font-medium">
+                          Save ${flight.savingsFromPrimary.toFixed(0)} vs primary airport
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Score and badges */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -702,44 +718,11 @@ const Flights = () => {
                   </div>
                 )}
 
-                {/* Further Airport */}
-                <div className="border-t pt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <Label className="flex items-center gap-2">
-                      <Car className="h-4 w-4" /> Drive further for savings
-                    </Label>
-                    <Switch 
-                      checked={preferences.willing_to_drive_further} 
-                      onCheckedChange={(v) => updatePreferences({ willing_to_drive_further: v })} 
-                    />
-                  </div>
-                  {preferences.willing_to_drive_further && (
-                    <div className="space-y-4 pl-4 border-l-2">
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm">Max extra drive</span>
-                          <span className="text-sm font-medium">{preferences.max_extra_drive_minutes} min</span>
-                        </div>
-                        <Slider 
-                          value={[preferences.max_extra_drive_minutes]} 
-                          onValueChange={([v]) => updatePreferences({ max_extra_drive_minutes: v })} 
-                          min={15} max={120} step={15} 
-                        />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm">Min savings required</span>
-                          <span className="text-sm font-medium">${preferences.min_savings_for_further_airport}</span>
-                        </div>
-                        <Slider 
-                          value={[preferences.min_savings_for_further_airport]} 
-                          onValueChange={([v]) => updatePreferences({ min_savings_for_further_airport: v })} 
-                          min={50} max={500} step={25} 
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {/* Alternate Airports for Savings */}
+                <AlternateAirportsSection 
+                  alternateAirports={preferences.alternate_airports}
+                  onUpdate={(airports) => updatePreferences({ alternate_airports: airports })}
+                />
                 
                 {/* Search button at bottom of preferences */}
                 <Button className="w-full" size="lg" onClick={searchFlights} disabled={searching}>
