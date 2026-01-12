@@ -24,72 +24,80 @@ serve(async (req) => {
     console.log(`Searching flights: ${origin} -> ${destination}, ${departureDate}${returnDate ? ` - ${returnDate}` : ''}, ${passengers} passengers`);
 
     // LiteAPI GraphQL query for flight search
-    const query = `
-      query {
-        liteapi {
-          search(criteria: {
-            origin: "${origin}",
-            destination: "${destination}",
-            departureDate: "${departureDate}",
-            ${returnDate && tripType === 'roundtrip' ? `returnDate: "${returnDate}",` : ''}
-            pax: { adults: ${passengers}, children: 0 },
-            currency: "USD"
-          }) {
-            options {
-              id
-              price { net, currency }
-              itineraries {
-                segments {
-                  departure { iataCode, at }
-                  arrival { iataCode, at }
-                  carrierCode
-                  flightNumber
-                  duration
-                  numberOfStops
-                }
-              }
-            }
-          }
-        }
-      }
-    `;
-
-    const response = await fetch('https://api.liteapi.travel/v3.0/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': liteApiKey,
-      },
-      body: JSON.stringify({ query }),
+    // Use REST API instead of GraphQL for more reliable response handling
+    const searchParams = new URLSearchParams({
+      origin,
+      destination,
+      departureDate,
+      adults: String(passengers),
+      currency: 'USD',
     });
-
-    const data = await response.json();
-
-    if (data.errors) {
-      console.error('LiteAPI errors:', JSON.stringify(data.errors));
-      throw new Error(data.errors[0]?.message || 'Failed to search flights');
+    
+    if (returnDate && tripType === 'roundtrip') {
+      searchParams.append('returnDate', returnDate);
     }
 
-    console.log(`Found ${data?.data?.liteapi?.search?.options?.length || 0} flight options`);
+    console.log(`Calling LiteAPI with params: ${searchParams.toString()}`);
+
+    const response = await fetch(`https://api.liteapi.travel/v3.0/flights/search?${searchParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'X-Api-Key': liteApiKey,
+      },
+    });
+
+    // Check if response is ok before parsing JSON
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('LiteAPI HTTP error:', response.status, errorText);
+      throw new Error(`Flight API returned ${response.status}: ${errorText || 'Unknown error'}`);
+    }
+
+    const responseText = await response.text();
+    
+    // Handle empty responses
+    if (!responseText || responseText.trim() === '') {
+      console.log('LiteAPI returned empty response - no flights found');
+      return new Response(JSON.stringify({ flights: [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse LiteAPI response:', responseText.substring(0, 500));
+      throw new Error('Invalid response from flight API');
+    }
+
+    if (data.error || data.errors) {
+      const errorMsg = data.error?.message || data.errors?.[0]?.message || 'Failed to search flights';
+      console.error('LiteAPI error response:', JSON.stringify(data));
+      throw new Error(errorMsg);
+    }
+
+    console.log(`Found ${data?.data?.length || 0} flight options`);
 
     // Transform the response to a cleaner format
-    const flights = data?.data?.liteapi?.search?.options?.map((option: any) => ({
-      id: option.id,
-      price: option.price?.net,
+    const flights = (data?.data || []).map((option: any) => ({
+      id: option.id || crypto.randomUUID(),
+      price: option.price?.total || option.price?.net || 0,
       currency: option.price?.currency || 'USD',
       itineraries: option.itineraries?.map((itinerary: any) => ({
         segments: itinerary.segments?.map((segment: any) => ({
-          departureAirport: segment.departure?.iataCode,
-          departureTime: segment.departure?.at,
-          arrivalAirport: segment.arrival?.iataCode,
-          arrivalTime: segment.arrival?.at,
-          airline: segment.carrierCode,
-          flightNumber: `${segment.carrierCode}${segment.flightNumber}`,
+          departureAirport: segment.departure?.iataCode || segment.origin,
+          departureTime: segment.departure?.at || segment.departureTime,
+          arrivalAirport: segment.arrival?.iataCode || segment.destination,
+          arrivalTime: segment.arrival?.at || segment.arrivalTime,
+          airline: segment.carrierCode || segment.airline,
+          flightNumber: segment.flightNumber ? `${segment.carrierCode || ''}${segment.flightNumber}` : segment.flight,
           duration: segment.duration,
           stops: segment.numberOfStops || 0,
-        })),
-      })),
-    })) || [];
+        })) || [],
+      })) || [],
+    }));
 
     return new Response(JSON.stringify({ flights }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

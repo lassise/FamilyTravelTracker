@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Users, Globe, ArrowRight, ArrowLeft, Check, Plane, Home, Sparkles, Heart, UserCheck } from "lucide-react";
+import { Users, Globe, ArrowRight, ArrowLeft, Check, Plane, Home, Sparkles, Heart, UserCheck, User } from "lucide-react";
+import YourNameStep from "./YourNameStep";
 import FamilyMembersStep from "./FamilyMembersStep";
 import CountriesStep from "./CountriesStep";
 import HomeCountryStep from "./HomeCountryStep";
@@ -24,6 +25,7 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
   const [isSoloTraveler, setIsSoloTraveler] = useState(false);
+  const [userName, setUserName] = useState<string>("");
 
   // Build steps dynamically based on solo/family mode
   const baseSteps = [
@@ -34,13 +36,30 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       component: <WelcomeFeaturesStep />,
     },
     {
+      title: "What's Your Name?",
+      description: "Let's personalize your experience.",
+      icon: User,
+      component: <YourNameStep onNameSaved={setUserName} />,
+    },
+    {
+      title: "Where's Home?",
+      description: "Select your home country. It will be displayed on the map but won't count as visited.",
+      icon: Home,
+      component: (
+        <HomeCountryStep 
+          onHomeCountryChange={setHomeCountry}
+        />
+      ),
+    },
+    {
       title: "Who's Traveling?",
-      description: "Add yourself and anyone else you'd like to track travels for.",
+      description: "Add yourself first, then add anyone else you'd like to track travels for.",
       icon: Users,
       component: (
         <FamilyMembersStep 
           onMembersChange={setFamilyMembers}
           onSoloMode={setIsSoloTraveler}
+          suggestedName={userName}
         />
       ),
     },
@@ -60,16 +79,6 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   }] : [];
 
   const remainingSteps = [
-    {
-      title: "Where's Home?",
-      description: "Select your home country. It will be displayed on the map but won't count as visited.",
-      icon: Home,
-      component: (
-        <HomeCountryStep 
-          onHomeCountryChange={setHomeCountry}
-        />
-      ),
-    },
     {
       title: "Travel Preferences",
       description: "Help us personalize your experience with a few quick questions.",

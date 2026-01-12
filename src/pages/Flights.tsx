@@ -208,6 +208,23 @@ const Flights = () => {
               </div>
             </div>
 
+            {/* Home Airports Quick Select */}
+            {preferences.home_airports.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Label className="w-full text-xs text-muted-foreground">Your airports:</Label>
+                {preferences.home_airports.map((airport) => (
+                  <Button
+                    key={airport.code}
+                    variant={origin === airport.code ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setOrigin(airport.code)}
+                  >
+                    {airport.code} {airport.isPrimary && "★"}
+                  </Button>
+                ))}
+              </div>
+            )}
+
             {/* Origin & Destination */}
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="relative">
@@ -546,31 +563,50 @@ const Flights = () => {
                   </div>
                 </div>
 
-                {/* Layover Settings */}
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <Label>Max Layover Hours</Label>
-                      <span className="text-sm">{preferences.max_layover_hours}h</span>
-                    </div>
-                    <Slider 
-                      value={[preferences.max_layover_hours]} 
-                      onValueChange={([v]) => updatePreferences({ max_layover_hours: v })} 
-                      min={1} max={12} step={1} 
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <Label>Min Connection Time (min)</Label>
-                      <span className="text-sm">{preferences.min_connection_minutes}m</span>
-                    </div>
-                    <Slider 
-                      value={[preferences.min_connection_minutes]} 
-                      onValueChange={([v]) => updatePreferences({ min_connection_minutes: v })} 
-                      min={30} max={180} step={15} 
-                    />
+                {/* Avoided Airlines */}
+                <div>
+                  <Label className="mb-2 block">Avoid Airlines</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {AIRLINES.slice(0, 10).map(airline => (
+                      <Badge 
+                        key={`avoid-${airline.code}`}
+                        variant={preferences.avoided_airlines.includes(airline.name) ? "destructive" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => togglePreference("avoided_airlines", airline.name)}
+                      >
+                        {airline.name}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
+
+                {/* Layover Settings - Only show if nonstop not selected */}
+                {!preferences.prefer_nonstop && (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <Label>Max Layover Hours</Label>
+                        <span className="text-sm">{preferences.max_layover_hours}h</span>
+                      </div>
+                      <Slider 
+                        value={[preferences.max_layover_hours]} 
+                        onValueChange={([v]) => updatePreferences({ max_layover_hours: v })} 
+                        min={1} max={12} step={1} 
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <Label>Min Connection Time (min)</Label>
+                        <span className="text-sm">{preferences.min_connection_minutes}m</span>
+                      </div>
+                      <Slider 
+                        value={[preferences.min_connection_minutes]} 
+                        onValueChange={([v]) => updatePreferences({ min_connection_minutes: v })} 
+                        min={30} max={180} step={15} 
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Further Airport */}
                 <div className="border-t pt-4">

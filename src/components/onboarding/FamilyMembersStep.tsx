@@ -17,22 +17,32 @@ const memberSchema = z.object({
 interface FamilyMembersStepProps {
   onMembersChange: (members: Array<{ id: string; name: string }>) => void;
   onSoloMode?: (isSolo: boolean) => void;
+  suggestedName?: string;
 }
 
 const ROLE_SUGGESTIONS = ["Me", "Partner", "Son", "Daughter", "Dad", "Mom", "Friend"];
 const AVATAR_EMOJIS = ["🧑", "👨", "👩", "👦", "👧", "👴", "👵", "👶"];
 const COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F"];
 
-const FamilyMembersStep = ({ onMembersChange, onSoloMode }: FamilyMembersStepProps) => {
+const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: FamilyMembersStepProps) => {
   const [members, setMembers] = useState<Array<{ id: string; name: string; role: string; avatar: string; color: string }>>([]);
   const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState("");
+  const [newRole, setNewRole] = useState("Me");
   const [loading, setLoading] = useState(false);
+  const [hasAutoFilled, setHasAutoFilled] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchMembers();
   }, []);
+
+  // Auto-fill name from the "What's Your Name" step
+  useEffect(() => {
+    if (suggestedName && !hasAutoFilled && members.length === 0 && !newName) {
+      setNewName(suggestedName);
+      setHasAutoFilled(true);
+    }
+  }, [suggestedName, hasAutoFilled, members.length, newName]);
 
   useEffect(() => {
     onMembersChange(members.map(m => ({ id: m.id, name: m.name })));

@@ -166,9 +166,34 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
   };
 
   const getGoalProgress = (goal: Goal) => {
-    if (goal.goal_type === 'countries') return (visitedCountries / goal.target_count) * 100;
-    if (goal.goal_type === 'continents') return (totalContinents / goal.target_count) * 100;
+    const current = getGoalCurrent(goal);
+    return (current / goal.target_count) * 100;
+  };
+
+  const getGoalCurrent = (goal: Goal) => {
+    if (goal.goal_type === 'countries') return visitedCountries;
+    if (goal.goal_type === 'continents') return totalContinents;
+    if (goal.goal_type === 'trips') return visitedCountries; // Placeholder - would need trip count
+    if (goal.goal_type === 'repeat_visits') return 0; // Would need repeat visit tracking
+    if (goal.goal_type === 'new_countries_year') return visitedCountries; // Placeholder
+    if (goal.goal_type === 'travel_streak') return 0; // Would need streak tracking
+    if (goal.goal_type === 'flight_miles') return 0; // Would need miles tracking
+    if (goal.goal_type === 'days_abroad') return 0; // Would need days tracking
     return 0;
+  };
+
+  const getGoalTypeLabel = (goalType: string) => {
+    const labels: Record<string, string> = {
+      countries: 'countries',
+      continents: 'continents',
+      trips: 'trips',
+      repeat_visits: 'repeat visits',
+      new_countries_year: 'new countries',
+      travel_streak: 'months',
+      flight_miles: 'miles',
+      days_abroad: 'days',
+    };
+    return labels[goalType] || goalType;
   };
 
   // Separate earned and locked achievements
@@ -261,8 +286,14 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="countries">Countries</SelectItem>
-                        <SelectItem value="continents">Continents</SelectItem>
+                        <SelectItem value="countries">Countries Visited</SelectItem>
+                        <SelectItem value="continents">Continents Explored</SelectItem>
+                        <SelectItem value="trips">Trips Taken</SelectItem>
+                        <SelectItem value="repeat_visits">Repeat Visits (Same Country)</SelectItem>
+                        <SelectItem value="new_countries_year">New Countries This Year</SelectItem>
+                        <SelectItem value="travel_streak">Travel Streak (Consecutive Months)</SelectItem>
+                        <SelectItem value="flight_miles">Flight Miles</SelectItem>
+                        <SelectItem value="days_abroad">Days Abroad</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -301,7 +332,8 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
             <div className="space-y-3">
               {goals.map((goal) => {
                 const progress = Math.min(getGoalProgress(goal), 100);
-                const current = goal.goal_type === 'countries' ? visitedCountries : totalContinents;
+                const current = getGoalCurrent(goal);
+                const typeLabel = getGoalTypeLabel(goal.goal_type);
                 
                 return (
                   <div key={goal.id} className="bg-muted/50 rounded-lg p-4">
@@ -309,7 +341,7 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                       <div>
                         <h4 className="font-medium text-foreground text-sm">{goal.title}</h4>
                         <p className="text-xs text-muted-foreground">
-                          {current} / {goal.target_count} {goal.goal_type}
+                          {current} / {goal.target_count} {typeLabel}
                           {goal.deadline && ` • Due ${format(new Date(goal.deadline), 'MMM d, yyyy')}`}
                         </p>
                       </div>

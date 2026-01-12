@@ -179,10 +179,10 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
+            <PopoverContent className="w-full p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
               <Command>
                 <CommandInput placeholder="Search country..." />
-                <CommandList>
+                <CommandList className="max-h-[300px] overflow-y-auto focus:outline-none" tabIndex={0}>
                   <CommandEmpty>No country found.</CommandEmpty>
                   <CommandGroup>
                     {allCountries
