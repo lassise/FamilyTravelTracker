@@ -57,9 +57,14 @@ const SelectYourselfStep = ({ familyMembers, onSelect }: SelectYourselfStepProps
     return (
       <div className="text-center py-8 text-muted-foreground">
         <UserCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-        <p>Add family members first to select yourself</p>
+        <p>Add at least one traveler first</p>
       </div>
     );
+  }
+
+  // Auto-select if only one member
+  if (members.length === 1 && !selectedId) {
+    handleSelect(members[0].id);
   }
 
   return (
@@ -108,7 +113,7 @@ const SelectYourselfStep = ({ familyMembers, onSelect }: SelectYourselfStepProps
       </div>
 
       <p className="text-xs text-muted-foreground text-center mt-4">
-        This helps separate "My Travel History" from "Family Travel History"
+        This helps us show your personal travel stats
       </p>
     </div>
   );

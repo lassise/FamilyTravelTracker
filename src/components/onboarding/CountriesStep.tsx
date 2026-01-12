@@ -104,9 +104,13 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
 
       if (error) throw error;
 
-      // Add visits for selected members
-      if (newCountry && selectedMembers.length > 0) {
-        const visits = selectedMembers.map((memberId) => ({
+      // Add visits for selected members, or auto-add for solo traveler
+      const membersToVisit = familyMembers.length === 1 
+        ? [familyMembers[0].id] 
+        : selectedMembers;
+      
+      if (newCountry && membersToVisit.length > 0) {
+        const visits = membersToVisit.map((memberId) => ({
           country_id: newCountry.id,
           family_member_id: memberId,
           user_id: user.id,
@@ -115,7 +119,7 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
         await supabase.from("country_visits").insert(visits);
       }
 
-      setCountries([...countries, { ...newCountry, visitedBy: selectedMembers }]);
+      setCountries([...countries, { ...newCountry, visitedBy: membersToVisit }]);
       setSelectedCountry(null);
       setSelectedMembers([]);
       setComboboxOpen(false);
@@ -202,7 +206,7 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
           </PopoverContent>
         </Popover>
 
-        {selectedCountry && familyMembers.length > 0 && (
+        {selectedCountry && familyMembers.length > 1 && (
           <div className="p-3 border rounded-lg space-y-2">
             <Label className="text-sm text-muted-foreground">Who visited?</Label>
             <div className="flex flex-wrap gap-2">

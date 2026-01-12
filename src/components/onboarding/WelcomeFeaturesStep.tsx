@@ -5,14 +5,14 @@ const features = [
   {
     icon: Globe,
     title: "Track Countries Visited",
-    description: "Log every country your family has explored together",
+    description: "Log every country you've explored",
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
   },
   {
     icon: Users,
-    title: "Family Travel Profiles",
-    description: "See who's been where and plan trips everyone will love",
+    title: "Solo or Group Travel",
+    description: "Track just yourself or add travel companions",
     color: "text-green-500",
     bgColor: "bg-green-500/10",
   },
@@ -26,7 +26,7 @@ const features = [
   {
     icon: Sparkles,
     title: "AI Trip Planner",
-    description: "Get personalized itineraries based on your family's preferences",
+    description: "Get personalized itineraries based on your preferences",
     color: "text-amber-500",
     bgColor: "bg-amber-500/10",
   },
@@ -66,7 +66,7 @@ const WelcomeFeaturesStep = () => {
     <div className="space-y-6">
       <div className="text-center">
         <p className="text-muted-foreground">
-          Your family's travel journey starts here. Here's what you can do:
+          Your travel journey starts here. Here's what you can do:
         </p>
       </div>
 
