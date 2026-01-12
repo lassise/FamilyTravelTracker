@@ -48,6 +48,7 @@ const Header = () => {
   const primaryLinks = [
     { href: "/", label: "Dashboard", icon: Globe },
     { href: "/family", label: "Travel Tracker", icon: Map },
+    { href: "/flights", label: "Flights", icon: PlaneTakeoff },
   ];
 
   // Trip planning links
@@ -183,12 +184,6 @@ const Header = () => {
               )}
 
               <div className="flex flex-col gap-1 py-4">
-                {/* Mobile Search */}
-                <div className="relative mb-3 sm:hidden">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search..." className="pl-9" />
-                </div>
-
                 {/* Primary Nav Links */}
                 <p className="text-xs font-medium text-muted-foreground px-3 mb-1">Explore</p>
                 {primaryLinks.map((link) => {
