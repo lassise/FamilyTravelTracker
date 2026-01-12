@@ -465,16 +465,27 @@ export type Database = {
       flight_preferences: {
         Row: {
           avoided_airlines: string[] | null
-          class_preference: string | null
+          cabin_class: string | null
+          carry_on_only: boolean | null
           created_at: string
+          default_checked_bags: number | null
+          family_min_connection_minutes: number | null
+          family_mode: boolean | null
+          home_airports: Json | null
           id: string
           max_extra_drive_minutes: number | null
           max_layover_hours: number | null
           max_stops: number | null
+          max_total_travel_hours: number | null
+          min_connection_minutes: number | null
           min_savings_for_further_airport: number | null
+          needs_window_for_car_seat: boolean | null
           prefer_nonstop: boolean | null
           preferred_airlines: string[] | null
+          preferred_alliances: string[] | null
           preferred_departure_times: string[] | null
+          red_eye_allowed: boolean | null
+          search_mode: string | null
           seat_preference: string | null
           updated_at: string
           user_id: string
@@ -482,16 +493,27 @@ export type Database = {
         }
         Insert: {
           avoided_airlines?: string[] | null
-          class_preference?: string | null
+          cabin_class?: string | null
+          carry_on_only?: boolean | null
           created_at?: string
+          default_checked_bags?: number | null
+          family_min_connection_minutes?: number | null
+          family_mode?: boolean | null
+          home_airports?: Json | null
           id?: string
           max_extra_drive_minutes?: number | null
           max_layover_hours?: number | null
           max_stops?: number | null
+          max_total_travel_hours?: number | null
+          min_connection_minutes?: number | null
           min_savings_for_further_airport?: number | null
+          needs_window_for_car_seat?: boolean | null
           prefer_nonstop?: boolean | null
           preferred_airlines?: string[] | null
+          preferred_alliances?: string[] | null
           preferred_departure_times?: string[] | null
+          red_eye_allowed?: boolean | null
+          search_mode?: string | null
           seat_preference?: string | null
           updated_at?: string
           user_id: string
@@ -499,16 +521,27 @@ export type Database = {
         }
         Update: {
           avoided_airlines?: string[] | null
-          class_preference?: string | null
+          cabin_class?: string | null
+          carry_on_only?: boolean | null
           created_at?: string
+          default_checked_bags?: number | null
+          family_min_connection_minutes?: number | null
+          family_mode?: boolean | null
+          home_airports?: Json | null
           id?: string
           max_extra_drive_minutes?: number | null
           max_layover_hours?: number | null
           max_stops?: number | null
+          max_total_travel_hours?: number | null
+          min_connection_minutes?: number | null
           min_savings_for_further_airport?: number | null
+          needs_window_for_car_seat?: boolean | null
           prefer_nonstop?: boolean | null
           preferred_airlines?: string[] | null
+          preferred_alliances?: string[] | null
           preferred_departure_times?: string[] | null
+          red_eye_allowed?: boolean | null
+          search_mode?: string | null
           seat_preference?: string | null
           updated_at?: string
           user_id?: string
@@ -773,6 +806,68 @@ export type Database = {
             columns: ["linked_family_member_id"]
             isOneToOne: false
             referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saved_flights: {
+        Row: {
+          cabin_class: string | null
+          created_at: string
+          destination: string
+          id: string
+          last_price: number | null
+          notes: string | null
+          origin: string
+          outbound_date: string | null
+          passengers: number | null
+          price_alert_enabled: boolean | null
+          return_date: string | null
+          target_price: number | null
+          trip_type: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cabin_class?: string | null
+          created_at?: string
+          destination: string
+          id?: string
+          last_price?: number | null
+          notes?: string | null
+          origin: string
+          outbound_date?: string | null
+          passengers?: number | null
+          price_alert_enabled?: boolean | null
+          return_date?: string | null
+          target_price?: number | null
+          trip_type?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cabin_class?: string | null
+          created_at?: string
+          destination?: string
+          id?: string
+          last_price?: number | null
+          notes?: string | null
+          origin?: string
+          outbound_date?: string | null
+          passengers?: number | null
+          price_alert_enabled?: boolean | null
+          return_date?: string | null
+          target_price?: number | null
+          trip_type?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_flights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1081,6 +1176,68 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      traveler_profiles: {
+        Row: {
+          created_at: string
+          date_of_birth: string | null
+          frequent_flyer_programs: Json | null
+          id: string
+          known_traveler_number: string | null
+          meal_preference: string | null
+          name: string
+          passport_country: string | null
+          passport_expiry: string | null
+          redress_number: string | null
+          seat_preference: string | null
+          special_assistance: string[] | null
+          traveler_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_of_birth?: string | null
+          frequent_flyer_programs?: Json | null
+          id?: string
+          known_traveler_number?: string | null
+          meal_preference?: string | null
+          name: string
+          passport_country?: string | null
+          passport_expiry?: string | null
+          redress_number?: string | null
+          seat_preference?: string | null
+          special_assistance?: string[] | null
+          traveler_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_of_birth?: string | null
+          frequent_flyer_programs?: Json | null
+          id?: string
+          known_traveler_number?: string | null
+          meal_preference?: string | null
+          name?: string
+          passport_country?: string | null
+          passport_expiry?: string | null
+          redress_number?: string | null
+          seat_preference?: string | null
+          special_assistance?: string[] | null
+          traveler_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traveler_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trip_collaborators: {
         Row: {
