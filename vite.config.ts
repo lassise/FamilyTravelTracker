@@ -17,9 +17,9 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
-        name: "Family on the Fly",
-        short_name: "FamilyFly",
-        description: "Track your family's travel adventures across the globe",
+        name: "Travel Tracker",
+        short_name: "TravelTracker",
+        description: "Track your travel adventures across the globe",
         theme_color: "#0ea5e9",
         background_color: "#ffffff",
         display: "standalone",

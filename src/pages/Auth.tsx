@@ -124,7 +124,7 @@ const Auth = () => {
         toast.error(error.message);
       }
     } else {
-      toast.success("Account created! Welcome to Family On The Fly!");
+      toast.success("Account created! Welcome to Travel Tracker!");
       navigate("/onboarding");
     }
   };
@@ -222,9 +222,9 @@ const Auth = () => {
             <Plane className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Family On The Fly
+            Travel Tracker
           </h1>
-          <p className="text-muted-foreground mt-2">Plan unforgettable family adventures</p>
+          <p className="text-muted-foreground mt-2">Track your adventures around the world</p>
         </div>
 
         <Card className="shadow-travel">
