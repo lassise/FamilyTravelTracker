@@ -17,7 +17,7 @@ import { AlternateAirportsSection } from "@/components/flights/AlternateAirports
 import { 
   PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
-  Info, Armchair, CheckCircle2, XCircle, ExternalLink
+  Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -73,6 +73,8 @@ const Flights = () => {
   const [isDemo, setIsDemo] = useState(false);
   const [categories, setCategories] = useState<ReturnType<typeof categorizeFlights> | null>(null);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [sortBy, setSortBy] = useState<"score" | "price" | "departure" | "arrival" | "duration" | "stops">("score");
+  const [cheapestPrimaryPrice, setCheapestPrimaryPrice] = useState<number | null>(null);
   
   // Seat preferences - multiple selection
   const [seatPreferences, setSeatPreferences] = useState<string[]>([]);
@@ -167,8 +169,23 @@ const Flights = () => {
       setIsDemo(data.isDemo || false);
       setSearchMessage(data.message || null);
       
+      // Store cheapest primary price for savings calculation
+      const primaryCheapest = data.searchMetadata?.cheapestPrimaryPrice || null;
+      setCheapestPrimaryPrice(primaryCheapest);
+      
       // Score and categorize flights with preference matching info
-      const scored = scoreFlights(rawFlights, preferences);
+      const scored = scoreFlights(rawFlights, preferences, undefined, passengers);
+      
+      // Calculate savings from primary for alternate airport flights
+      if (primaryCheapest) {
+        scored.forEach(flight => {
+          if (flight.isAlternateOrigin) {
+            flight.savingsFromPrimary = primaryCheapest - flight.price;
+            flight.savingsPerTicket = passengers > 0 ? (primaryCheapest - flight.price) / passengers : 0;
+          }
+        });
+      }
+      
       setFlights(scored);
       setCategories(categorizeFlights(scored));
 
@@ -483,23 +500,75 @@ const Flights = () => {
 
         {flights.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">
-              All Flights ({flights.length})
-              {isDemo && <Badge variant="secondary" className="ml-2">Sample Data</Badge>}
-            </h2>
-            {flights.map((flight, idx) => (
-              <Card key={flight.id} className={`${idx === 0 ? "border-primary" : ""} ${flight.isAlternateOrigin ? "border-l-4 border-l-green-500" : ""}`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-lg font-semibold">
+                All Flights ({flights.length})
+                {isDemo && <Badge variant="secondary" className="ml-2">Sample Data</Badge>}
+              </h2>
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="score">Best Match</SelectItem>
+                    <SelectItem value="price">Price (Low to High)</SelectItem>
+                    <SelectItem value="departure">Departure Time</SelectItem>
+                    <SelectItem value="arrival">Arrival Time</SelectItem>
+                    <SelectItem value="duration">Duration</SelectItem>
+                    <SelectItem value="stops">Stops</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {[...flights].sort((a, b) => {
+              switch (sortBy) {
+                case "price":
+                  return a.price - b.price;
+                case "departure": {
+                  const aTime = new Date(a.itineraries[0]?.segments[0]?.departureTime || 0).getTime();
+                  const bTime = new Date(b.itineraries[0]?.segments[0]?.departureTime || 0).getTime();
+                  return aTime - bTime;
+                }
+                case "arrival": {
+                  const aSegs = a.itineraries[0]?.segments || [];
+                  const bSegs = b.itineraries[0]?.segments || [];
+                  const aTime = new Date(aSegs[aSegs.length - 1]?.arrivalTime || 0).getTime();
+                  const bTime = new Date(bSegs[bSegs.length - 1]?.arrivalTime || 0).getTime();
+                  return aTime - bTime;
+                }
+                case "duration": {
+                  const aDur = a.itineraries.reduce((sum, it) => sum + it.segments.reduce((s, seg) => s + (typeof seg.duration === 'number' ? seg.duration : 0), 0), 0);
+                  const bDur = b.itineraries.reduce((sum, it) => sum + it.segments.reduce((s, seg) => s + (typeof seg.duration === 'number' ? seg.duration : 0), 0), 0);
+                  return aDur - bDur;
+                }
+                case "stops": {
+                  const aStops = a.itineraries.reduce((sum, it) => sum + it.segments.length - 1, 0);
+                  const bStops = b.itineraries.reduce((sum, it) => sum + it.segments.length - 1, 0);
+                  return aStops - bStops;
+                }
+                default:
+                  return b.score - a.score;
+              }
+            }).map((flight, idx) => (
+              <Card key={flight.id} className={`${idx === 0 && sortBy === "score" ? "border-primary" : ""} ${flight.isAlternateOrigin ? "border-l-4 border-l-orange-500" : ""}`}>
                 <CardContent className="p-4">
                   {/* Alternate Airport Badge */}
                   {flight.isAlternateOrigin && flight.departureAirport && (
-                    <div className="flex items-center gap-2 mb-2 p-2 bg-green-50 dark:bg-green-950/30 rounded-md">
-                      <Badge className="bg-green-600 hover:bg-green-700 text-white">
+                    <div className="flex flex-wrap items-center gap-2 mb-2 p-2 bg-orange-50 dark:bg-orange-950/30 rounded-md">
+                      <Badge className="bg-orange-500 hover:bg-orange-600 text-white">
                         From {flight.departureAirport}
                       </Badge>
                       {flight.savingsFromPrimary && flight.savingsFromPrimary > 0 && (
-                        <span className="text-sm text-green-700 dark:text-green-400 font-medium">
-                          Save ${flight.savingsFromPrimary.toFixed(0)} vs primary airport
-                        </span>
+                        <div className="flex flex-wrap gap-2 text-sm text-orange-700 dark:text-orange-400 font-medium">
+                          <span>Save ${flight.savingsFromPrimary.toFixed(0)} total</span>
+                          {passengers > 1 && flight.savingsPerTicket && (
+                            <span className="text-orange-600 dark:text-orange-300">
+                              (${flight.savingsPerTicket.toFixed(0)}/ticket)
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -523,6 +592,11 @@ const Flights = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-primary">${flight.price?.toFixed(0)}</p>
+                      {passengers > 1 && flight.pricePerTicket && (
+                        <p className="text-sm text-muted-foreground">
+                          ${flight.pricePerTicket.toFixed(0)}/ticket
+                        </p>
+                      )}
                       {flight.hiddenCosts.length > 0 && (
                         <p className="text-xs text-muted-foreground">
                           +${flight.hiddenCosts.reduce((s, c) => s + c.estimatedCost, 0)} est. fees
@@ -538,16 +612,34 @@ const Flights = () => {
                   {flight.preferenceMatches && flight.preferenceMatches.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-3">
                       {flight.preferenceMatches.filter(m => m.type === "positive").map((match, i) => (
-                        <Badge key={`pos-${i}`} variant="outline" className="text-xs border-green-500/50 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          {match.label}
-                        </Badge>
+                        <Tooltip key={`pos-${i}`}>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-xs border-green-500/50 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 cursor-help">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              {match.label}
+                            </Badge>
+                          </TooltipTrigger>
+                          {match.detail && (
+                            <TooltipContent>
+                              <p>{match.detail}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       ))}
                       {flight.preferenceMatches.filter(m => m.type === "negative").map((match, i) => (
-                        <Badge key={`neg-${i}`} variant="outline" className="text-xs border-red-500/50 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400">
-                          <XCircle className="h-3 w-3 mr-1" />
-                          {match.label}
-                        </Badge>
+                        <Tooltip key={`neg-${i}`}>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-xs border-red-500/50 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 cursor-help">
+                              <XCircle className="h-3 w-3 mr-1" />
+                              {match.label}
+                            </Badge>
+                          </TooltipTrigger>
+                          {match.detail && (
+                            <TooltipContent>
+                              <p>{match.detail}</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                       ))}
                     </div>
                   )}

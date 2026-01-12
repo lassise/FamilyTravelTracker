@@ -49,6 +49,9 @@ export interface ScoredFlight extends FlightResult {
   preferenceMatches: PreferenceMatch[];
   bookingUrl?: string;
   savingsFromPrimary?: number;
+  pricePerTicket?: number;
+  savingsPerTicket?: number;
+  passengers?: number;
 }
 
 export interface ScoreBreakdown {
@@ -121,19 +124,29 @@ const scoreDepartureTime = (hour: number, preferences: FlightPreferences): numbe
   return score;
 };
 
+// Check if an airline is in the avoided list (by code or name)
+const isAvoidedAirline = (airlineCode: string, preferences: FlightPreferences): boolean => {
+  const airline = AIRLINES.find(a => airlineCode.startsWith(a.code) || airlineCode === a.name);
+  if (!airline) return false;
+  
+  // Check if the airline name OR code is in the avoided list
+  return preferences.avoided_airlines.includes(airline.name) || 
+         preferences.avoided_airlines.includes(airline.code);
+};
+
 // Score airline reliability
 const scoreAirlineReliability = (airlineCode: string, preferences: FlightPreferences): number => {
-  const airline = AIRLINES.find(a => airlineCode.startsWith(a.code));
+  const airline = AIRLINES.find(a => airlineCode.startsWith(a.code) || airlineCode === a.name);
   let score = airline?.reliability || 70;
 
   // Bonus for preferred airlines
-  if (preferences.preferred_airlines.includes(airline?.name || "")) {
+  if (airline && preferences.preferred_airlines.includes(airline.name)) {
     score = Math.min(100, score + 15);
   }
 
-  // Penalty for avoided airlines
-  if (preferences.avoided_airlines.includes(airline?.name || "")) {
-    score = Math.max(0, score - 40);
+  // Heavy penalty for avoided airlines - make it very significant
+  if (airline && (preferences.avoided_airlines.includes(airline.name) || preferences.avoided_airlines.includes(airline.code))) {
+    score = 0; // Zero out the score for avoided airlines
   }
 
   // Bonus for preferred alliances
@@ -323,7 +336,8 @@ const generateExplanation = (flight: ScoredFlight, preferences: FlightPreference
 export const scoreFlights = (
   flights: FlightResult[],
   preferences: FlightPreferences,
-  allFlightPrices?: number[]
+  allFlightPrices?: number[],
+  passengers: number = 1
 ): ScoredFlight[] => {
   if (!flights || flights.length === 0) return [];
 
@@ -467,6 +481,18 @@ export const scoreFlights = (
     if (breakdown.price > 90) {
       preferenceMatches.push({ type: "positive", label: "Great price", detail: "Among the cheapest" });
     }
+
+    // Check for wifi in extensions
+    const hasWifi = flight.itineraries.some(it => 
+      it.segments.some(seg => 
+        (seg.extensions || []).some((ext: string) => 
+          ext?.toLowerCase().includes('wi-fi') || ext?.toLowerCase().includes('wifi')
+        )
+      )
+    );
+    if (hasWifi) {
+      preferenceMatches.push({ type: "positive", label: "Has WiFi" });
+    }
     
     // Negative matches
     if (!isNonstop && preferences.prefer_nonstop) {
@@ -485,6 +511,37 @@ export const scoreFlights = (
     if (breakdown.layoverQuality < 60) {
       preferenceMatches.push({ type: "negative", label: "Limited airport", detail: "Connection airport has fewer amenities" });
     }
+
+    // Check for long layovers
+    for (const it of flight.itineraries) {
+      if (it.segments.length > 1) {
+        for (let i = 0; i < it.segments.length - 1; i++) {
+          const arrival = new Date(it.segments[i].arrivalTime);
+          const nextDeparture = new Date(it.segments[i + 1].departureTime);
+          const connectionMinutes = (nextDeparture.getTime() - arrival.getTime()) / (1000 * 60);
+          
+          if (connectionMinutes > preferences.max_layover_hours * 60) {
+            preferenceMatches.push({ type: "negative", label: "Long layover", detail: `${Math.round(connectionMinutes / 60)}h layover exceeds your ${preferences.max_layover_hours}h max` });
+            break;
+          } else if (connectionMinutes < preferences.min_connection_minutes) {
+            preferenceMatches.push({ type: "negative", label: "Tight connection", detail: `${connectionMinutes}min is less than your ${preferences.min_connection_minutes}min minimum` });
+            break;
+          }
+        }
+      }
+    }
+
+    // Check for no wifi (if we can determine it)
+    if (!hasWifi && flight.itineraries.some(it => it.segments.some(seg => seg.extensions && seg.extensions.length > 0))) {
+      preferenceMatches.push({ type: "negative", label: "No WiFi listed" });
+    }
+
+    // Budget airline warnings (extra fees)
+    if (["NK", "F9"].includes(firstSegment?.airline || "")) {
+      if (!preferences.carry_on_only) {
+        preferenceMatches.push({ type: "negative", label: "Bag fees extra", detail: "Ultra low-cost carrier" });
+      }
+    }
     
     if (preferences.family_mode) {
       const stressScore = calculateFamilyStressScore(flight, preferences);
@@ -502,6 +559,9 @@ export const scoreFlights = (
       ? `https://www.google.com/travel/flights?q=flights%20${departureAirport}%20to%20${arrivalAirport}`
       : undefined;
 
+    // Calculate per-ticket pricing
+    const pricePerTicket = passengers > 0 ? flight.price / passengers : flight.price;
+
     const scoredFlight: ScoredFlight = {
       ...flight,
       score: breakdown.total,
@@ -516,6 +576,8 @@ export const scoreFlights = (
       hiddenCosts: detectHiddenCosts(flight, preferences),
       preferenceMatches,
       bookingUrl,
+      pricePerTicket,
+      passengers,
     };
 
     scoredFlight.explanation = generateExplanation(scoredFlight, preferences);
