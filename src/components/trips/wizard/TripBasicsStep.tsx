@@ -1,13 +1,20 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TripFormData } from "../TripWizard";
-import { MapPin, Calendar, Hotel, Users } from "lucide-react";
+import { MapPin, Calendar, Hotel, Users, Briefcase, Palmtree, ArrowRightLeft } from "lucide-react";
 
 interface TripBasicsStepProps {
   formData: TripFormData;
   updateFormData: (updates: Partial<TripFormData>) => void;
 }
+
+const PURPOSE_OPTIONS = [
+  { value: "leisure", label: "Leisure / Vacation", icon: Palmtree, description: "Family fun, relaxation, sightseeing" },
+  { value: "business", label: "Business Trip", icon: Briefcase, description: "Meetings, conferences, work-related" },
+  { value: "mixed", label: "Bleisure (Both)", icon: ArrowRightLeft, description: "Combine work with leisure activities" },
+];
 
 export const TripBasicsStep = ({ formData, updateFormData }: TripBasicsStepProps) => {
   return (
@@ -23,6 +30,35 @@ export const TripBasicsStep = ({ formData, updateFormData }: TripBasicsStepProps
           value={formData.destination}
           onChange={(e) => updateFormData({ destination: e.target.value })}
         />
+      </div>
+
+      {/* Trip Purpose */}
+      <div className="space-y-3">
+        <Label>What's the primary purpose of this trip?</Label>
+        <RadioGroup
+          value={formData.tripPurpose}
+          onValueChange={(value) => updateFormData({ tripPurpose: value })}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+        >
+          {PURPOSE_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            return (
+              <label
+                key={option.value}
+                className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 cursor-pointer transition-all text-center ${
+                  formData.tripPurpose === option.value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <RadioGroupItem value={option.value} className="sr-only" />
+                <Icon className="h-6 w-6 mb-2" />
+                <span className="font-medium text-sm">{option.label}</span>
+                <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+              </label>
+            );
+          })}
+        </RadioGroup>
       </div>
 
       {/* Planning stage toggles */}
@@ -57,19 +93,21 @@ export const TripBasicsStep = ({ formData, updateFormData }: TripBasicsStepProps
           />
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="travelingWithKids" className="font-normal cursor-pointer">
-              Traveling with kids
-            </Label>
+        {formData.tripPurpose !== "business" && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="travelingWithKids" className="font-normal cursor-pointer">
+                Traveling with kids
+              </Label>
+            </div>
+            <Switch
+              id="travelingWithKids"
+              checked={formData.travelingWithKids}
+              onCheckedChange={(checked) => updateFormData({ travelingWithKids: checked })}
+            />
           </div>
-          <Switch
-            id="travelingWithKids"
-            checked={formData.travelingWithKids}
-            onCheckedChange={(checked) => updateFormData({ travelingWithKids: checked })}
-          />
-        </div>
+        )}
       </div>
 
       {formData.hasDates && (

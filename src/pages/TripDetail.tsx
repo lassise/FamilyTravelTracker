@@ -25,6 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import TripCollaboratorsDialog from "@/components/trips/TripCollaboratorsDialog";
+import { CustomActivityDialog } from "@/components/trips/CustomActivityDialog";
 
 interface ItineraryItem {
   id: string;
@@ -67,6 +68,7 @@ interface Trip {
   interests: string[] | null;
   pace_preference: string | null;
   notes: string | null;
+  cover_image: string | null;
 }
 
 const TripDetail = () => {
@@ -188,38 +190,78 @@ const TripDetail = () => {
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header with destination image */}
         <div className="mb-8">
+          {trip.cover_image && (
+            <div className="relative h-48 md:h-64 rounded-xl overflow-hidden mb-6">
+              <img
+                src={trip.cover_image}
+                alt={trip.destination || trip.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+              <div className="absolute bottom-4 left-4">
+                <h1 className="text-3xl font-bold text-white drop-shadow-lg">{trip.title}</h1>
+                {trip.destination && (
+                  <p className="text-white/90 flex items-center gap-2 mt-1 drop-shadow">
+                    <MapPin className="h-4 w-4" />
+                    {trip.destination}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <Button variant="ghost" onClick={() => navigate("/trips")} className="mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Trips
           </Button>
           
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold">{trip.title}</h1>
-              {trip.destination && (
-                <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                  <MapPin className="h-4 w-4" />
-                  {trip.destination}
-                </p>
-              )}
+          {!trip.cover_image && (
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold">{trip.title}</h1>
+                {trip.destination && (
+                  <p className="text-muted-foreground flex items-center gap-2 mt-1">
+                    <MapPin className="h-4 w-4" />
+                    {trip.destination}
+                  </p>
+                )}
+                {trip.start_date && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                    <Calendar className="h-4 w-4" />
+                    {formatDate(trip.start_date)}
+                    {trip.end_date && ` - ${formatDate(trip.end_date)}`}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <TripCollaboratorsDialog tripId={trip.id} tripTitle={trip.title} />
+                <Badge variant="secondary" className="capitalize">
+                  {trip.status || "planning"}
+                </Badge>
+              </div>
+            </div>
+          )}
+
+          {trip.cover_image && (
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               {trip.start_date && (
-                <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   {formatDate(trip.start_date)}
                   {trip.end_date && ` - ${formatDate(trip.end_date)}`}
                 </p>
               )}
+              <div className="flex gap-2">
+                <TripCollaboratorsDialog tripId={trip.id} tripTitle={trip.title} />
+                <Badge variant="secondary" className="capitalize">
+                  {trip.status || "planning"}
+                </Badge>
+              </div>
             </div>
-            
-            <div className="flex gap-2">
-              <TripCollaboratorsDialog tripId={trip.id} tripTitle={trip.title} />
-              <Badge variant="secondary" className="capitalize">
-                {trip.status || "planning"}
-              </Badge>
-            </div>
-          </div>
+          )}
 
           {trip.kids_ages && trip.kids_ages.length > 0 && (
             <div className="flex items-center gap-2 mt-4">
@@ -256,10 +298,17 @@ const TripDetail = () => {
                           {formatDate(day.date)}
                         </CardDescription>
                       </div>
-                      <Button variant="outline" size="sm">
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Regenerate Day
-                      </Button>
+                      <div className="flex gap-2">
+                        <CustomActivityDialog 
+                          itineraryDayId={day.id} 
+                          onActivityAdded={fetchTripData}
+                          existingItemsCount={day.itinerary_items?.length || 0}
+                        />
+                        <Button variant="outline" size="sm">
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Regenerate Day
+                        </Button>
+                      </div>
                     </div>
 
                     {day.weather_notes && (
@@ -297,20 +346,23 @@ const TripDetail = () => {
                                     {item.category || "activity"}
                                   </Badge>
                                 </div>
-                                <div className="flex gap-1">
-                                  {item.is_kid_friendly && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <Baby className="h-3 w-3 mr-1" />
-                                      Kid-friendly
-                                    </Badge>
-                                  )}
-                                  {item.is_stroller_friendly && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <ShoppingCart className="h-3 w-3 mr-1" />
-                                      Stroller OK
-                                    </Badge>
-                                  )}
-                                </div>
+                                {/* Only show kid-friendly badges if trip has kids */}
+                                {trip.kids_ages && trip.kids_ages.length > 0 && (
+                                  <div className="flex gap-1">
+                                    {item.is_kid_friendly && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        <Baby className="h-3 w-3 mr-1" />
+                                        Kid-friendly
+                                      </Badge>
+                                    )}
+                                    {item.is_stroller_friendly && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        <ShoppingCart className="h-3 w-3 mr-1" />
+                                        Stroller OK
+                                      </Badge>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               <h4 className="font-semibold text-lg">{item.title}</h4>
