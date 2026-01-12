@@ -10,6 +10,7 @@ import {
   getCountryMetadataByName,
   CountryMetadata 
 } from "@/lib/countryMetadata";
+import GeographicDetailsDialog from "./GeographicDetailsDialog";
 
 interface CountryComparisonProps {
   countries: Country[];
@@ -132,21 +133,27 @@ const CountryComparison = ({ countries }: CountryComparisonProps) => {
             Geographic Types
           </h4>
           <div className="grid grid-cols-3 gap-2">
-            <div className="p-3 rounded-lg bg-cyan-500/10 text-center">
-              <Waves className="w-5 h-5 mx-auto mb-1 text-cyan-500" />
-              <p className="text-lg font-bold text-foreground">{geographicTypes.islands}</p>
-              <p className="text-xs text-muted-foreground">Islands</p>
-            </div>
-            <div className="p-3 rounded-lg bg-amber-500/10 text-center">
-              <Mountain className="w-5 h-5 mx-auto mb-1 text-amber-500" />
-              <p className="text-lg font-bold text-foreground">{geographicTypes.landlocked}</p>
-              <p className="text-xs text-muted-foreground">Landlocked</p>
-            </div>
-            <div className="p-3 rounded-lg bg-blue-500/10 text-center">
-              <TreePine className="w-5 h-5 mx-auto mb-1 text-blue-500" />
-              <p className="text-lg font-bold text-foreground">{geographicTypes.coastal}</p>
-              <p className="text-xs text-muted-foreground">Coastal</p>
-            </div>
+            <GeographicDetailsDialog type="islands" countries={countries}>
+              <div className="p-3 rounded-lg bg-cyan-500/10 text-center cursor-pointer hover:bg-cyan-500/20 transition-colors">
+                <Waves className="w-5 h-5 mx-auto mb-1 text-cyan-500" />
+                <p className="text-lg font-bold text-foreground">{geographicTypes.islands}</p>
+                <p className="text-xs text-muted-foreground">Islands</p>
+              </div>
+            </GeographicDetailsDialog>
+            <GeographicDetailsDialog type="landlocked" countries={countries}>
+              <div className="p-3 rounded-lg bg-amber-500/10 text-center cursor-pointer hover:bg-amber-500/20 transition-colors">
+                <Mountain className="w-5 h-5 mx-auto mb-1 text-amber-500" />
+                <p className="text-lg font-bold text-foreground">{geographicTypes.landlocked}</p>
+                <p className="text-xs text-muted-foreground">Landlocked</p>
+              </div>
+            </GeographicDetailsDialog>
+            <GeographicDetailsDialog type="coastal" countries={countries}>
+              <div className="p-3 rounded-lg bg-blue-500/10 text-center cursor-pointer hover:bg-blue-500/20 transition-colors">
+                <TreePine className="w-5 h-5 mx-auto mb-1 text-blue-500" />
+                <p className="text-lg font-bold text-foreground">{geographicTypes.coastal}</p>
+                <p className="text-xs text-muted-foreground">Coastal</p>
+              </div>
+            </GeographicDetailsDialog>
           </div>
         </div>
 

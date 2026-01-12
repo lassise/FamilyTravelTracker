@@ -87,21 +87,46 @@ export const useFlightPreferences = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("flight_preferences")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+      // Fetch both flight preferences and profile home_airports in parallel
+      const [flightPrefsResult, profileResult] = await Promise.all([
+        supabase
+          .from("flight_preferences")
+          .select("*")
+          .eq("user_id", user.id)
+          .single(),
+        supabase
+          .from("profiles")
+          .select("home_airports")
+          .eq("id", user.id)
+          .single()
+      ]);
 
-      if (error) {
-        if (error.code === "PGRST116") {
-          // No preferences exist yet, create defaults
-          await createDefaultPreferences();
-        } else {
-          throw error;
+      // Parse profile home_airports as fallback
+      let profileHomeAirports: HomeAirport[] = [];
+      if (profileResult.data?.home_airports) {
+        const rawAirports = profileResult.data.home_airports;
+        if (typeof rawAirports === 'string') {
+          try {
+            profileHomeAirports = JSON.parse(rawAirports);
+          } catch {
+            profileHomeAirports = [];
+          }
+        } else if (Array.isArray(rawAirports)) {
+          profileHomeAirports = rawAirports as unknown as HomeAirport[];
         }
-      } else if (data) {
-        // Parse home_airports from JSON
+      }
+
+      if (flightPrefsResult.error) {
+        if (flightPrefsResult.error.code === "PGRST116") {
+          // No preferences exist yet, create defaults with profile airports
+          await createDefaultPreferences(profileHomeAirports);
+        } else {
+          throw flightPrefsResult.error;
+        }
+      } else if (flightPrefsResult.data) {
+        const data = flightPrefsResult.data;
+        
+        // Parse home_airports from flight preferences JSON
         let homeAirports: HomeAirport[] = [];
         if (data.home_airports) {
           if (typeof data.home_airports === 'string') {
@@ -113,6 +138,11 @@ export const useFlightPreferences = () => {
           } else if (Array.isArray(data.home_airports)) {
             homeAirports = data.home_airports as unknown as HomeAirport[];
           }
+        }
+        
+        // Use profile home_airports as fallback if flight preferences don't have any
+        if (homeAirports.length === 0 && profileHomeAirports.length > 0) {
+          homeAirports = profileHomeAirports;
         }
         
         setPreferences({
@@ -156,7 +186,7 @@ export const useFlightPreferences = () => {
     }
   };
 
-  const createDefaultPreferences = async () => {
+  const createDefaultPreferences = async (profileHomeAirports: HomeAirport[] = []) => {
     if (!user?.id) return;
 
     try {
@@ -164,7 +194,7 @@ export const useFlightPreferences = () => {
         .from("flight_preferences")
         .insert([{
           user_id: user.id,
-          home_airports: JSON.stringify([]),
+          home_airports: JSON.stringify(profileHomeAirports),
           preferred_airlines: [],
           avoided_airlines: [],
           preferred_alliances: [],
@@ -195,6 +225,7 @@ export const useFlightPreferences = () => {
         setPreferences({
           ...defaultPreferences,
           id: data.id,
+          home_airports: profileHomeAirports,
         });
       }
     } catch (error) {
