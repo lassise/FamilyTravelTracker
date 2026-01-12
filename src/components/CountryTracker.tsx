@@ -10,6 +10,7 @@ import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
 import { getAllCountries } from "@/lib/countriesData";
+import { getEmojiFlag, type TCountryCode } from 'countries-list';
 
 interface CountryTrackerProps {
   countries: Country[];
@@ -90,12 +91,13 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {countries.map((country) => {
+        {countries.map((country) => {
             const summary = getCountrySummary(country.id);
             const countryCode = getCountryCode(country.name);
-            // Get the proper emoji flag from the countries-list library
-            const countryData = allCountriesData.find(c => c.name === country.name);
-            const displayFlag = countryData?.flag || country.flag;
+            // Get the proper emoji flag from the countries-list library using the code
+            const displayFlag = countryCode 
+              ? getEmojiFlag(countryCode as TCountryCode) 
+              : country.flag;
             
             return (
               <Card 
