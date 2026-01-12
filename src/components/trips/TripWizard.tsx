@@ -28,6 +28,7 @@ export interface TripFormData {
   lodgingLocation: string;
   napSchedule: string;
   strollerNeeds: boolean;
+  tripPurpose: string; // "leisure" | "business" | "mixed"
 }
 
 const STEPS = [
@@ -59,6 +60,7 @@ const TripWizard = () => {
     lodgingLocation: "",
     napSchedule: "",
     strollerNeeds: false,
+    tripPurpose: "leisure",
   });
 
   const updateFormData = (updates: Partial<TripFormData>) => {
@@ -130,13 +132,15 @@ const TripWizard = () => {
           destination: formData.destination,
           startDate: formData.startDate,
           endDate: formData.endDate,
-          kidsAges: formData.kidsAges,
+          kidsAges: formData.travelingWithKids ? formData.kidsAges : [],
           interests: formData.interests,
           pacePreference: formData.pacePreference,
           budgetLevel: formData.budgetLevel,
           lodgingLocation: formData.lodgingLocation,
-          napSchedule: formData.napSchedule,
-          strollerNeeds: formData.strollerNeeds,
+          napSchedule: formData.travelingWithKids ? formData.napSchedule : "",
+          strollerNeeds: formData.travelingWithKids ? formData.strollerNeeds : false,
+          tripPurpose: formData.tripPurpose,
+          hasKids: formData.travelingWithKids && formData.kidsAges.length > 0,
         },
       });
 

@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { TripFormData } from "../TripWizard";
 import { 
   Trees, 
@@ -13,7 +17,11 @@ import {
   Footprints,
   Palette,
   Gamepad2,
-  Target
+  Target,
+  Church,
+  Briefcase,
+  Plus,
+  X
 } from "lucide-react";
 
 interface InterestsStepProps {
@@ -24,6 +32,7 @@ interface InterestsStepProps {
 const INTERESTS = [
   { id: "nature", label: "Nature & Outdoors", icon: Trees },
   { id: "culture", label: "Culture & History", icon: Landmark },
+  { id: "churches", label: "Churches & Religious Sites", icon: Church },
   { id: "theme-parks", label: "Theme Parks", icon: Ticket },
   { id: "beaches", label: "Beaches & Water", icon: Waves },
   { id: "museums", label: "Museums", icon: Building2 },
@@ -35,9 +44,12 @@ const INTERESTS = [
   { id: "arts", label: "Arts & Crafts", icon: Palette },
   { id: "playgrounds", label: "Playgrounds & Play Areas", icon: Gamepad2 },
   { id: "golf", label: "Golf", icon: Target },
+  { id: "business", label: "Business & Work", icon: Briefcase },
 ];
 
 export const InterestsStep = ({ formData, updateFormData }: InterestsStepProps) => {
+  const [customInterest, setCustomInterest] = useState("");
+
   const toggleInterest = (interestId: string) => {
     const current = formData.interests;
     if (current.includes(interestId)) {
@@ -46,6 +58,21 @@ export const InterestsStep = ({ formData, updateFormData }: InterestsStepProps) 
       updateFormData({ interests: [...current, interestId] });
     }
   };
+
+  const addCustomInterest = () => {
+    const trimmed = customInterest.trim();
+    if (trimmed && !formData.interests.includes(`custom:${trimmed}`)) {
+      updateFormData({ interests: [...formData.interests, `custom:${trimmed}`] });
+      setCustomInterest("");
+    }
+  };
+
+  const removeCustomInterest = (interest: string) => {
+    updateFormData({ interests: formData.interests.filter((i) => i !== interest) });
+  };
+
+  const customInterests = formData.interests.filter(i => i.startsWith("custom:"));
+  const standardInterests = formData.interests.filter(i => !i.startsWith("custom:"));
 
   return (
     <div className="space-y-4">
@@ -59,7 +86,7 @@ export const InterestsStep = ({ formData, updateFormData }: InterestsStepProps) 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {INTERESTS.map((interest) => {
           const Icon = interest.icon;
-          const isSelected = formData.interests.includes(interest.id);
+          const isSelected = standardInterests.includes(interest.id);
           
           return (
             <button
@@ -77,6 +104,38 @@ export const InterestsStep = ({ formData, updateFormData }: InterestsStepProps) 
             </button>
           );
         })}
+      </div>
+
+      {/* Custom Interests */}
+      <div className="space-y-2">
+        <Label>Add your own interests</Label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="E.g., Wine tasting, Hiking..."
+            value={customInterest}
+            onChange={(e) => setCustomInterest(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomInterest())}
+          />
+          <Button type="button" variant="outline" size="icon" onClick={addCustomInterest}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        {customInterests.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {customInterests.map((interest) => (
+              <Badge key={interest} variant="secondary" className="gap-1">
+                {interest.replace("custom:", "")}
+                <button
+                  type="button"
+                  onClick={() => removeCustomInterest(interest)}
+                  className="ml-1 hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {formData.interests.length > 0 && (

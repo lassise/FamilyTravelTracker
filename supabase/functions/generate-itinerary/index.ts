@@ -17,12 +17,14 @@ const TripDetailsSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   kidsAges: z.array(z.number().int().min(0).max(18)).max(10, "Too many kids"),
-  interests: z.array(z.string().trim().min(1).max(50)).max(20, "Too many interests"),
+  interests: z.array(z.string().trim().min(1).max(100)).max(30, "Too many interests"),
   pacePreference: z.string().trim().max(50),
   budgetLevel: z.string().trim().max(50),
   lodgingLocation: z.string().trim().max(200).optional(),
   napSchedule: z.string().trim().max(200).optional(),
   strollerNeeds: z.boolean().optional(),
+  tripPurpose: z.enum(["leisure", "business", "mixed"]).optional().default("leisure"),
+  hasKids: z.boolean().optional().default(false),
 });
 
 type TripDetails = z.infer<typeof TripDetailsSchema>;
@@ -229,7 +231,37 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = `You are an expert family travel planner specializing in trips with children. You create detailed, practical itineraries that account for kids' needs, energy levels, and attention spans.
+    // Build system prompt based on trip purpose
+    const isBusiness = tripDetails.tripPurpose === "business";
+    const isMixed = tripDetails.tripPurpose === "mixed";
+    const hasKids = tripDetails.hasKids || tripDetails.kidsAges.length > 0;
+
+    let systemPrompt = `You are an expert travel planner creating detailed, practical itineraries.`;
+    
+    if (isBusiness) {
+      systemPrompt = `You are an expert business travel planner. You create efficient itineraries that maximize productivity while allowing for networking opportunities and local experiences.
+
+Your itineraries should:
+- Prioritize business meetings and work commitments
+- Include professional dining options for client meetings
+- Suggest convenient transport between business venues
+- Include downtime for preparation and rest
+- Recommend business-appropriate restaurants and venues
+- Note which venues have good WiFi and workspaces
+- Include backup options for cancelled meetings`;
+    } else if (isMixed) {
+      systemPrompt = `You are an expert travel planner specializing in "bleisure" trips that combine business and leisure. You create balanced itineraries that accommodate work commitments while maximizing leisure time.
+
+Your itineraries should:
+- Clearly separate business and leisure activities
+- Schedule business activities during appropriate hours
+- Include leisure activities around work commitments
+${hasKids ? `- Account for kid-friendly activities during leisure time
+- Suggest family-friendly dining options` : ''}
+- Suggest efficient transitions between work and personal time
+- Note venues with good WiFi for impromptu work needs`;
+    } else if (hasKids) {
+      systemPrompt = `You are an expert family travel planner specializing in trips with children. You create detailed, practical itineraries that account for kids' needs, energy levels, and attention spans.
 
 Your itineraries should:
 - Be realistic about timing and travel between locations
@@ -240,6 +272,17 @@ Your itineraries should:
 - Group activities by proximity to minimize travel time
 - Note which activities require reservations
 - Include estimated costs and duration for each activity`;
+    } else {
+      systemPrompt = `You are an expert travel planner creating detailed, practical itineraries for adults.
+
+Your itineraries should:
+- Be realistic about timing and travel between locations
+- Include diverse dining experiences
+- Group activities by proximity to minimize travel time
+- Note which activities require reservations
+- Include estimated costs and duration for each activity
+- Suggest nightlife and evening entertainment options where relevant`;
+    }
 
     // Sanitize user inputs before including in prompt
     const safeDestination = sanitizeForPrompt(tripDetails.destination);
@@ -249,17 +292,27 @@ Your itineraries should:
     const safeLodging = tripDetails.lodgingLocation ? sanitizeForPrompt(tripDetails.lodgingLocation) : '';
     const safeNapSchedule = tripDetails.napSchedule ? sanitizeForPrompt(tripDetails.napSchedule) : '';
 
-    const userPrompt = `Create a ${tripDays}-day family travel itinerary for ${safeDestination}.
+    // Parse custom interests
+    const customInterests = tripDetails.interests.filter(i => i.startsWith("custom:")).map(i => i.replace("custom:", ""));
+    const standardInterests = tripDetails.interests.filter(i => !i.startsWith("custom:"));
+    const allInterests = [...standardInterests, ...customInterests];
+
+    const userPrompt = `Create a ${tripDays}-day ${isBusiness ? 'business' : isMixed ? 'bleisure' : 'travel'} itinerary for ${safeDestination}.
 
 Trip Details:
 - Dates: ${tripDetails.startDate} to ${tripDetails.endDate}
-- Kids' ages: ${tripDetails.kidsAges.join(', ')} years old
-- Interests: ${safeInterests}
+- Trip Purpose: ${tripDetails.tripPurpose || 'leisure'}
+${hasKids ? `- Kids' ages: ${tripDetails.kidsAges.join(', ')} years old` : '- Adult travelers only'}
+- Interests: ${allInterests.map(i => sanitizeForPrompt(i)).join(', ')}
 - Pace preference: ${safePace}
 - Budget level: ${safeBudget}
 ${safeLodging ? `- Staying near: ${safeLodging}` : ''}
-${safeNapSchedule ? `- Nap schedule: ${safeNapSchedule}` : ''}
-${tripDetails.strollerNeeds ? '- Need stroller-friendly options' : ''}
+${hasKids && safeNapSchedule ? `- Nap schedule: ${safeNapSchedule}` : ''}
+${hasKids && tripDetails.strollerNeeds ? '- Need stroller-friendly options' : ''}
+
+${isBusiness ? 'Focus on professional venues, efficient scheduling, and business-appropriate activities.' : ''}
+${isMixed ? 'Balance business commitments with leisure activities. Mark which activities are business vs personal.' : ''}
+${!hasKids ? 'Do NOT include kid-friendly ratings or stroller information in the response.' : ''}
 
 Please generate a detailed day-by-day itinerary in the following JSON format:
 {
@@ -276,14 +329,14 @@ Please generate a detailed day-by-day itinerary in the following JSON format:
           "startTime": "HH:MM",
           "endTime": "HH:MM",
           "title": "Activity name",
-          "description": "Why this is great for the family",
+          "description": "Why this is great${isBusiness ? ' for business' : isMixed ? ' (mark as business/leisure)' : ''}",
           "locationName": "Place name",
           "locationAddress": "Full address",
-          "category": "attraction|restaurant|outdoor|museum|entertainment|transport|rest",
+          "category": "${isBusiness ? 'meeting|restaurant|transport|networking|rest|sightseeing' : 'attraction|restaurant|outdoor|museum|entertainment|transport|rest'}",
           "durationMinutes": 90,
-          "costEstimate": 50,
+          "costEstimate": 50${hasKids ? `,
           "isKidFriendly": true,
-          "isStrollerFriendly": true,
+          "isStrollerFriendly": true` : ''},
           "requiresReservation": false,
           "reservationInfo": "How to book if needed"
         }
@@ -292,20 +345,20 @@ Please generate a detailed day-by-day itinerary in the following JSON format:
         {
           "mealType": "breakfast|lunch|dinner|snack",
           "name": "Restaurant name",
-          "description": "Why it's good for families",
-          "priceRange": "$|$$|$$$",
-          "kidFriendlyNotes": "What kids will like"
+          "description": "Why it's good${hasKids ? ' for families' : ''}",
+          "priceRange": "$|$$|$$$"${hasKids ? `,
+          "kidFriendlyNotes": "What kids will like"` : ''}
         }
       ],
-      "planB": "Alternative plan for rain or tired kids",
+      "planB": "${hasKids ? 'Alternative plan for rain or tired kids' : 'Alternative plan for bad weather'}",
       "notes": "Tips for this day"
     }
   ],
   "packingTips": ["List of items specific to this destination"],
-  "generalTips": ["Overall trip tips for families"]
+  "generalTips": ["Overall trip tips${hasKids ? ' for families' : ''}"]
 }
 
-Ensure all times are realistic and include buffer time for transitions with kids. Return ONLY valid JSON, no additional text.`;
+Ensure all times are realistic and include buffer time for transitions. Return ONLY valid JSON, no additional text.`;
 
     console.log('Generating itinerary for:', safeDestination, 'by user:', user.id);
 
