@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.demo-login]
 verify_jwt = false
+
+[functions.search-flights]
+verify_jwt = false
