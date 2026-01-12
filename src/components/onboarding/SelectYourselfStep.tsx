@@ -71,11 +71,11 @@ const SelectYourselfStep = ({ familyMembers, onSelect }: SelectYourselfStepProps
     <div className="space-y-4">
       <div className="text-center mb-4">
         <p className="text-sm text-muted-foreground">
-          Select which family member represents you. This helps us show your personal travel statistics.
+          Select the primary traveler who will manage this account and see personal travel statistics.
         </p>
       </div>
 
-      <Label className="text-muted-foreground">Which one is you?</Label>
+      <Label className="text-muted-foreground">Select Primary Traveler</Label>
       
       <div className="grid gap-3">
         {members.map((member) => (
@@ -113,7 +113,7 @@ const SelectYourselfStep = ({ familyMembers, onSelect }: SelectYourselfStepProps
       </div>
 
       <p className="text-xs text-muted-foreground text-center mt-4">
-        This helps us show your personal travel stats
+        The primary traveler will see their personal travel stats on the dashboard
       </p>
     </div>
   );

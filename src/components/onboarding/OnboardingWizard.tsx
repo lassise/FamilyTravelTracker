@@ -46,10 +46,10 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     },
   ];
 
-  // Only show "Select Yourself" step if there's more than one family member
+  // Only show "Select Primary Traveler" step if there's more than one family member
   const selectYourselfStep = familyMembers.length > 1 ? [{
-    title: "Which One Is You?",
-    description: "Select yourself so we can show your personal travel stats.",
+    title: "Who's the Primary Traveler?",
+    description: "Select the main traveler who will manage this account.",
     icon: UserCheck,
     component: (
       <SelectYourselfStep 

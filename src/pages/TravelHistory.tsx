@@ -41,10 +41,8 @@ const TravelHistory = () => {
   const { visitedCountries, totalCountries: personalTotalCountries, continentsVisited: personalContinents, linkedMember, loading: personalLoading } = usePersonalTravelData();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  // Default to personal view if solo (1 or fewer family members), otherwise family view
-  const [viewMode, setViewMode] = useState<ViewMode>(() => 
-    familyMembers.length <= 1 ? 'personal' : 'family'
-  );
+  // Default to family view (combined travel history)
+  const [viewMode, setViewMode] = useState<ViewMode>('family');
 
   // Reset scroll to top when tab changes
   const handleTabChange = (tab: TabKey) => {
@@ -106,6 +104,19 @@ const TravelHistory = () => {
               {familyMembers.length > 1 ? (
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setViewMode('family')}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                      viewMode === 'family'
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <Users className="h-4 w-4" />
+                    <span className="hidden sm:inline">Family Travel History</span>
+                    <span className="sm:hidden">Family</span>
+                  </button>
+                  <button
                     onClick={() => setViewMode('personal')}
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
@@ -117,19 +128,6 @@ const TravelHistory = () => {
                     <User className="h-4 w-4" />
                     <span className="hidden sm:inline">My Travel</span>
                     <span className="sm:hidden">Me</span>
-                  </button>
-                  <button
-                    onClick={() => setViewMode('family')}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                      viewMode === 'family'
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    )}
-                  >
-                    <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">All Travelers</span>
-                    <span className="sm:hidden">All</span>
                   </button>
                 </div>
               ) : (

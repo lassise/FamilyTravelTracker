@@ -44,6 +44,7 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showAddAnother, setShowAddAnother] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -73,7 +74,7 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
     }
   };
 
-  const handleAddCountry = async () => {
+  const handleSaveCountry = async () => {
     if (!selectedCountry) return;
 
     // Check if already added
@@ -120,15 +121,22 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
       }
 
       setCountries([...countries, { ...newCountry, visitedBy: membersToVisit }]);
+      toast({ title: `${selectedCountry.name} saved!` });
+      
+      // Show add another prompt
+      setShowAddAnother(true);
       setSelectedCountry(null);
       setSelectedMembers([]);
-      setComboboxOpen(false);
-      toast({ title: `${selectedCountry.name} added!` });
     } catch (error) {
-      toast({ title: "Failed to add country", variant: "destructive" });
+      toast({ title: "Failed to save country", variant: "destructive" });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddAnother = () => {
+    setShowAddAnother(false);
+    setComboboxOpen(true);
   };
 
   const handleRemoveCountry = async (countryId: string) => {
@@ -151,90 +159,103 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
-        <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              className="w-full justify-between"
-            >
-              {selectedCountry ? (
-                <span className="flex items-center gap-2">
-                  <span>{selectedCountry.flag}</span>
-                  <span>{selectedCountry.name}</span>
-                </span>
-              ) : (
-                "Select a country..."
-              )}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-full p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Search country..." />
-              <CommandList>
-                <CommandEmpty>No country found.</CommandEmpty>
-                <CommandGroup>
-                  {allCountries
-                    .filter((c) => !countries.some((added) => added.name === c.name))
-                    .map((country) => (
-                      <CommandItem
-                        key={country.code}
-                        value={country.name}
-                        onSelect={() => {
-                          setSelectedCountry(country);
-                          setComboboxOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedCountry?.name === country.name ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <span className="mr-2">{country.flag}</span>
-                        <span>{country.name}</span>
-                        <span className="ml-auto text-xs text-muted-foreground">
-                          {country.continent}
-                        </span>
-                      </CommandItem>
-                    ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+      {!showAddAnother ? (
+        <div className="space-y-3">
+          <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between"
+              >
+                {selectedCountry ? (
+                  <span className="flex items-center gap-2">
+                    <span>{selectedCountry.flag}</span>
+                    <span>{selectedCountry.name}</span>
+                  </span>
+                ) : (
+                  "Select a country..."
+                )}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search country..." />
+                <CommandList>
+                  <CommandEmpty>No country found.</CommandEmpty>
+                  <CommandGroup>
+                    {allCountries
+                      .filter((c) => !countries.some((added) => added.name === c.name))
+                      .map((country) => (
+                        <CommandItem
+                          key={country.code}
+                          value={country.name}
+                          onSelect={() => {
+                            setSelectedCountry(country);
+                            setComboboxOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedCountry?.name === country.name ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <span className="mr-2">{country.flag}</span>
+                          <span>{country.name}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">
+                            {country.continent}
+                          </span>
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
-        {selectedCountry && familyMembers.length > 1 && (
-          <div className="p-3 border rounded-lg space-y-2">
-            <Label className="text-sm text-muted-foreground">Who visited?</Label>
-            <div className="flex flex-wrap gap-2">
-              {familyMembers.map((member) => (
-                <div key={member.id} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`member-${member.id}`}
-                    checked={selectedMembers.includes(member.id)}
-                    onCheckedChange={() => toggleMember(member.id)}
-                  />
-                  <label htmlFor={`member-${member.id}`} className="text-sm cursor-pointer">
-                    {member.name}
-                  </label>
-                </div>
-              ))}
+          {selectedCountry && familyMembers.length > 1 && (
+            <div className="p-3 border rounded-lg space-y-2">
+              <Label className="text-sm text-muted-foreground">Who visited?</Label>
+              <div className="flex flex-wrap gap-2">
+                {familyMembers.map((member) => (
+                  <div key={member.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`member-${member.id}`}
+                      checked={selectedMembers.includes(member.id)}
+                      onCheckedChange={() => toggleMember(member.id)}
+                    />
+                    <label htmlFor={`member-${member.id}`} className="text-sm cursor-pointer">
+                      {member.name}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <Button
-          onClick={handleAddCountry}
-          disabled={loading || !selectedCountry}
-          className="w-full"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Country
-        </Button>
-      </div>
+          {selectedCountry && (
+            <Button
+              onClick={handleSaveCountry}
+              disabled={loading}
+              className="w-full"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              {loading ? "Saving..." : "Save Country"}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4 py-6 bg-primary/5 rounded-lg border border-primary/20">
+          <Check className="w-8 h-8 text-primary" />
+          <p className="text-sm text-muted-foreground">Country saved successfully!</p>
+          <Button onClick={handleAddAnother} variant="outline">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Another Country
+          </Button>
+        </div>
+      )}
 
       {countries.length > 0 && (
         <div className="space-y-2">
@@ -276,7 +297,7 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
         </div>
       )}
 
-      {countries.length === 0 && (
+      {countries.length === 0 && !showAddAnother && (
         <div className="text-center py-8 text-muted-foreground">
           <Globe className="w-12 h-12 mx-auto mb-2 opacity-50" />
           <p>Add countries you've visited</p>

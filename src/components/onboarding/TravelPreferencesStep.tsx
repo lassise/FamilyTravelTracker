@@ -29,20 +29,21 @@ interface TravelPrefs {
 }
 
 const INTEREST_OPTIONS = [
-  { label: "Beach & Relaxation", emoji: "🏖️" },
   { label: "Adventure & Outdoors", emoji: "🏔️" },
-  { label: "History & Culture", emoji: "🏛️" },
-  { label: "Food & Culinary", emoji: "🍜" },
-  { label: "Family-friendly", emoji: "👨‍👩‍👧‍👦" },
-  { label: "City Exploration", emoji: "🌆" },
-  { label: "Nature & Wildlife", emoji: "🦁" },
-  { label: "Theme Parks", emoji: "🎢" },
   { label: "Art & Museums", emoji: "🎨" },
-  { label: "Shopping", emoji: "🛍️" },
-  { label: "Nightlife", emoji: "🌃" },
-  { label: "Sports & Activities", emoji: "⚽" },
+  { label: "Beach & Relaxation", emoji: "🏖️" },
+  { label: "Churches & Religious Sites", emoji: "⛪" },
+  { label: "City Exploration", emoji: "🌆" },
+  { label: "Family-friendly", emoji: "👨‍👩‍👧‍👦" },
+  { label: "Food & Culinary", emoji: "🍜" },
   { label: "Golf", emoji: "⛳" },
-];
+  { label: "History & Culture", emoji: "🏛️" },
+  { label: "Nature & Wildlife", emoji: "🦁" },
+  { label: "Nightlife", emoji: "🌃" },
+  { label: "Shopping", emoji: "🛍️" },
+  { label: "Sports & Activities", emoji: "⚽" },
+  { label: "Theme Parks", emoji: "🎢" },
+].sort((a, b) => a.label.localeCompare(b.label));
 
 const ACCOMMODATION_OPTIONS = [
   { value: "hotels", label: "Hotels", icon: Hotel },
