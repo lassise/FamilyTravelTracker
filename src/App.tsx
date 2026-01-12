@@ -15,6 +15,7 @@ const Trips = lazy(() => import("./pages/Trips"));
 const NewTrip = lazy(() => import("./pages/NewTrip"));
 const TripDetail = lazy(() => import("./pages/TripDetail"));
 const Index = lazy(() => import("./pages/Index"));
+const TravelHistory = lazy(() => import("./pages/TravelHistory"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -53,7 +54,7 @@ const App = () => (
               <Route path="/trips" element={<Trips />} />
               <Route path="/trips/new" element={<NewTrip />} />
               <Route path="/trips/:tripId" element={<TripDetail />} />
-              <Route path="/family" element={<Index />} />
+              <Route path="/family" element={<TravelHistory />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/highlights/:token" element={<Highlights />} />

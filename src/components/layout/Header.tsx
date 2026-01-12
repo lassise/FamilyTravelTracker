@@ -44,9 +44,10 @@ const Header = () => {
       .slice(0, 2);
   };
 
-  // Primary nav - family focused
+  // Primary nav - main features
   const primaryLinks = [
-    { href: "/", label: "Home", icon: Globe },
+    { href: "/", label: "Dashboard", icon: Globe },
+    { href: "/family", label: "Travel Tracker", icon: Map },
   ];
 
   // Trip planning links

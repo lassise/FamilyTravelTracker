@@ -94,8 +94,8 @@ const Flights = () => {
   
   // Load seat preferences
   useEffect(() => {
-    if (!prefsLoading && preferences.seat_preference) {
-      setSeatPreferences([preferences.seat_preference]);
+    if (!prefsLoading && preferences.seat_preference && preferences.seat_preference.length > 0) {
+      setSeatPreferences(preferences.seat_preference);
     }
   }, [preferences.seat_preference, prefsLoading]);
 

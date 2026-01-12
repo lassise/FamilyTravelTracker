@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFamilyData } from "@/hooks/useFamilyData";
-import { usePersonalTravelData } from "@/hooks/usePersonalTravelData";
 import AppLayout from "@/components/layout/AppLayout";
 import CountryTracker from "@/components/CountryTracker";
 import CountryWishlist from "@/components/CountryWishlist";
@@ -19,13 +18,11 @@ import TravelStreaks from "@/components/travel/TravelStreaks";
 import CountryComparison from "@/components/travel/CountryComparison";
 import EnhancedBucketList from "@/components/travel/EnhancedBucketList";
 import TravelMilestones from "@/components/travel/TravelMilestones";
-import PersonalTravelSummary from "@/components/travel/PersonalTravelSummary";
 
-import { Loader2, BarChart3, Globe2, Trophy, Map, Camera, User, Users } from "lucide-react";
+import { Loader2, BarChart3, Globe2, Trophy, Map, Camera, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TabKey = 'overview' | 'analytics' | 'achievements' | 'countries' | 'memories';
-type ViewMode = 'family' | 'personal';
 
 const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'overview', label: 'Overview', icon: Globe2 },
@@ -38,11 +35,8 @@ const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
 const TravelHistory = () => {
   const { user, loading: authLoading, needsOnboarding, profile } = useAuth();
   const { familyMembers, countries, wishlist, homeCountry, loading, refetch, totalContinents } = useFamilyData();
-  const { visitedCountries, totalCountries: personalTotalCountries, continentsVisited: personalContinents, linkedMember, loading: personalLoading } = usePersonalTravelData();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  // Default to family view (combined travel history)
-  const [viewMode, setViewMode] = useState<ViewMode>('family');
 
   // Reset scroll to top when tab changes
   const handleTabChange = (tab: TabKey) => {
@@ -81,20 +75,8 @@ const TravelHistory = () => {
       </AppLayout>
     );
   }
-  
-  // Separate loading state to prevent freezing on slow data fetches
-  const isDataLoading = loading || personalLoading;
 
   const visitedCountriesCount = countries.filter(c => c.visitedBy.length > 0).length;
-
-  // Build personal countries data for map
-  const personalCountriesForMap = visitedCountries.map(c => ({
-    id: c.id,
-    name: c.name,
-    flag: c.flag,
-    continent: c.continent,
-    visitedBy: linkedMember ? [linkedMember.name] : [],
-  }));
 
   return (
     <AppLayout>
@@ -102,72 +84,25 @@ const TravelHistory = () => {
         {/* Sticky Header with Stats + Navigation */}
         <div className="sticky top-16 z-40 bg-background border-b border-border shadow-sm">
           <div className="container mx-auto px-4 py-3">
-            {/* View Mode Toggle - only show if there are multiple travelers */}
+            {/* Header with title and stats */}
             <div className="flex items-center justify-between mb-3">
-              {familyMembers.length > 1 ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setViewMode('family')}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                      viewMode === 'family'
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    )}
-                  >
-                    <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Family Travel History</span>
-                    <span className="sm:hidden">Family</span>
-                  </button>
-                  <button
-                    onClick={() => setViewMode('personal')}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                      viewMode === 'personal'
-                        ? "bg-secondary text-secondary-foreground shadow-md"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    )}
-                  >
-                    <User className="h-4 w-4" />
-                    <span className="hidden sm:inline">My Travel</span>
-                    <span className="sm:hidden">Me</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-secondary text-secondary-foreground">
-                  <User className="h-4 w-4" />
-                  <span>My Travel</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-primary/10 text-primary">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Family Travel Tracker</span>
+                <span className="sm:hidden">Travel</span>
+              </div>
               
               <div className="flex items-center gap-4 text-sm">
-                {viewMode === 'family' ? (
-                  <>
-                    <div className="flex items-center gap-1.5">
-                      <Globe2 className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-foreground">{visitedCountriesCount}</span>
-                      <span className="text-muted-foreground hidden sm:inline">countries</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Map className="h-4 w-4 text-secondary" />
-                      <span className="font-semibold text-foreground">{totalContinents}</span>
-                      <span className="text-muted-foreground hidden sm:inline">continents</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-1.5">
-                      <Globe2 className="h-4 w-4 text-secondary" />
-                      <span className="font-semibold text-foreground">{personalTotalCountries}</span>
-                      <span className="text-muted-foreground hidden sm:inline">countries</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Map className="h-4 w-4 text-secondary" />
-                      <span className="font-semibold text-foreground">{personalContinents}</span>
-                      <span className="text-muted-foreground hidden sm:inline">continents</span>
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-1.5">
+                  <Globe2 className="h-4 w-4 text-primary" />
+                  <span className="font-semibold text-foreground">{visitedCountriesCount}</span>
+                  <span className="text-muted-foreground hidden sm:inline">countries</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Map className="h-4 w-4 text-secondary" />
+                  <span className="font-semibold text-foreground">{totalContinents}</span>
+                  <span className="text-muted-foreground hidden sm:inline">continents</span>
+                </div>
               </div>
             </div>
             
@@ -182,9 +117,7 @@ const TravelHistory = () => {
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all",
                       activeTab === tab.key
-                        ? viewMode === 'family' 
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-secondary text-secondary-foreground shadow-md"
+                        ? "bg-primary text-primary-foreground shadow-md"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
                     )}
                   >
@@ -200,7 +133,7 @@ const TravelHistory = () => {
         {/* Tab Content */}
         <div className="container mx-auto px-4 py-6">
           {/* Show loading skeleton when data is loading */}
-          {isDataLoading ? (
+          {loading ? (
             <div className="space-y-6">
               <div className="h-48 bg-muted/50 rounded-lg animate-pulse flex items-center justify-center">
                 <div className="text-center">
@@ -213,7 +146,7 @@ const TravelHistory = () => {
                 <div className="h-64 bg-muted/50 rounded-lg animate-pulse" />
               </div>
             </div>
-          ) : viewMode === 'family' ? (
+          ) : (
             <>
               {activeTab === 'overview' && (
                 <div className="space-y-6">
@@ -268,86 +201,6 @@ const TravelHistory = () => {
                   <TravelTimeline countries={countries} />
                   <PhotoGallery countries={countries} />
                   <TripSuggestions countries={countries} wishlist={wishlist} />
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {activeTab === 'overview' && (
-                <div className="space-y-6">
-                  <PersonalTravelSummary 
-                    visitedCountries={visitedCountries}
-                    totalCountries={personalTotalCountries}
-                    continentsVisited={personalContinents}
-                    linkedMember={linkedMember}
-                  />
-                  <InteractiveWorldMap 
-                    countries={personalCountriesForMap} 
-                    wishlist={[]} 
-                    homeCountry={homeCountry} 
-                  />
-                  <div className="grid lg:grid-cols-2 gap-6">
-                    <TravelDNA countries={personalCountriesForMap} homeCountryCode={getHomeCountryCode()} />
-                    <TravelStreaks />
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'analytics' && (
-                <div className="space-y-6">
-                  <AnalyticsInsightCard countries={personalCountriesForMap} />
-                  <TravelHeatmapCalendar />
-                </div>
-              )}
-
-              {activeTab === 'achievements' && (
-                <div className="space-y-6">
-                  <EnhancedAchievements 
-                    countries={personalCountriesForMap} 
-                    familyMembers={linkedMember ? [{ 
-                      id: linkedMember.id, 
-                      name: linkedMember.name, 
-                      role: linkedMember.role, 
-                      avatar: linkedMember.avatar, 
-                      color: linkedMember.color, 
-                      countriesVisited: personalTotalCountries 
-                    }] : []}
-                    totalContinents={personalContinents}
-                  />
-                  <EnhancedBucketList />
-                </div>
-              )}
-
-              {activeTab === 'countries' && (
-                <div className="space-y-8">
-                  {!linkedMember ? (
-                    <div className="text-center py-12">
-                      <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <h3 className="text-lg font-semibold mb-2">No Profile Linked</h3>
-                      <p className="text-muted-foreground max-w-md mx-auto">
-                        To see your travel history, complete onboarding or link yourself in profile settings.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {visitedCountries.map(country => (
-                        <div key={country.id} className="flex items-center gap-3 p-4 bg-card rounded-lg border border-border">
-                          <span className="text-2xl">{country.flag}</span>
-                          <div>
-                            <p className="font-medium">{country.name}</p>
-                            <p className="text-sm text-muted-foreground">{country.continent}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'memories' && (
-                <div className="space-y-6">
-                  <TravelTimeline countries={personalCountriesForMap} />
-                  <PhotoGallery countries={personalCountriesForMap} />
                 </div>
               )}
             </>

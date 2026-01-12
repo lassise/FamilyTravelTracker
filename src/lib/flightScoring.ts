@@ -194,11 +194,14 @@ const detectHiddenCosts = (flight: FlightResult, preferences: FlightPreferences)
         });
       }
 
-      // Basic economy seat selection
-      if (["AA", "UA", "DL"].includes(airlineCode) && preferences.seat_preference !== "middle") {
+      // Basic economy seat selection - check if user has seat preference
+      const seatPrefs = preferences.seat_preference || [];
+      const wantsSpecificSeat = seatPrefs.length > 0 && !seatPrefs.includes("middle");
+      if (["AA", "UA", "DL"].includes(airlineCode) && wantsSpecificSeat) {
+        const seatType = seatPrefs.includes("window") ? "Window" : seatPrefs.includes("aisle") ? "Aisle" : "Preferred";
         costs.push({
           type: "seat",
-          description: `${preferences.seat_preference === "window" ? "Window" : "Aisle"} seat may require fee on basic economy`,
+          description: `${seatType} seat may require fee on basic economy`,
           estimatedCost: 35,
         });
       }

@@ -10,13 +10,15 @@ export interface HomeAirport {
   isPrimary: boolean;
 }
 
+export type PreferencePriority = "non_negotiable" | "strong" | "nice_to_have";
+
 export interface FlightPreferences {
   id?: string;
   home_airports: HomeAirport[];
   preferred_airlines: string[];
   avoided_airlines: string[];
   preferred_alliances: string[];
-  seat_preference: "window" | "aisle" | "middle";
+  seat_preference: string[]; // Changed to array for multiple selection
   needs_window_for_car_seat: boolean;
   cabin_class: "economy" | "premium_economy" | "business" | "first";
   max_stops: number;
@@ -34,6 +36,12 @@ export interface FlightPreferences {
   default_checked_bags: number;
   carry_on_only: boolean;
   search_mode: "cash" | "points" | "hybrid";
+  // Preference priorities
+  nonstop_priority: PreferencePriority;
+  departure_time_priority: PreferencePriority;
+  airline_priority: PreferencePriority;
+  layover_priority: PreferencePriority;
+  seat_priority: PreferencePriority;
 }
 
 const defaultPreferences: FlightPreferences = {
@@ -41,7 +49,7 @@ const defaultPreferences: FlightPreferences = {
   preferred_airlines: [],
   avoided_airlines: [],
   preferred_alliances: [],
-  seat_preference: "window",
+  seat_preference: [], // Empty array = no preference
   needs_window_for_car_seat: false,
   cabin_class: "economy",
   max_stops: 0,
@@ -59,6 +67,12 @@ const defaultPreferences: FlightPreferences = {
   default_checked_bags: 0,
   carry_on_only: false,
   search_mode: "cash",
+  // Default priorities
+  nonstop_priority: "strong",
+  departure_time_priority: "nice_to_have",
+  airline_priority: "nice_to_have",
+  layover_priority: "strong",
+  seat_priority: "nice_to_have",
 };
 
 export const useFlightPreferences = () => {
@@ -107,7 +121,9 @@ export const useFlightPreferences = () => {
           preferred_airlines: data.preferred_airlines || [],
           avoided_airlines: data.avoided_airlines || [],
           preferred_alliances: data.preferred_alliances || [],
-          seat_preference: (data.seat_preference as "window" | "aisle" | "middle") || "window",
+          seat_preference: Array.isArray(data.seat_preference) 
+            ? data.seat_preference 
+            : data.seat_preference ? [data.seat_preference] : [],
           needs_window_for_car_seat: data.needs_window_for_car_seat || false,
           cabin_class: (data.cabin_class as "economy" | "premium_economy" | "business" | "first") || "economy",
           max_stops: data.max_stops || 0,
@@ -125,6 +141,12 @@ export const useFlightPreferences = () => {
           default_checked_bags: data.default_checked_bags || 0,
           carry_on_only: data.carry_on_only || false,
           search_mode: (data.search_mode as "cash" | "points" | "hybrid") || "cash",
+          // Priority settings - stored in local state only for now
+          nonstop_priority: "strong",
+          departure_time_priority: "nice_to_have",
+          airline_priority: "nice_to_have",
+          layover_priority: "strong",
+          seat_priority: "nice_to_have",
         });
       }
     } catch (error) {
@@ -140,11 +162,31 @@ export const useFlightPreferences = () => {
     try {
       const { data, error } = await supabase
         .from("flight_preferences")
-        .insert({
+        .insert([{
           user_id: user.id,
-          ...defaultPreferences,
-          home_airports: JSON.stringify(defaultPreferences.home_airports),
-        })
+          home_airports: JSON.stringify([]),
+          preferred_airlines: [],
+          avoided_airlines: [],
+          preferred_alliances: [],
+          seat_preference: null,
+          needs_window_for_car_seat: false,
+          cabin_class: "economy",
+          max_stops: 0,
+          prefer_nonstop: true,
+          max_layover_hours: 4,
+          min_connection_minutes: 60,
+          max_total_travel_hours: 24,
+          preferred_departure_times: [],
+          red_eye_allowed: false,
+          family_mode: false,
+          family_min_connection_minutes: 90,
+          willing_to_drive_further: true,
+          max_extra_drive_minutes: 60,
+          min_savings_for_further_airport: 200,
+          default_checked_bags: 0,
+          carry_on_only: false,
+          search_mode: "cash",
+        }])
         .select()
         .single();
 
