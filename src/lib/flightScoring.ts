@@ -68,9 +68,10 @@ const WEIGHTS = {
 };
 
 // Parse duration - can be ISO 8601 string "PT5H30M" or number (minutes)
-const parseDuration = (duration: string | number): number => {
-  if (!duration) return 0;
+const parseDuration = (duration: string | number | undefined | null): number => {
+  if (duration === null || duration === undefined) return 0;
   if (typeof duration === 'number') return duration;
+  if (typeof duration !== 'string') return 0;
   const hours = duration.match(/(\d+)H/)?.[1] || 0;
   const minutes = duration.match(/(\d+)M/)?.[1] || 0;
   return parseInt(String(hours)) * 60 + parseInt(String(minutes));
