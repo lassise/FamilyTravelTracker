@@ -1,8 +1,9 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle2, Trash2, Calendar, MapPin, Clock } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CheckCircle2, Trash2, Calendar, MapPin, Clock, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CountryDialog from "./CountryDialog";
@@ -11,6 +12,7 @@ import { Country } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
 import { getAllCountries } from "@/lib/countriesData";
 import { getEmojiFlag, type TCountryCode } from 'countries-list';
+import { cn } from "@/lib/utils";
 
 interface CountryTrackerProps {
   countries: Country[];
@@ -22,6 +24,19 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
   const { toast } = useToast();
   const { getCountrySummary, refetch: refetchVisitDetails } = useVisitDetails();
   const allCountriesData = getAllCountries();
+  const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
+
+  const toggleCountry = (countryId: string) => {
+    setExpandedCountries(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(countryId)) {
+        newSet.delete(countryId);
+      } else {
+        newSet.add(countryId);
+      }
+      return newSet;
+    });
+  };
 
   const getCountryCode = (countryName: string): string => {
     const found = allCountriesData.find((c) => c.name === countryName);
@@ -35,7 +50,6 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
 
   const handleToggleVisit = async (countryId: string, memberId: string, isVisited: boolean) => {
     if (isVisited) {
-      // Remove visit
       const { error } = await supabase
         .from("country_visits")
         .delete()
@@ -46,7 +60,6 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
         toast({ title: "Error updating visit", variant: "destructive" });
       }
     } else {
-      // Add visit
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({ title: "You must be logged in", variant: "destructive" });
@@ -77,6 +90,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
       onUpdate();
     }
   };
+
   return (
     <section className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
@@ -90,117 +104,126 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
           <CountryDialog familyMembers={familyMembers} onSuccess={handleUpdate} />
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {countries.map((country) => {
+        <div className="space-y-3">
+          {countries.map((country) => {
             const summary = getCountrySummary(country.id);
             const countryCode = getCountryCode(country.name);
-            // Get the proper emoji flag from the countries-list library using the code
             const displayFlag = countryCode 
               ? getEmojiFlag(countryCode as TCountryCode) 
               : country.flag;
+            const isExpanded = expandedCountries.has(country.id);
             
             return (
-              <Card 
+              <Collapsible
                 key={country.id}
-                className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/30 overflow-hidden"
+                open={isExpanded}
+                onOpenChange={() => toggleCountry(country.id)}
               >
-                {/* Flag Banner */}
-                <div className="h-16 w-full relative overflow-hidden bg-gradient-to-r from-muted to-muted/50">
-                  <div className="absolute inset-0 flex items-center justify-center text-6xl leading-none">
-                    {displayFlag}
-                  </div>
-                </div>
-                
-                <CardHeader className="pb-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <span className="text-2xl">{displayFlag}</span>
-                      <span>{country.name}</span>
-                    </CardTitle>
-                    <CheckCircle2 className="w-5 h-5 text-accent" />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-1">
-                    <Badge variant="outline" className="text-xs">
-                      {country.continent}
-                    </Badge>
-                    {summary.timesVisited > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {summary.timesVisited}x
-                      </Badge>
-                    )}
-                    {summary.totalDays > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {summary.totalDays}d
-                      </Badge>
-                    )}
-                    {summary.citiesCount > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        {summary.citiesCount}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {summary.cities.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {summary.cities.slice(0, 3).map((city) => (
-                        <Badge key={city} variant="outline" className="text-xs bg-muted/50">
-                          {city}
-                        </Badge>
-                      ))}
-                      {summary.cities.length > 3 && (
-                        <Badge variant="outline" className="text-xs bg-muted/50">
-                          +{summary.cities.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Visited by:</p>
-                    {familyMembers.map((member) => {
-                      const isVisited = country.visitedBy.includes(member.name);
-                      return (
-                        <div key={member.id} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`${country.id}-${member.id}`}
-                            checked={isVisited}
-                            onCheckedChange={() => handleToggleVisit(country.id, member.id, isVisited)}
-                          />
-                          <label
-                            htmlFor={`${country.id}-${member.id}`}
-                            className="text-sm cursor-pointer"
-                          >
-                            {member.name}
-                          </label>
+                <div className="border rounded-lg bg-card overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{displayFlag}</span>
+                        <div>
+                          <h3 className="font-semibold text-foreground">{country.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {country.continent}
+                            </Badge>
+                            {summary.timesVisited > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {summary.timesVisited}x
+                              </Badge>
+                            )}
+                            {summary.totalDays > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {summary.totalDays}d
+                              </Badge>
+                            )}
+                            {summary.citiesCount > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                <MapPin className="w-3 h-3 mr-1" />
+                                {summary.citiesCount}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-accent" />
+                        <ChevronDown 
+                          className={cn(
+                            "w-5 h-5 text-muted-foreground transition-transform duration-200",
+                            isExpanded && "rotate-180"
+                          )} 
+                        />
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+                  
+                  <CollapsibleContent>
+                    <div className="border-t p-4 space-y-4 bg-muted/20">
+                      {summary.cities.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Cities visited:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {summary.cities.map((city) => (
+                              <Badge key={city} variant="outline" className="text-xs bg-background">
+                                {city}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Visited by:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {familyMembers.map((member) => {
+                            const isVisited = country.visitedBy.includes(member.name);
+                            return (
+                              <div key={member.id} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`${country.id}-${member.id}`}
+                                  checked={isVisited}
+                                  onCheckedChange={() => handleToggleVisit(country.id, member.id, isVisited)}
+                                />
+                                <label
+                                  htmlFor={`${country.id}-${member.id}`}
+                                  className="text-sm cursor-pointer"
+                                >
+                                  {member.name}
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                  <div className="flex gap-2 pt-2 flex-wrap">
-                    <CountryVisitDetailsDialog
-                      countryId={country.id}
-                      countryName={country.name}
-                      countryCode={countryCode}
-                      onUpdate={handleUpdate}
-                      buttonLabel="Trips"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(country.id, country.name)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                      <div className="flex gap-2 pt-2 flex-wrap">
+                        <CountryVisitDetailsDialog
+                          countryId={country.id}
+                          countryName={country.name}
+                          countryCode={countryCode}
+                          onUpdate={handleUpdate}
+                          buttonLabel="View Trips"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(country.id, country.name)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
             );
           })}
         </div>

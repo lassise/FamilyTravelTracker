@@ -252,7 +252,10 @@ const Flights = () => {
                     key={airport.code}
                     variant={origin === airport.code ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setOrigin(airport.code)}
+                    onClick={() => {
+                      setOrigin(airport.code);
+                      setShowOriginResults(false);
+                    }}
                   >
                     {airport.code} {airport.isPrimary && "★"}
                   </Button>

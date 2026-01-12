@@ -8,9 +8,13 @@ export interface FlightSegment {
   arrivalTime: string;
   airline: string;
   flightNumber: string;
-  duration: string;
+  duration: string | number; // Can be ISO 8601 string or minutes as number
   stops: number;
   aircraft?: string;
+  cabin?: string;
+  airplane?: string;
+  legroom?: string;
+  extensions?: string[];
 }
 
 export interface FlightItinerary {
@@ -63,9 +67,10 @@ const WEIGHTS = {
   price: 15,
 };
 
-// Parse duration string like "PT5H30M" to minutes
-const parseDuration = (duration: string): number => {
+// Parse duration - can be ISO 8601 string "PT5H30M" or number (minutes)
+const parseDuration = (duration: string | number): number => {
   if (!duration) return 0;
+  if (typeof duration === 'number') return duration;
   const hours = duration.match(/(\d+)H/)?.[1] || 0;
   const minutes = duration.match(/(\d+)M/)?.[1] || 0;
   return parseInt(String(hours)) * 60 + parseInt(String(minutes));
