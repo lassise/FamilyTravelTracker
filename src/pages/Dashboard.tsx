@@ -66,7 +66,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card 
             className="cursor-pointer hover:shadow-travel transition-all hover:border-primary/50 group"
             onClick={() => navigate("/trips/new")}
@@ -99,15 +99,30 @@ const Dashboard = () => {
 
           <Card 
             className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/50"
-            onClick={() => navigate("/travel-history")}
+            onClick={() => navigate("/flights")}
           >
             <CardContent className="flex items-center gap-4 p-6">
               <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center">
-                <Globe className="h-6 w-6 text-accent" />
+                <Plane className="h-6 w-6 text-accent" />
               </div>
               <div>
-                <h3 className="font-semibold">Travel History</h3>
-                <p className="text-sm text-muted-foreground">View countries visited</p>
+                <h3 className="font-semibold">Find Flights</h3>
+                <p className="text-sm text-muted-foreground">Search & compare options</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/50"
+            onClick={() => navigate("/explore")}
+          >
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Globe className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Explore Destinations</h3>
+                <p className="text-sm text-muted-foreground">Get recommendations</p>
               </div>
             </CardContent>
           </Card>

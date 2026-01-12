@@ -7,6 +7,87 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Generate demo flights when API fails or returns empty
+function generateDemoFlights(origin: string, destination: string, departureDate: string, returnDate: string | null, passengers: number) {
+  const airlines = [
+    { code: 'AA', name: 'American Airlines' },
+    { code: 'DL', name: 'Delta Air Lines' },
+    { code: 'UA', name: 'United Airlines' },
+    { code: 'WN', name: 'Southwest Airlines' },
+    { code: 'B6', name: 'JetBlue Airways' },
+    { code: 'AS', name: 'Alaska Airlines' },
+  ];
+
+  const flights = [];
+  const basePrice = 150 + Math.random() * 300;
+  
+  // Generate 6-10 flight options
+  const numFlights = 6 + Math.floor(Math.random() * 5);
+  
+  for (let i = 0; i < numFlights; i++) {
+    const airline = airlines[i % airlines.length];
+    const departHour = 6 + Math.floor(Math.random() * 14);
+    const flightDurationHours = 2 + Math.floor(Math.random() * 4);
+    const stops = Math.random() > 0.6 ? 1 : 0;
+    const priceMultiplier = 0.8 + Math.random() * 0.6;
+    
+    const departTime = new Date(departureDate);
+    departTime.setHours(departHour, Math.floor(Math.random() * 60));
+    
+    const arriveTime = new Date(departTime);
+    arriveTime.setHours(arriveTime.getHours() + flightDurationHours + (stops ? 1 : 0));
+    
+    const itineraries = [{
+      segments: [{
+        departureAirport: origin,
+        departureTime: departTime.toISOString(),
+        arrivalAirport: destination,
+        arrivalTime: arriveTime.toISOString(),
+        airline: airline.code,
+        flightNumber: `${airline.code}${100 + Math.floor(Math.random() * 900)}`,
+        duration: `PT${flightDurationHours}H${Math.floor(Math.random() * 60)}M`,
+        stops: stops,
+      }]
+    }];
+    
+    // Add return flight if round trip
+    if (returnDate) {
+      const returnDepartHour = 6 + Math.floor(Math.random() * 14);
+      const returnDepartTime = new Date(returnDate);
+      returnDepartTime.setHours(returnDepartHour, Math.floor(Math.random() * 60));
+      
+      const returnArriveTime = new Date(returnDepartTime);
+      returnArriveTime.setHours(returnArriveTime.getHours() + flightDurationHours + (stops ? 1 : 0));
+      
+      itineraries.push({
+        segments: [{
+          departureAirport: destination,
+          departureTime: returnDepartTime.toISOString(),
+          arrivalAirport: origin,
+          arrivalTime: returnArriveTime.toISOString(),
+          airline: airline.code,
+          flightNumber: `${airline.code}${100 + Math.floor(Math.random() * 900)}`,
+          duration: `PT${flightDurationHours}H${Math.floor(Math.random() * 60)}M`,
+          stops: stops,
+        }]
+      });
+    }
+    
+    flights.push({
+      id: crypto.randomUUID(),
+      price: Math.round((basePrice * priceMultiplier * passengers) * 100) / 100,
+      currency: 'USD',
+      itineraries,
+      isDemo: true,
+    });
+  }
+  
+  // Sort by price
+  flights.sort((a, b) => a.price - b.price);
+  
+  return flights;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -45,15 +126,24 @@ serve(async (req) => {
     const userId = claimsData.claims.sub;
     console.log('Authenticated user:', userId);
 
-    const liteApiKey = Deno.env.get('LITEAPI_SANDBOX_KEY');
-    if (!liteApiKey) {
-      console.error('LITEAPI_SANDBOX_KEY not configured');
-      throw new Error('LiteAPI key not configured');
-    }
-
     const { origin, destination, departureDate, returnDate, passengers, tripType } = await req.json();
 
     console.log(`User ${userId} searching flights: ${origin} -> ${destination}, ${departureDate}${returnDate ? ` - ${returnDate}` : ''}, ${passengers} passengers`);
+
+    const liteApiKey = Deno.env.get('LITEAPI_SANDBOX_KEY');
+    
+    // If no API key, return demo flights
+    if (!liteApiKey) {
+      console.log('No API key configured, returning demo flights');
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
+      return new Response(JSON.stringify({ 
+        flights: demoFlights, 
+        message: 'Showing sample flight options (demo mode)',
+        isDemo: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // LiteAPI REST API for flight search
     const searchParams = new URLSearchParams({
@@ -81,10 +171,12 @@ serve(async (req) => {
       });
     } catch (fetchError) {
       console.error('Network error calling LiteAPI:', fetchError);
-      // Return empty flights on network error instead of 500
+      // Return demo flights on network error
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
       return new Response(JSON.stringify({ 
-        flights: [], 
-        message: 'Flight search service temporarily unavailable' 
+        flights: demoFlights, 
+        message: 'Showing sample flights (live API temporarily unavailable)',
+        isDemo: true 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -100,10 +192,12 @@ serve(async (req) => {
       }
       console.error('LiteAPI HTTP error:', response.status, errorText);
       
-      // Return empty flights with message instead of throwing
+      // Return demo flights on API error
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
       return new Response(JSON.stringify({ 
-        flights: [], 
-        message: `No flights found. API status: ${response.status}` 
+        flights: demoFlights, 
+        message: 'Showing sample flights (API returned error)',
+        isDemo: true 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -113,16 +207,26 @@ serve(async (req) => {
     try {
       responseText = await response.text();
     } catch (e) {
-      console.log('Could not read response text, returning empty flights');
-      return new Response(JSON.stringify({ flights: [] }), {
+      console.log('Could not read response text, returning demo flights');
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
+      return new Response(JSON.stringify({ 
+        flights: demoFlights, 
+        message: 'Showing sample flights',
+        isDemo: true 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
     
     // Handle empty responses
     if (!responseText || responseText.trim() === '') {
-      console.log('LiteAPI returned empty response - no flights found');
-      return new Response(JSON.stringify({ flights: [] }), {
+      console.log('LiteAPI returned empty response - returning demo flights');
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
+      return new Response(JSON.stringify({ 
+        flights: demoFlights, 
+        message: 'Showing sample flights for this route',
+        isDemo: true 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -132,20 +236,37 @@ serve(async (req) => {
       data = JSON.parse(responseText);
     } catch (parseError) {
       console.error('Failed to parse LiteAPI response:', responseText.substring(0, 500));
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
       return new Response(JSON.stringify({ 
-        flights: [], 
-        message: 'Invalid response from flight API' 
+        flights: demoFlights, 
+        message: 'Showing sample flights',
+        isDemo: true 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (data.error || data.errors) {
-      const errorMsg = data.error?.message || data.errors?.[0]?.message || 'No flights found';
+      const errorMsg = data.error?.message || data.errors?.[0]?.message || 'API error';
       console.error('LiteAPI error response:', JSON.stringify(data));
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
       return new Response(JSON.stringify({ 
-        flights: [], 
-        message: errorMsg 
+        flights: demoFlights, 
+        message: `Showing sample flights (${errorMsg})`,
+        isDemo: true 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // If no flights from API, return demo flights
+    if (!data?.data || data.data.length === 0) {
+      console.log('LiteAPI returned no flights, returning demo flights');
+      const demoFlights = generateDemoFlights(origin, destination, departureDate, returnDate, passengers);
+      return new Response(JSON.stringify({ 
+        flights: demoFlights, 
+        message: 'Showing sample flights for this route',
+        isDemo: true 
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -170,9 +291,10 @@ serve(async (req) => {
           stops: segment.numberOfStops || 0,
         })) || [],
       })) || [],
+      isDemo: false,
     }));
 
-    return new Response(JSON.stringify({ flights }), {
+    return new Response(JSON.stringify({ flights, isDemo: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {

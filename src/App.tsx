@@ -14,7 +14,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Trips = lazy(() => import("./pages/Trips"));
 const NewTrip = lazy(() => import("./pages/NewTrip"));
 const TripDetail = lazy(() => import("./pages/TripDetail"));
-const TravelHistory = lazy(() => import("./pages/TravelHistory"));
+const Index = lazy(() => import("./pages/Index"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -53,7 +53,7 @@ const App = () => (
               <Route path="/trips" element={<Trips />} />
               <Route path="/trips/new" element={<NewTrip />} />
               <Route path="/trips/:tripId" element={<TripDetail />} />
-              <Route path="/travel-history" element={<TravelHistory />} />
+              <Route path="/family" element={<Index />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/highlights/:token" element={<Highlights />} />

@@ -16,7 +16,6 @@ import {
   Map,
   Luggage,
   Globe,
-  History,
   PlaneTakeoff
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -45,10 +44,9 @@ const Header = () => {
       .slice(0, 2);
   };
 
-  // Primary nav - focused on travel history
+  // Primary nav - family focused
   const primaryLinks = [
     { href: "/", label: "Home", icon: Globe },
-    { href: "/travel-history", label: "Travel History", icon: History },
   ];
 
   // Trip planning links

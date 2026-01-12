@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFlightPreferences } from "@/hooks/useFlightPreferences";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,17 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
-  PlaneTakeoff, PlaneLanding, Calendar, Users, Filter, Clock, DollarSign, Car, 
+  PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, Car, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
-  TrendingUp, Shield, Armchair, Luggage, CreditCard
+  Info, Armchair
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { scoreFlights, categorizeFlights, type ScoredFlight, type FlightResult } from "@/lib/flightScoring";
-import { searchAirports, AIRLINES, ALLIANCES, type Airport } from "@/lib/airportsData";
+import { searchAirports, AIRLINES, type Airport } from "@/lib/airportsData";
 
 const DEPARTURE_TIMES = [
   { value: "early_morning", label: "Early (5-8am)" },
@@ -36,6 +36,12 @@ const CABIN_CLASSES = [
   { value: "premium_economy", label: "Premium Economy" },
   { value: "business", label: "Business" },
   { value: "first", label: "First Class" },
+];
+
+const SEAT_OPTIONS = [
+  { value: "window", label: "Window" },
+  { value: "aisle", label: "Aisle" },
+  { value: "middle", label: "Middle" },
 ];
 
 const Flights = () => {
@@ -62,8 +68,13 @@ const Flights = () => {
   const [searching, setSearching] = useState(false);
   const [flights, setFlights] = useState<ScoredFlight[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
   const [categories, setCategories] = useState<ReturnType<typeof categorizeFlights> | null>(null);
   const [showPreferences, setShowPreferences] = useState(false);
+  
+  // Seat preferences - multiple selection
+  const [seatPreferences, setSeatPreferences] = useState<string[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -80,6 +91,13 @@ const Flights = () => {
       if (primary) setOrigin(primary.code);
     }
   }, [preferences.home_airports, prefsLoading, origin]);
+  
+  // Load seat preferences
+  useEffect(() => {
+    if (!prefsLoading && preferences.seat_preference) {
+      setSeatPreferences([preferences.seat_preference]);
+    }
+  }, [preferences.seat_preference, prefsLoading]);
 
   const handleOriginSearch = (value: string) => {
     setOrigin(value.toUpperCase());
@@ -100,6 +118,15 @@ const Flights = () => {
       setShowDestResults(false);
     }
   };
+  
+  const toggleSeatPreference = (seat: string) => {
+    setSeatPreferences(prev => {
+      if (prev.includes(seat)) {
+        return prev.filter(s => s !== seat);
+      }
+      return [...prev, seat];
+    });
+  };
 
   const searchFlights = async () => {
     if (!origin || !destination || !departDate) {
@@ -114,8 +141,10 @@ const Flights = () => {
 
     setSearching(true);
     setSearchError(null);
+    setSearchMessage(null);
     setFlights([]);
     setCategories(null);
+    setIsDemo(false);
 
     try {
       const { data, error } = await supabase.functions.invoke('search-flights', {
@@ -133,8 +162,10 @@ const Flights = () => {
       if (data.error) throw new Error(data.error);
 
       const rawFlights: FlightResult[] = data.flights || [];
+      setIsDemo(data.isDemo || false);
+      setSearchMessage(data.message || null);
       
-      // Score and categorize flights
+      // Score and categorize flights with preference matching info
       const scored = scoreFlights(rawFlights, preferences);
       setFlights(scored);
       setCategories(categorizeFlights(scored));
@@ -142,7 +173,11 @@ const Flights = () => {
       if (scored.length === 0) {
         toast.info("No flights found for your search criteria");
       } else {
-        toast.success(`Found ${scored.length} flight options`);
+        if (data.isDemo) {
+          toast.info(`Found ${scored.length} sample flight options`);
+        } else {
+          toast.success(`Found ${scored.length} flight options`);
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to search flights";
@@ -339,6 +374,14 @@ const Flights = () => {
                 <Label className="text-sm flex items-center gap-1">
                   <Baby className="h-3 w-3" /> Family mode
                 </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Family mode prioritizes flights with longer connection times (90+ min), avoids red-eye flights, and considers kid-friendly factors like departure times and total travel duration.</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <div className="flex items-center gap-2">
                 <Switch 
@@ -357,6 +400,18 @@ const Flights = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Demo Mode Notice */}
+        {isDemo && searchMessage && (
+          <Card className="mb-6 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <Info className="h-5 w-5" />
+                <p className="text-sm">{searchMessage}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Category Cards */}
         {categories && (
@@ -423,7 +478,10 @@ const Flights = () => {
 
         {flights.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">All Flights ({flights.length})</h2>
+            <h2 className="text-lg font-semibold">
+              All Flights ({flights.length})
+              {isDemo && <Badge variant="secondary" className="ml-2">Sample Data</Badge>}
+            </h2>
             {flights.map((flight, idx) => (
               <Card key={flight.id} className={idx === 0 ? "border-primary" : ""}>
                 <CardContent className="p-4">
@@ -485,10 +543,11 @@ const Flights = () => {
                     </div>
                   ))}
 
-                  {/* Warnings */}
+                  {/* Warnings - preferences not matched */}
                   {flight.warnings.length > 0 && (
-                    <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                      {flight.warnings.map((w, i) => <p key={i}>⚠️ {w}</p>)}
+                    <div className="mt-2 p-2 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">⚠️ Some preferences not matched:</p>
+                      {flight.warnings.map((w, i) => <p key={i} className="text-xs text-amber-600 dark:text-amber-500">• {w}</p>)}
                     </div>
                   )}
                 </CardContent>
@@ -512,20 +571,23 @@ const Flights = () => {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="space-y-6">
-                {/* Seat Preference */}
+                {/* Seat Preference - Multiple Selection */}
                 <div>
-                  <Label className="mb-2 block">Seat Preference</Label>
-                  <div className="flex gap-2">
-                    {["window", "aisle", "middle"].map(seat => (
-                      <Button
-                        key={seat}
-                        variant={preferences.seat_preference === seat ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => updatePreferences({ seat_preference: seat as typeof preferences.seat_preference })}
+                  <Label className="mb-2 block">Seat Preference (select all that apply)</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {SEAT_OPTIONS.map(seat => (
+                      <Badge
+                        key={seat.value}
+                        variant={seatPreferences.includes(seat.value) ? "default" : "outline"}
+                        className="cursor-pointer px-3 py-1.5"
+                        onClick={() => toggleSeatPreference(seat.value)}
                       >
-                        {seat.charAt(0).toUpperCase() + seat.slice(1)}
-                      </Button>
+                        {seat.label}
+                      </Badge>
                     ))}
+                    {seatPreferences.length === 0 && (
+                      <span className="text-xs text-muted-foreground">No preference</span>
+                    )}
                   </div>
                 </div>
 
@@ -646,6 +708,12 @@ const Flights = () => {
                     </div>
                   )}
                 </div>
+                
+                {/* Search button at bottom of preferences */}
+                <Button className="w-full" size="lg" onClick={searchFlights} disabled={searching}>
+                  {searching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlaneTakeoff className="h-4 w-4 mr-2" />}
+                  {searching ? "Searching..." : "Search with These Preferences"}
+                </Button>
               </CardContent>
             </CollapsibleContent>
           </Card>
