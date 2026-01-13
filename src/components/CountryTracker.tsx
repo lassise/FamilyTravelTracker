@@ -123,10 +123,10 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
                   <CollapsibleTrigger asChild>
                     <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left">
                       <div className="flex items-center gap-3">
-                        <span className="text-3xl">{displayFlag}</span>
+                        <span className="text-4xl leading-none">{country.flag}</span>
                         <div>
-                          <h3 className="font-semibold text-foreground">
-                            {displayFlag} {country.name}
+                          <h3 className="font-semibold text-foreground flex items-center gap-2">
+                            <span className="text-xl">{country.flag}</span> {country.name}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline" className="text-xs">
