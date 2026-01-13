@@ -311,8 +311,16 @@ const estimateDelayRisk = (flight: FlightResult): "low" | "medium" | "high" => {
   return "low";
 };
 
+// Ranking category for flight quality
+export type FlightRanking = "best" | "good_alternative" | "acceptable" | "not_recommended";
+
 // Generate explanation for why this flight was scored this way
-const generateExplanation = (flight: ScoredFlight, preferences: FlightPreferences): string => {
+const generateExplanation = (
+  flight: ScoredFlight, 
+  preferences: FlightPreferences,
+  ranking: FlightRanking,
+  rankIndex: number
+): string => {
   const reasons: string[] = [];
 
   const firstSegment = flight.itineraries[0]?.segments[0];
@@ -338,11 +346,37 @@ const generateExplanation = (flight: ScoredFlight, preferences: FlightPreference
     reasons.push("low delay risk");
   }
 
-  if (reasons.length === 0) {
-    return "Balanced option considering your preferences";
+  // Different verbiage based on ranking
+  if (ranking === "best") {
+    if (reasons.length === 0) {
+      return "🏆 Top pick: Best balance of your preferences";
+    }
+    return `🏆 Top pick: ${reasons.join(", ")}`;
+  } else if (ranking === "good_alternative") {
+    const positives = reasons.slice(0, 2);
+    if (positives.length === 0) {
+      return `✓ Good alternative (#${rankIndex + 1}): Solid option worth considering`;
+    }
+    return `✓ Good alternative (#${rankIndex + 1}): ${positives.join(", ")}`;
+  } else if (ranking === "acceptable") {
+    if (reasons.length === 0) {
+      return `Option #${rankIndex + 1}: Meets basic requirements`;
+    }
+    return `Option #${rankIndex + 1}: ${reasons.slice(0, 2).join(", ")}`;
+  } else {
+    // not_recommended
+    const negatives: string[] = [];
+    if (flight.breakdown.price < 50) negatives.push("expensive");
+    if (flight.breakdown.travelTime < 50) negatives.push("long travel time");
+    if (!isNonstop && preferences.prefer_nonstop) negatives.push("has stops");
+    if (flight.delayRisk === "high") negatives.push("high delay risk");
+    if (flight.breakdown.airlineReliability < 60) negatives.push("less reliable airline");
+    
+    if (negatives.length === 0) {
+      return `⚠️ Not recommended: Doesn't match your preferences well`;
+    }
+    return `⚠️ Not recommended: ${negatives.slice(0, 2).join(", ")}`;
   }
-
-  return `Great pick: ${reasons.join(", ")}`;
 };
 
 // Generate match explanation for non-perfect scores
@@ -464,44 +498,58 @@ const calculatePriceInsight = (price: number, allPrices: number[]): PriceInsight
   }
 };
 
-// Build a proper Google Flights booking URL
+export interface PassengerBreakdown {
+  adults: number;
+  children: number; // Ages 2-11
+  infantsInSeat: number;
+  infantsOnLap: number;
+}
+
+// Build a proper Google Flights booking URL with full passenger breakdown
 const buildGoogleFlightsUrl = (
   departureAirport: string,
   arrivalAirport: string,
   departureDate: string,
   returnDate?: string,
-  passengers: number = 1,
+  passengerBreakdown?: PassengerBreakdown,
   cabinClass: string = "economy"
 ): string => {
-  // Format: YYYY-MM-DD
-  const cabinMap: Record<string, number> = {
-    economy: 1,
-    premium_economy: 2,
-    business: 3,
-    first: 4,
+  const adults = passengerBreakdown?.adults || 1;
+  const children = passengerBreakdown?.children || 0;
+  const infantsInSeat = passengerBreakdown?.infantsInSeat || 0;
+  const infantsOnLap = passengerBreakdown?.infantsOnLap || 0;
+  
+  // Cabin class mapping for Google Flights
+  const cabinMap: Record<string, string> = {
+    economy: "economy",
+    premium_economy: "premium+economy",
+    business: "business",
+    first: "first",
   };
   
-  const cabin = cabinMap[cabinClass] || 1;
+  const cabin = cabinMap[cabinClass] || "economy";
   
-  // Google Flights direct search URL
-  // Format: /flights/DEP-ARR/2024-01-15/2024-01-22
-  const baseUrl = "https://www.google.com/travel/flights/search";
+  // Build passenger string parts
+  const passengerParts: string[] = [];
+  if (adults > 0) passengerParts.push(`${adults}%20adult${adults > 1 ? 's' : ''}`);
+  if (children > 0) passengerParts.push(`${children}%20child${children > 1 ? 'ren' : ''}`);
+  if (infantsInSeat > 0) passengerParts.push(`${infantsInSeat}%20infant${infantsInSeat > 1 ? 's' : ''}%20in%20seat`);
+  if (infantsOnLap > 0) passengerParts.push(`${infantsOnLap}%20infant${infantsOnLap > 1 ? 's' : ''}%20on%20lap`);
   
-  let flightPath = `${departureAirport}-${arrivalAirport}/${departureDate}`;
+  const passengerString = passengerParts.length > 0 ? `%20${passengerParts.join('%20')}` : '';
+  
+  // Build the query - format that Google Flights understands
+  // Example: flights from JFK to LAX on 2024-03-15 return 2024-03-22 2 adults 1 child business class
+  let query = `flights%20from%20${departureAirport}%20to%20${arrivalAirport}%20on%20${departureDate}`;
   if (returnDate) {
-    flightPath += `/${returnDate}`;
+    query += `%20return%20${returnDate}`;
+  }
+  query += passengerString;
+  if (cabin !== "economy") {
+    query += `%20${cabin}%20class`;
   }
   
-  // Build query params for passengers and cabin
-  const params = new URLSearchParams({
-    tfs: "CBwQAhAA", // Required for the search to work
-    curr: "USD",
-    hl: "en",
-    gl: "us",
-  });
-  
-  // The direct URL format that works
-  return `https://www.google.com/travel/flights/search?q=flights%20from%20${departureAirport}%20to%20${arrivalAirport}%20on%20${departureDate}${returnDate ? `%20return%20${returnDate}` : ''}&curr=USD`;
+  return `https://www.google.com/travel/flights/search?q=${query}&curr=USD`;
 };
 
 // Main scoring function - optimized
@@ -509,9 +557,13 @@ export const scoreFlights = (
   flights: FlightResult[],
   preferences: FlightPreferences,
   allFlightPrices?: number[],
-  passengers: number = 1
+  passengerBreakdown?: PassengerBreakdown
 ): ScoredFlight[] => {
   if (!flights || flights.length === 0) return [];
+  
+  const totalPassengers = passengerBreakdown 
+    ? passengerBreakdown.adults + passengerBreakdown.children + passengerBreakdown.infantsInSeat + passengerBreakdown.infantsOnLap
+    : 1;
 
   // Pre-calculate price range
   const prices = allFlightPrices || flights.map(f => f.price);
@@ -733,10 +785,10 @@ export const scoreFlights = (
     const returnDateStr = returnSegment?.departureTime ? new Date(returnSegment.departureTime).toISOString().split('T')[0] : "";
     
     const bookingUrl = departureAirport && arrivalAirport && departureDateStr
-      ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengers)
+      ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengerBreakdown)
       : undefined;
 
-    const pricePerTicket = passengers > 0 ? flight.price / passengers : flight.price;
+    const pricePerTicket = totalPassengers > 0 ? flight.price / totalPassengers : flight.price;
     const priceInsight = calculatePriceInsight(flight.price, prices);
 
     const scoredFlight: ScoredFlight = {
@@ -752,11 +804,12 @@ export const scoreFlights = (
       preferenceMatches,
       bookingUrl,
       pricePerTicket,
-      passengers,
+      passengers: totalPassengers,
       priceInsight,
     };
 
-    scoredFlight.explanation = generateExplanation(scoredFlight, preferences);
+    // Explanation will be set after sorting
+    scoredFlight.explanation = "";
     
     if (breakdown.total < 100) {
       scoredFlight.matchExplanation = generateMatchExplanation(scoredFlight, preferences);
@@ -766,7 +819,30 @@ export const scoreFlights = (
   }
 
   // Sort by score descending
-  return scoredFlights.sort((a, b) => b.score - a.score);
+  scoredFlights.sort((a, b) => b.score - a.score);
+  
+  // Now assign rankings and explanations based on sorted order
+  const topScore = scoredFlights[0]?.score || 0;
+  
+  for (let i = 0; i < scoredFlights.length; i++) {
+    const flight = scoredFlights[i];
+    const scoreDiff = topScore - flight.score;
+    
+    let ranking: FlightRanking;
+    if (i === 0) {
+      ranking = "best";
+    } else if (scoreDiff <= 10) {
+      ranking = "good_alternative";
+    } else if (scoreDiff <= 25 || flight.score >= 60) {
+      ranking = "acceptable";
+    } else {
+      ranking = "not_recommended";
+    }
+    
+    flight.explanation = generateExplanation(flight, preferences, ranking, i);
+  }
+  
+  return scoredFlights;
 };
 
 // Get categorized results - optimized with single pass where possible

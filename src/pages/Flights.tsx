@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { scoreFlights, categorizeFlights, type ScoredFlight, type FlightResult } from "@/lib/flightScoring";
+import { scoreFlights, categorizeFlights, type ScoredFlight, type FlightResult, type PassengerBreakdown } from "@/lib/flightScoring";
 import { searchAirports, AIRLINES, type Airport } from "@/lib/airportsData";
 
 const DEPARTURE_TIMES = [
@@ -57,8 +57,16 @@ const Flights = () => {
   const [destination, setDestination] = useState("");
   const [departDate, setDepartDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
-  const [passengers, setPassengers] = useState(1);
   const [tripType, setTripType] = useState<"roundtrip" | "oneway" | "multicity">("roundtrip");
+  
+  // Passenger breakdown
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0); // Ages 2-11
+  const [infantsInSeat, setInfantsInSeat] = useState(0);
+  const [infantsOnLap, setInfantsOnLap] = useState(0);
+  
+  // Total passengers derived
+  const passengers = adults + children + infantsInSeat + infantsOnLap;
 
   // Airport search
   const [originResults, setOriginResults] = useState<Airport[]>([]);
@@ -178,7 +186,8 @@ const Flights = () => {
       setCheapestPrimaryPrice(primaryCheapest);
       
       // Score and categorize flights with preference matching info
-      const scored = scoreFlights(rawFlights, preferences, undefined, passengers);
+      const passengerBreakdown = { adults, children, infantsInSeat, infantsOnLap };
+      const scored = scoreFlights(rawFlights, preferences, undefined, passengerBreakdown);
       
       // Calculate savings from primary for alternate airport flights
       if (primaryCheapest) {
@@ -354,7 +363,8 @@ const Flights = () => {
             </div>
 
             {/* Dates & Passengers */}
-            <div className="grid sm:grid-cols-4 gap-4">
+            {/* Dates */}
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <Label>Depart</Label>
                 <Input type="date" value={departDate} onChange={(e) => setDepartDate(e.target.value)} />
@@ -365,31 +375,73 @@ const Flights = () => {
                   <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
                 </div>
               )}
-              <div>
-                <Label>Travelers</Label>
-                <Select value={String(passengers)} onValueChange={(v) => setPassengers(Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[1,2,3,4,5,6,7,8].map(n => (
-                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            </div>
+
+            {/* Travelers Breakdown */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Travelers ({passengers} total)</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Adults</Label>
+                  <Select value={String(adults)} onValueChange={(v) => setAdults(Number(v))}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[1,2,3,4,5,6,7,8,9].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Children (2-11)</Label>
+                  <Select value={String(children)} onValueChange={(v) => setChildren(Number(v))}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[0,1,2,3,4,5,6].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Infant in seat</Label>
+                  <Select value={String(infantsInSeat)} onValueChange={(v) => setInfantsInSeat(Number(v))}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[0,1,2,3,4].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Infant on lap</Label>
+                  <Select value={String(infantsOnLap)} onValueChange={(v) => setInfantsOnLap(Number(v))}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[0,1,2,3,4].map(n => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label>Cabin</Label>
-                <Select 
-                  value={preferences.cabin_class} 
-                  onValueChange={(v) => updatePreferences({ cabin_class: v as typeof preferences.cabin_class })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CABIN_CLASSES.map(c => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
+
+            {/* Cabin Class */}
+            <div>
+              <Label>Cabin</Label>
+              <Select 
+                value={preferences.cabin_class} 
+                onValueChange={(v) => updatePreferences({ cabin_class: v as typeof preferences.cabin_class })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CABIN_CLASSES.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Quick Filters */}

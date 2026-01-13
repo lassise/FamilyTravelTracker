@@ -88,10 +88,12 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
   );
 
   // Countries that support state-level tracking (visited OR home country)
+  // homeCountry can be stored as full name ("United States") or code ("US")
   const countriesWithStateTracking = useMemo(() => 
     countries.filter(c => {
       const code = countryNameToCode[c.name];
-      const isHomeCountry = c.name === homeCountry;
+      // Check both name match and code match for home country
+      const isHomeCountry = c.name === homeCountry || code === homeCountry;
       const isVisited = c.visitedBy.length > 0;
       return (isVisited || isHomeCountry) && code && countriesWithStates.includes(code);
     }),
