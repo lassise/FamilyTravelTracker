@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Country } from '@/hooks/useFamilyData';
@@ -8,6 +8,7 @@ import { Globe, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStateVisits } from '@/hooks/useStateVisits';
 import { countriesWithStates, countryNameToCode, getStatesForCountry } from '@/lib/statesData';
+import { getAllCountries, searchCountries } from '@/lib/countriesData';
 import StateMapDialog from './StateMapDialog';
 
 // Country to ISO 3166-1 alpha-3 mapping for Mapbox
@@ -62,6 +63,10 @@ const iso3ToIso2: Record<string, string> = {
   'ESP': 'ES', 'JPN': 'JP', 'CHN': 'CN',
 };
 
+// ISO2 to ISO3 mapping (inverse of iso3ToIso2)
+const iso2ToIso3: Record<string, string> = Object.fromEntries(
+  Object.entries(iso3ToIso2).map(([iso3, iso2]) => [iso2, iso3])
+);
 interface InteractiveWorldMapProps {
   countries: Country[];
   wishlist: string[];
@@ -87,30 +92,71 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
     [countries]
   );
 
+  // Resolve home country into a canonical {name, iso2, iso3} so map + state tracking work
+  // even if the stored value is "US", "USA", or "United States".
+  const resolvedHomeCountry = useMemo(() => {
+    if (!homeCountry) return { name: null as string | null, iso2: null as string | null, iso3: null as string | null };
+
+    const raw = homeCountry.trim();
+    const upper = raw.toUpperCase();
+
+    // ISO2 code
+    if (upper.length === 2) {
+      const match = getAllCountries().find(c => c.code === upper);
+      return {
+        name: match?.name ?? raw,
+        iso2: upper,
+        iso3: iso2ToIso3[upper] ?? null,
+      };
+    }
+
+    // ISO3 code (for the handful we support for state tracking)
+    if (upper.length === 3 && iso3ToIso2[upper]) {
+      const iso2 = iso3ToIso2[upper];
+      const match = getAllCountries().find(c => c.code === iso2);
+      return {
+        name: match?.name ?? raw,
+        iso2,
+        iso3: upper,
+      };
+    }
+
+    // Country name / alias
+    const matchBySearch = searchCountries(raw)[0];
+    const canonicalName = matchBySearch?.name ?? raw;
+    const iso2 = matchBySearch?.code ?? null;
+
+    return {
+      name: canonicalName,
+      iso2,
+      iso3: countryToISO3[canonicalName] ?? (iso2 ? iso2ToIso3[iso2] : null) ?? null,
+    };
+  }, [homeCountry]);
+
+  const homeCountryISO = resolvedHomeCountry.iso3;
+
   // Countries that support state-level tracking (visited OR home country)
-  // homeCountry can be stored as full name ("United States") or code ("US")
-  const countriesWithStateTracking = useMemo(() => 
-    countries.filter(c => {
-      const code = countryNameToCode[c.name];
-      // Check both name match and code match for home country
-      const isHomeCountry = c.name === homeCountry || code === homeCountry;
-      const isVisited = c.visitedBy.length > 0;
-      return (isVisited || isHomeCountry) && code && countriesWithStates.includes(code);
-    }),
-    [countries, homeCountry]
+  const countriesWithStateTracking = useMemo(
+    () =>
+      countries.filter((c) => {
+        const code = countryNameToCode[c.name];
+        const isHomeCountry =
+          !!resolvedHomeCountry.name &&
+          (c.name === resolvedHomeCountry.name || (!!resolvedHomeCountry.iso2 && code === resolvedHomeCountry.iso2));
+
+        const isVisited = c.visitedBy.length > 0;
+        return (isVisited || isHomeCountry) && code && countriesWithStates.includes(code);
+      }),
+    [countries, resolvedHomeCountry]
   );
 
-  const wishlistCountries = useMemo(() => 
-    countries
-      .filter(c => wishlist.includes(c.id))
-      .map(c => countryToISO3[c.name])
-      .filter(Boolean),
+  const wishlistCountries = useMemo(
+    () =>
+      countries
+        .filter((c) => wishlist.includes(c.id))
+        .map((c) => countryToISO3[c.name])
+        .filter(Boolean),
     [countries, wishlist]
-  );
-
-  const homeCountryISO = useMemo(() =>
-    homeCountry ? countryToISO3[homeCountry] : null,
-    [homeCountry]
   );
 
   // Country center coordinates for initial map view
@@ -150,6 +196,71 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
     }
     return [30, 20]; // Default center
   }, [homeCountryISO]);
+
+  const openStateTrackingDialogForIso3 = useCallback(
+    async (iso3?: string) => {
+      if (!iso3) return;
+      const iso2 = iso3ToIso2[iso3];
+      if (!iso2 || !countriesWithStates.includes(iso2)) return;
+
+      // Prefer a country that already exists in the current in-memory list
+      const canonical = getAllCountries().find((c) => c.code === iso2);
+      const countryName = canonical?.name ?? resolvedHomeCountry.name;
+      if (!countryName) return;
+
+      const inMemory = countries.find((c) => c.name === countryName);
+      if (inMemory) {
+        setSelectedCountry(inMemory);
+        setStateDialogOpen(true);
+        return;
+      }
+
+      // If the user hasn't marked the country as visited yet, create/retrieve a country record
+      // so state visits can reference a real country_id.
+      try {
+        const { data: existing } = await supabase
+          .from('countries')
+          .select('*')
+          .eq('name', countryName)
+          .limit(1);
+
+        let row = existing?.[0] ?? null;
+
+        if (!row) {
+          const { data: userRes } = await supabase.auth.getUser();
+          const userId = userRes.user?.id ?? null;
+
+          const { data: inserted, error: insertError } = await supabase
+            .from('countries')
+            .insert({
+              name: countryName,
+              flag: canonical?.flag ?? '🏳️',
+              continent: canonical?.continent ?? 'Unknown',
+              user_id: userId,
+            })
+            .select('*')
+            .single();
+
+          if (insertError) throw insertError;
+          row = inserted;
+        }
+
+        const hydrated: Country = {
+          id: row.id,
+          name: row.name,
+          flag: row.flag,
+          continent: row.continent,
+          visitedBy: [],
+        };
+
+        setSelectedCountry(hydrated);
+        setStateDialogOpen(true);
+      } catch (err) {
+        console.error('Failed to open state tracking dialog:', err);
+      }
+    },
+    [countries, resolvedHomeCountry.name]
+  );
 
   useEffect(() => {
     const fetchToken = async () => {
@@ -266,31 +377,15 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
       // Add click handler for countries with state tracking (visited countries)
       map.current?.on('click', 'visited-countries', (e) => {
         if (!e.features?.[0]) return;
-        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
-        const iso2 = iso3ToIso2[iso3];
-        
-        if (iso2 && countriesWithStates.includes(iso2)) {
-          const clickedCountry = countries.find(c => countryToISO3[c.name] === iso3);
-          if (clickedCountry) {
-            setSelectedCountry(clickedCountry);
-            setStateDialogOpen(true);
-          }
-        }
+        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3 as string | undefined;
+        void openStateTrackingDialogForIso3(iso3);
       });
 
       // Add click handler for home country (separate layer)
       map.current?.on('click', 'home-country', (e) => {
         if (!e.features?.[0]) return;
-        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3;
-        const iso2 = iso3ToIso2[iso3];
-        
-        if (iso2 && countriesWithStates.includes(iso2)) {
-          const clickedCountry = countries.find(c => countryToISO3[c.name] === iso3);
-          if (clickedCountry) {
-            setSelectedCountry(clickedCountry);
-            setStateDialogOpen(true);
-          }
-        }
+        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3 as string | undefined;
+        void openStateTrackingDialogForIso3(iso3);
       });
 
       // Change cursor on hover for home country (if it has state tracking)
@@ -330,7 +425,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry }: InteractiveWo
       map.current?.remove();
       map.current = null;
     };
-  }, [mapToken, initialCenter, homeCountryISO, countries]);
+  }, [mapToken, initialCenter, homeCountryISO, countries, openStateTrackingDialogForIso3]);
 
   // Update filters when countries change (without re-creating map)
   useEffect(() => {
