@@ -18,7 +18,8 @@ import { PriceAlertDialog } from "@/components/flights/PriceAlertDialog";
 import { 
   PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
-  Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown, Bell
+  Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown, Bell,
+  TrendingDown, TrendingUp, Minus, Lightbulb
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -643,11 +644,75 @@ const Flights = () => {
                             +${flight.hiddenCosts.reduce((s, c) => s + c.estimatedCost, 0)} est. fees
                           </p>
                         )}
+                        {/* Price Insight Badge */}
+                        {flight.priceInsight && (
+                          <Badge 
+                            variant="outline" 
+                            className={`mt-1 text-xs ${
+                              flight.priceInsight.level === "low" 
+                                ? "border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400" 
+                                : flight.priceInsight.level === "high" 
+                                  ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                                  : "border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400"
+                            }`}
+                          >
+                            {flight.priceInsight.level === "low" && <TrendingDown className="h-3 w-3 mr-1" />}
+                            {flight.priceInsight.level === "high" && <TrendingUp className="h-3 w-3 mr-1" />}
+                            {flight.priceInsight.level === "medium" && <Minus className="h-3 w-3 mr-1" />}
+                            {flight.priceInsight.label}
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
+                    {/* Price Insight Advice */}
+                    {flight.priceInsight && (
+                      <div className={`text-xs p-2 rounded-md mb-3 flex items-start gap-2 ${
+                        flight.priceInsight.level === "low" 
+                          ? "bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400"
+                          : flight.priceInsight.level === "high"
+                            ? "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400"
+                            : "bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400"
+                      }`}>
+                        <Clock className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                        <span>{flight.priceInsight.advice}</span>
+                      </div>
+                    )}
+
                     {/* Explanation */}
                     <p className="text-sm text-muted-foreground mb-3 italic">{flight.explanation}</p>
+
+                    {/* Match Explanation for non-100 scores */}
+                    {flight.score < 100 && flight.matchExplanation && (
+                      <div className="mb-3 p-3 bg-muted/50 rounded-lg space-y-2">
+                        <div className="flex items-center gap-1.5 text-sm font-medium">
+                          <Lightbulb className="h-4 w-4 text-amber-500" />
+                          <span>Why this is your best match:</span>
+                        </div>
+                        
+                        {flight.matchExplanation.whyNotPerfect.length > 0 && (
+                          <div className="text-xs space-y-1">
+                            <p className="text-muted-foreground font-medium">Not a 100% match because:</p>
+                            <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                              {flight.matchExplanation.whyNotPerfect.map((reason, i) => (
+                                <li key={i}>{reason}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {flight.matchExplanation.whyBestChoice.length > 0 && (
+                          <div className="text-xs space-y-1">
+                            <p className="text-green-700 dark:text-green-400 font-medium">But it's still best because:</p>
+                            <ul className="list-disc list-inside text-green-700 dark:text-green-400 space-y-0.5">
+                              {flight.matchExplanation.whyBestChoice.map((reason, i) => (
+                                <li key={i}>{reason}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Preference Matches - Positives and Negatives */}
                     {flight.preferenceMatches && flight.preferenceMatches.length > 0 && (

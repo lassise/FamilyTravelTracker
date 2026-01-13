@@ -37,6 +37,17 @@ export interface PreferenceMatch {
   detail?: string;
 }
 
+export interface PriceInsight {
+  level: "low" | "medium" | "high";
+  label: string;
+  advice: string;
+}
+
+export interface MatchExplanation {
+  whyNotPerfect: string[];
+  whyBestChoice: string[];
+}
+
 export interface ScoredFlight extends FlightResult {
   score: number;
   breakdown: ScoreBreakdown;
@@ -52,6 +63,8 @@ export interface ScoredFlight extends FlightResult {
   pricePerTicket?: number;
   savingsPerTicket?: number;
   passengers?: number;
+  priceInsight?: PriceInsight;
+  matchExplanation?: MatchExplanation;
 }
 
 export interface ScoreBreakdown {
@@ -332,6 +345,165 @@ const generateExplanation = (flight: ScoredFlight, preferences: FlightPreference
   return `Great pick: ${reasons.join(", ")}`;
 };
 
+// Generate match explanation for non-perfect scores
+const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPreferences): MatchExplanation => {
+  const whyNotPerfect: string[] = [];
+  const whyBestChoice: string[] = [];
+  
+  const negativeMatches = flight.preferenceMatches.filter(m => m.type === "negative");
+  const positiveMatches = flight.preferenceMatches.filter(m => m.type === "positive");
+  
+  // Why not perfect - based on negative preference matches
+  for (const match of negativeMatches) {
+    if (match.label.includes("stops") || match.label === "Has stops") {
+      whyNotPerfect.push("Has connecting flights instead of nonstop");
+    } else if (match.label.includes("Red-eye")) {
+      whyNotPerfect.push("Departure time is outside your preferred hours");
+    } else if (match.label.includes("layover") || match.label.includes("connection")) {
+      whyNotPerfect.push(match.detail || "Layover timing doesn't match preferences");
+    } else if (match.label.includes("Carry-on") || match.label.includes("Bag")) {
+      whyNotPerfect.push("Extra baggage fees may apply");
+    } else if (match.detail?.includes("avoid")) {
+      whyNotPerfect.push(`Flying on ${match.label} which you prefer to avoid`);
+    } else if (match.label.includes("stress")) {
+      whyNotPerfect.push("May be stressful for family travel");
+    } else if (match.label.includes("airport") || match.label.includes("Limited")) {
+      whyNotPerfect.push("Connection airport has limited amenities");
+    }
+  }
+  
+  // Add score-based reasons
+  if (flight.breakdown.price < 70) {
+    whyNotPerfect.push("Not the most affordable option");
+  }
+  if (flight.breakdown.travelTime < 60) {
+    whyNotPerfect.push("Longer total travel time");
+  }
+  if (flight.breakdown.departureTime < 70 && !whyNotPerfect.some(r => r.includes("Departure"))) {
+    whyNotPerfect.push("Departure time is not your preferred slot");
+  }
+  
+  // Why it's still the best choice
+  for (const match of positiveMatches) {
+    if (match.label.includes("Non-stop")) {
+      whyBestChoice.push("Direct flight saves you time and hassle");
+    } else if (match.label.includes("Preferred departure")) {
+      whyBestChoice.push("Departs at your preferred time");
+    } else if (match.label.includes("reliable") || match.label.includes("Reliable")) {
+      whyBestChoice.push("High airline reliability means fewer delays");
+    } else if (match.label.includes("Short travel")) {
+      whyBestChoice.push("Gets you there faster than alternatives");
+    } else if (match.label.includes("price") || match.label.includes("Price")) {
+      whyBestChoice.push("Great value for money");
+    } else if (match.label.includes("WiFi")) {
+      whyBestChoice.push("In-flight WiFi available");
+    } else if (match.label.includes("Family")) {
+      whyBestChoice.push("Family-friendly timing and connections");
+    } else if (match.detail?.includes("preferred airline")) {
+      whyBestChoice.push(`Flying on ${match.label}, your preferred airline`);
+    }
+  }
+  
+  // Add breakdown-based positives
+  if (flight.breakdown.price >= 85 && !whyBestChoice.some(r => r.includes("value"))) {
+    whyBestChoice.push("One of the most affordable options");
+  }
+  if (flight.breakdown.travelTime >= 85 && !whyBestChoice.some(r => r.includes("faster"))) {
+    whyBestChoice.push("Minimal total travel time");
+  }
+  if (flight.delayRisk === "low" && !whyBestChoice.some(r => r.includes("delay"))) {
+    whyBestChoice.push("Low risk of delays");
+  }
+  if (flight.breakdown.layoverQuality >= 85) {
+    whyBestChoice.push("Well-connected hub airports if stopping");
+  }
+  
+  return {
+    whyNotPerfect: whyNotPerfect.slice(0, 3), // Limit to top 3
+    whyBestChoice: whyBestChoice.slice(0, 3),
+  };
+};
+
+// Calculate price insight based on price distribution
+const calculatePriceInsight = (price: number, allPrices: number[]): PriceInsight => {
+  if (allPrices.length < 2) {
+    return {
+      level: "medium",
+      label: "Average price",
+      advice: "Prices vary. Check back for potential drops.",
+    };
+  }
+  
+  const sorted = [...allPrices].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const range = max - min;
+  
+  // Determine percentile position
+  const percentile = range > 0 ? ((price - min) / range) * 100 : 50;
+  
+  if (percentile <= 25) {
+    return {
+      level: "low",
+      label: "Great price",
+      advice: "This is a good deal. Book soon – prices can rise as departure approaches.",
+    };
+  } else if (percentile <= 60) {
+    return {
+      level: "medium", 
+      label: "Fair price",
+      advice: "Average pricing. Best to book 3-6 weeks before domestic or 2-3 months before international flights.",
+    };
+  } else {
+    return {
+      level: "high",
+      label: "Higher price",
+      advice: "Consider waiting if your dates are flexible. Prices often drop on Tuesdays or during sales.",
+    };
+  }
+};
+
+// Build a proper Google Flights booking URL
+const buildGoogleFlightsUrl = (
+  departureAirport: string,
+  arrivalAirport: string,
+  departureDate: string,
+  returnDate?: string,
+  passengers: number = 1,
+  cabinClass: string = "economy"
+): string => {
+  // Format: YYYY-MM-DD
+  const cabinMap: Record<string, number> = {
+    economy: 1,
+    premium_economy: 2,
+    business: 3,
+    first: 4,
+  };
+  
+  const cabin = cabinMap[cabinClass] || 1;
+  
+  // Google Flights direct search URL
+  // Format: /flights/DEP-ARR/2024-01-15/2024-01-22
+  const baseUrl = "https://www.google.com/travel/flights/search";
+  
+  let flightPath = `${departureAirport}-${arrivalAirport}/${departureDate}`;
+  if (returnDate) {
+    flightPath += `/${returnDate}`;
+  }
+  
+  // Build query params for passengers and cabin
+  const params = new URLSearchParams({
+    tfs: "CBwQAhAA", // Required for the search to work
+    curr: "USD",
+    hl: "en",
+    gl: "us",
+  });
+  
+  // The direct URL format that works
+  return `https://www.google.com/travel/flights/search?q=flights%20from%20${departureAirport}%20to%20${arrivalAirport}%20on%20${departureDate}${returnDate ? `%20return%20${returnDate}` : ''}&curr=USD`;
+};
+
 // Main scoring function
 export const scoreFlights = (
   flights: FlightResult[],
@@ -553,28 +725,23 @@ export const scoreFlights = (
       }
     }
 
-    // Build booking URL (Google Flights redirect) with proper date formatting
+    // Build booking URL with correct dates from the actual flight
     const departureAirport = firstSegment?.departureAirport || "";
     const arrivalAirport = lastSegment?.arrivalAirport || "";
-    const departureDate = firstSegment?.departureTime ? new Date(firstSegment.departureTime).toISOString().split('T')[0] : "";
+    const departureDateStr = firstSegment?.departureTime ? new Date(firstSegment.departureTime).toISOString().split('T')[0] : "";
     const returnSegment = flight.itineraries[1]?.segments[0];
     const returnDateStr = returnSegment?.departureTime ? new Date(returnSegment.departureTime).toISOString().split('T')[0] : "";
     
-    let bookingUrl: string | undefined;
-    if (departureAirport && arrivalAirport && departureDate) {
-      const dateParams = returnDateStr 
-        ? `&tfs=CBwQAhopEgoyMDI1LTAxLTEwagwIAxIIL20vMHBseTByDAgDEggvbS8wZG1tchoKMjAyNS0wMS0xNWoMCAMSCC9tLzBkbW1yDAoDEggvbS8wcGx5MAYIAY&d=${departureDate}&r=${returnDateStr}`
-        : `&tfs=CBwQAhopEgoyMDI1LTAxLTEwagwIAxIIL20vMHBseTByDAgDEggvbS8wZG1tchoKMjAyNS0wMS0xNWoMCAMSCC9tLzBkbW1yDAoDEggvbS8wcGx5MAYIAQ&d=${departureDate}`;
-      bookingUrl = `https://www.google.com/travel/flights/search?tfs=CBwQAhoXEgoyMDI1LTAyLTAxGgNQQkkqA0FUTHABggELCP___________wFAAUgBmAEB&curr=USD&hl=en&gl=us&tfu=EgoIABAAGAAgASgC&f=${departureAirport}-${arrivalAirport}.${departureDate}`;
-    }
-    
-    // Simpler URL that works better
-    bookingUrl = departureAirport && arrivalAirport && departureDate
-      ? `https://www.google.com/travel/flights?q=Flights%20to%20${arrivalAirport}%20from%20${departureAirport}%20on%20${departureDate}${returnDateStr ? `%20returning%20${returnDateStr}` : ''}`
+    const bookingUrl = departureAirport && arrivalAirport && departureDateStr
+      ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengers)
       : undefined;
 
     // Calculate per-ticket pricing
     const pricePerTicket = passengers > 0 ? flight.price / passengers : flight.price;
+    
+    // Calculate price insight
+    const allPrices = flights.map(f => f.price);
+    const priceInsight = calculatePriceInsight(flight.price, allPrices);
 
     const scoredFlight: ScoredFlight = {
       ...flight,
@@ -592,9 +759,15 @@ export const scoreFlights = (
       bookingUrl,
       pricePerTicket,
       passengers,
+      priceInsight,
     };
 
     scoredFlight.explanation = generateExplanation(scoredFlight, preferences);
+    
+    // Generate match explanation for non-perfect scores
+    if (breakdown.total < 100) {
+      scoredFlight.matchExplanation = generateMatchExplanation(scoredFlight, preferences);
+    }
 
     return scoredFlight;
   });
