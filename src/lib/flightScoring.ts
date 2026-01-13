@@ -523,8 +523,8 @@ export const scoreFlights = (
           if (connectionMinutes > preferences.max_layover_hours * 60) {
             preferenceMatches.push({ type: "negative", label: "Long layover", detail: `${Math.round(connectionMinutes / 60)}h layover exceeds your ${preferences.max_layover_hours}h max` });
             break;
-          } else if (connectionMinutes < preferences.min_connection_minutes) {
-            preferenceMatches.push({ type: "negative", label: "Tight connection", detail: `${connectionMinutes}min is less than your ${preferences.min_connection_minutes}min minimum` });
+          } else if (connectionMinutes <= 75) {
+            preferenceMatches.push({ type: "negative", label: "Tight connection", detail: `${connectionMinutes}min layover is tight` });
             break;
           }
         }

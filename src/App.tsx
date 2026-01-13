@@ -23,6 +23,7 @@ const Highlights = lazy(() => import("./pages/Highlights"));
 const Explore = lazy(() => import("./pages/Explore"));
 const YearWrapped = lazy(() => import("./pages/YearWrapped"));
 const Flights = lazy(() => import("./pages/Flights"));
+const SavedFlights = lazy(() => import("./pages/SavedFlights"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/explore" element={<Explore />} />
               <Route path="/year-wrapped" element={<YearWrapped />} />
               <Route path="/flights" element={<Flights />} />
+              <Route path="/saved-flights" element={<SavedFlights />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

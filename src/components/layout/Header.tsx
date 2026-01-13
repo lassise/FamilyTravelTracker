@@ -13,7 +13,8 @@ import {
   Map,
   Luggage,
   Globe,
-  PlaneTakeoff
+  PlaneTakeoff,
+  Bell
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -52,6 +53,7 @@ const Header = () => {
     { href: "/trips", label: "My Trips", icon: Luggage },
     { href: "/trips/new", label: "Plan New Trip", icon: Plus },
     { href: "/flights", label: "Find Flights", icon: PlaneTakeoff },
+    { href: "/saved-flights", label: "Saved Flights", icon: Bell },
     { href: "/explore", label: "Explore Destinations", icon: Map },
   ];
 
