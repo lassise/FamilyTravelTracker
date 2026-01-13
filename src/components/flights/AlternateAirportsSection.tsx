@@ -21,7 +21,7 @@ export const AlternateAirportsSection = ({
   const [searchResults, setSearchResults] = useState<Airport[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [selectedAirport, setSelectedAirport] = useState<Airport | null>(null);
-  const [minSavings, setMinSavings] = useState(100);
+  const [minSavings, setMinSavings] = useState<number | "">(100);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value.toUpperCase());
@@ -50,7 +50,7 @@ export const AlternateAirportsSection = ({
     const newAirport: AlternateAirport = {
       code: selectedAirport.code,
       name: `${selectedAirport.city} (${selectedAirport.name})`,
-      minSavings,
+      minSavings: minSavings === "" ? 0 : minSavings,
     };
 
     onUpdate([...alternateAirports, newAirport]);
@@ -100,8 +100,11 @@ export const AlternateAirportsSection = ({
                   <DollarSign className="h-3 w-3 text-green-600" />
                   <Input
                     type="number"
-                    value={airport.minSavings}
-                    onChange={(e) => handleUpdateSavings(airport.code, Number(e.target.value))}
+                    value={airport.minSavings ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleUpdateSavings(airport.code, val === "" ? 0 : Number(val));
+                    }}
                     className="w-20 h-8 text-sm"
                     min={0}
                     step={25}
@@ -158,7 +161,10 @@ export const AlternateAirportsSection = ({
                   <Input
                     type="number"
                     value={minSavings}
-                    onChange={(e) => setMinSavings(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMinSavings(val === "" ? "" : Number(val));
+                    }}
                     min={0}
                     step={25}
                     className="w-32"

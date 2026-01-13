@@ -122,12 +122,12 @@ const DaysInput = ({
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => {
-        const numValue = parseInt(value) || 1;
-        const finalValue = numValue < 1 ? 1 : numValue;
-        if (finalValue !== initialValue) {
-          onSave(finalValue);
+        const numValue = parseInt(value);
+        if (!isNaN(numValue) && numValue >= 1 && numValue !== initialValue) {
+          onSave(numValue);
+        } else if (isNaN(numValue) || numValue < 1) {
+          setValue(initialValue.toString());
         }
-        setValue(finalValue.toString());
       }}
       disabled={disabled}
       className={`h-8 text-sm ${disabled ? "bg-muted cursor-not-allowed" : ""}`}
@@ -428,11 +428,12 @@ const NewVisitCard = ({
             <Input
               type="number"
               min={1}
-              value={draft.numberOfDays || ""}
+              value={draft.numberOfDays ?? ""}
               onChange={(e) => {
                 const value = e.target.value;
+                const numValue = parseInt(value);
                 onUpdate(draft.id, {
-                  numberOfDays: value === "" ? 1 : parseInt(value) || 1,
+                  numberOfDays: value === "" ? null : (isNaN(numValue) ? null : numValue),
                 });
               }}
               disabled={!draft.isApproximate && !!draft.visitDate && !!draft.endDate}
