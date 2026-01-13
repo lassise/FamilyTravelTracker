@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -27,6 +27,8 @@ export const useFamilyData = () => {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [homeCountry, setHomeCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const isFetching = useRef(false);
+  const lastUserId = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user) {
@@ -38,69 +40,74 @@ export const useFamilyData = () => {
       return;
     }
     
-    setLoading(true);
+    // Prevent duplicate fetches
+    if (isFetching.current) return;
+    isFetching.current = true;
+    
+    // Only show loading on initial load, not refetches
+    if (lastUserId.current !== user.id) {
+      setLoading(true);
+      lastUserId.current = user.id;
+    }
+    
     try {
-      // Fetch family members
-      const { data: membersData, error: membersError } = await supabase
-        .from("family_members")
-        .select("*")
-        .order("created_at", { ascending: true });
+      // Fetch all data in parallel
+      const [membersResult, countriesResult, visitsResult, wishlistResult, profileResult] = await Promise.all([
+        supabase.from("family_members").select("*").order("created_at", { ascending: true }),
+        supabase.from("countries").select("*").order("name", { ascending: true }),
+        supabase.from("country_visits").select("country_id, family_member_id, family_members (name)"),
+        supabase.from("country_wishlist").select("country_id"),
+        supabase.from("profiles").select("home_country").eq("id", user.id).single()
+      ]);
 
-      if (membersError) throw membersError;
+      if (membersResult.error) throw membersResult.error;
+      if (countriesResult.error) throw countriesResult.error;
+      if (visitsResult.error) throw visitsResult.error;
+      if (wishlistResult.error) throw wishlistResult.error;
 
-      // Fetch countries
-      const { data: countriesData, error: countriesError } = await supabase
-        .from("countries")
-        .select("*")
-        .order("name", { ascending: true });
+      const membersData = membersResult.data || [];
+      const countriesData = countriesResult.data || [];
+      const visitsData = visitsResult.data || [];
+      const wishlistData = wishlistResult.data || [];
+      const userHomeCountry = profileResult.data?.home_country || null;
 
-      if (countriesError) throw countriesError;
+      // Build lookup maps for O(1) access
+      const visitsByMember = new Map<string, number>();
+      const visitsByCountry = new Map<string, string[]>();
 
-      // Fetch country visits
-      const { data: visitsData, error: visitsError } = await supabase
-        .from("country_visits")
-        .select(`
-          country_id,
-          family_member_id,
-          family_members (name)
-        `);
+      for (const visit of visitsData) {
+        // Count visits per member
+        if (visit.family_member_id) {
+          visitsByMember.set(
+            visit.family_member_id, 
+            (visitsByMember.get(visit.family_member_id) || 0) + 1
+          );
+        }
+        // Group visits by country
+        if (visit.country_id) {
+          const memberName = (visit as any).family_members?.name;
+          if (memberName) {
+            const existing = visitsByCountry.get(visit.country_id) || [];
+            existing.push(memberName);
+            visitsByCountry.set(visit.country_id, existing);
+          }
+        }
+      }
 
-      if (visitsError) throw visitsError;
+      // Map data with O(1) lookups
+      const membersWithCount = membersData.map((member) => ({
+        ...member,
+        countriesVisited: visitsByMember.get(member.id) || 0
+      }));
 
-      // Fetch wishlist
-      const { data: wishlistData, error: wishlistError } = await supabase
-        .from("country_wishlist")
-        .select("country_id");
+      const countriesWithVisits = countriesData.map((country) => ({
+        ...country,
+        visitedBy: visitsByCountry.get(country.id) || []
+      }));
 
-      if (wishlistError) throw wishlistError;
-
-      // Fetch home country from profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("home_country")
-        .eq("id", user.id)
-        .single();
-      const userHomeCountry = profileData?.home_country || null;
-
-      // Calculate countries visited per family member
-      const membersWithCount = membersData?.map((member) => {
-        const visitCount = visitsData?.filter(
-          (visit) => visit.family_member_id === member.id
-        ).length || 0;
-        return { ...member, countriesVisited: visitCount };
-      }) || [];
-
-      // Map visited by names to countries
-      const countriesWithVisits = countriesData?.map((country) => {
-        const visits = visitsData?.filter((visit) => visit.country_id === country.id) || [];
-        const visitedBy = visits
-          .map((visit: any) => visit.family_members?.name)
-          .filter(Boolean);
-        return { ...country, visitedBy };
-      }) || [];
-
-      // Extract wishlist country IDs
-      const wishlistIds = wishlistData?.map(w => w.country_id).filter(Boolean) as string[] || [];
+      const wishlistIds = wishlistData
+        .map(w => w.country_id)
+        .filter((id): id is string => id !== null);
 
       setFamilyMembers(membersWithCount);
       setCountries(countriesWithVisits);
@@ -110,46 +117,39 @@ export const useFamilyData = () => {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
   }, [user]);
 
   useEffect(() => {
     fetchData();
 
-    // Set up realtime subscriptions
+    // Debounce realtime updates
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchData, 300);
+    };
+
     const channel = supabase
       .channel('family_data_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'family_members' },
-        () => fetchData()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'countries' },
-        () => fetchData()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'country_visits' },
-        () => fetchData()
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'country_wishlist' },
-        () => fetchData()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'family_members' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'countries' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'country_visits' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'country_wishlist' }, debouncedFetch)
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [user, fetchData]);
 
-  // Calculate total continents visited
-  const totalContinents = new Set(
-    countries.filter(c => c.visitedBy.length > 0).map(c => c.continent)
-  ).size;
+  // Memoize totalContinents calculation
+  const totalContinents = useMemo(() => 
+    new Set(countries.filter(c => c.visitedBy.length > 0).map(c => c.continent)).size,
+    [countries]
+  );
 
   return { 
     familyMembers, 

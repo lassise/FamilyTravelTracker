@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, memo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
@@ -26,14 +26,118 @@ interface MilestoneData {
   color: string;
 }
 
-const TravelMilestones = ({ countries, familyMembers, totalContinents }: TravelMilestonesProps) => {
-  const visitedCountries = countries.filter(c => c.visitedBy.length > 0);
-  const visitedCount = visitedCountries.length;
-  
-  // Calculate unique continents from visited countries
-  const visitedContinents = new Set(visitedCountries.map(c => c.continent)).size;
+// Memoized milestone card component
+const FlippableMilestoneCard = memo(({ milestone }: { milestone: MilestoneData }) => {
+  const [isFlipped, setIsFlipped] = useState(false);
+  const Icon = milestone.icon;
+  const progress = Math.min((milestone.current / milestone.threshold) * 100, 100);
 
-  const milestones: MilestoneData[] = [
+  const handleClick = useCallback(() => setIsFlipped(f => !f), []);
+
+  return (
+    <div
+      className="relative h-[120px] cursor-pointer"
+      onClick={handleClick}
+      style={{ perspective: '1000px' }}
+    >
+      <div
+        className="absolute inset-0 transition-transform duration-500"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        }}
+      >
+        {/* Front of card */}
+        <div
+          className={cn(
+            "absolute inset-0 p-3 rounded-lg text-center flex flex-col items-center",
+            milestone.achieved
+              ? "bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/30"
+              : "bg-muted/30 border border-transparent opacity-60"
+          )}
+          style={{ backfaceVisibility: 'hidden' }}
+        >
+          <div className={cn(
+            "inline-flex p-2 rounded-full mb-2",
+            milestone.achieved ? "bg-primary/20" : "bg-muted"
+          )}>
+            <Icon className={cn(
+              "h-5 w-5",
+              milestone.achieved ? milestone.color : "text-muted-foreground"
+            )} />
+          </div>
+          <h4 className={cn(
+            "text-xs font-semibold mb-0.5",
+            milestone.achieved ? "text-foreground" : "text-muted-foreground"
+          )}>
+            {milestone.title}
+          </h4>
+          <p className="text-[10px] text-muted-foreground mt-auto">Tap for details</p>
+          {milestone.achieved && (
+            <div className="absolute -top-1 -right-1">
+              <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+                <Star className="h-2.5 w-2.5 text-primary-foreground fill-primary-foreground" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Back of card */}
+        <div
+          className={cn(
+            "absolute inset-0 p-3 rounded-lg text-center flex flex-col items-center justify-center border",
+            milestone.achieved
+              ? "bg-gradient-to-br from-secondary/10 to-primary/10 border-primary/30"
+              : "bg-muted/50 border-border"
+          )}
+          style={{
+            backfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)',
+          }}
+        >
+          <Icon className={cn("h-4 w-4 mb-1", milestone.achieved ? milestone.color : "text-muted-foreground")} />
+          <h4 className="text-xs font-semibold text-foreground mb-1">{milestone.title}</h4>
+          <p className="text-[10px] text-muted-foreground leading-relaxed mb-2">
+            {milestone.description}
+          </p>
+          {milestone.achieved ? (
+            <span className="text-[10px] text-accent flex items-center gap-1">
+              <Check className="h-3 w-3" />
+              Achieved!
+            </span>
+          ) : (
+            <>
+              <div className="w-full h-1 bg-muted rounded-full overflow-hidden mb-1">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-secondary"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                {milestone.current}/{milestone.threshold} {milestone.category}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+FlippableMilestoneCard.displayName = "FlippableMilestoneCard";
+
+const TravelMilestones = memo(({ countries, familyMembers, totalContinents }: TravelMilestonesProps) => {
+  const visitedCount = useMemo(() => 
+    countries.filter(c => c.visitedBy.length > 0).length,
+    [countries]
+  );
+  
+  const visitedContinents = useMemo(() => 
+    new Set(countries.filter(c => c.visitedBy.length > 0).map(c => c.continent)).size,
+    [countries]
+  );
+
+  const milestones: MilestoneData[] = useMemo(() => [
     // Country milestones
     { id: 'first', title: 'First Steps', description: 'Visit your first country', icon: Flag, threshold: 1, current: visitedCount, achieved: visitedCount >= 1, category: 'countries', color: 'text-green-500' },
     { id: 'explorer', title: 'Explorer', description: 'Visit 5 countries', icon: Globe, threshold: 5, current: visitedCount, achieved: visitedCount >= 5, category: 'countries', color: 'text-blue-500' },
@@ -49,106 +153,17 @@ const TravelMilestones = ({ countries, familyMembers, totalContinents }: TravelM
     
     // Special milestones
     { id: 'familyfun', title: 'Family Fun', description: 'Travel with 3+ family members', icon: Award, threshold: 3, current: familyMembers.length, achieved: familyMembers.length >= 3, category: 'special', color: 'text-rose-500' },
-  ];
+  ], [visitedCount, visitedContinents, familyMembers.length]);
 
-  const achievedCount = milestones.filter(m => m.achieved).length;
-  const nextMilestone = milestones.find(m => !m.achieved);
-
-  // Flippable milestone card component
-  const FlippableMilestoneCard = ({ milestone }: { milestone: MilestoneData }) => {
-    const [isFlipped, setIsFlipped] = useState(false);
-    const Icon = milestone.icon;
-    const progress = Math.min((milestone.current / milestone.threshold) * 100, 100);
-
-    return (
-      <div
-        className="relative h-[120px] cursor-pointer"
-        onClick={() => setIsFlipped(!isFlipped)}
-        style={{ perspective: '1000px' }}
-      >
-        <div
-          className="absolute inset-0 transition-transform duration-500"
-          style={{
-            transformStyle: 'preserve-3d',
-            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          }}
-        >
-          {/* Front of card */}
-          <div
-            className={cn(
-              "absolute inset-0 p-3 rounded-lg text-center flex flex-col items-center",
-              milestone.achieved
-                ? "bg-gradient-to-br from-primary/10 to-secondary/10 border border-primary/30"
-                : "bg-muted/30 border border-transparent opacity-60"
-            )}
-            style={{ backfaceVisibility: 'hidden' }}
-          >
-            <div className={cn(
-              "inline-flex p-2 rounded-full mb-2",
-              milestone.achieved ? "bg-primary/20" : "bg-muted"
-            )}>
-              <Icon className={cn(
-                "h-5 w-5",
-                milestone.achieved ? milestone.color : "text-muted-foreground"
-              )} />
-            </div>
-            <h4 className={cn(
-              "text-xs font-semibold mb-0.5",
-              milestone.achieved ? "text-foreground" : "text-muted-foreground"
-            )}>
-              {milestone.title}
-            </h4>
-            <p className="text-[10px] text-muted-foreground mt-auto">Tap for details</p>
-            {milestone.achieved && (
-              <div className="absolute -top-1 -right-1">
-                <div className="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
-                  <Star className="h-2.5 w-2.5 text-primary-foreground fill-primary-foreground" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Back of card */}
-          <div
-            className={cn(
-              "absolute inset-0 p-3 rounded-lg text-center flex flex-col items-center justify-center border",
-              milestone.achieved
-                ? "bg-gradient-to-br from-secondary/10 to-primary/10 border-primary/30"
-                : "bg-muted/50 border-border"
-            )}
-            style={{
-              backfaceVisibility: 'hidden',
-              transform: 'rotateY(180deg)',
-            }}
-          >
-            <Icon className={cn("h-4 w-4 mb-1", milestone.achieved ? milestone.color : "text-muted-foreground")} />
-            <h4 className="text-xs font-semibold text-foreground mb-1">{milestone.title}</h4>
-            <p className="text-[10px] text-muted-foreground leading-relaxed mb-2">
-              {milestone.description}
-            </p>
-            {milestone.achieved ? (
-              <span className="text-[10px] text-accent flex items-center gap-1">
-                <Check className="h-3 w-3" />
-                Achieved!
-              </span>
-            ) : (
-              <>
-                <div className="w-full h-1 bg-muted rounded-full overflow-hidden mb-1">
-                  <div
-                    className="h-full bg-gradient-to-r from-primary to-secondary"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {milestone.current}/{milestone.threshold} {milestone.category}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const achievedCount = useMemo(() => 
+    milestones.filter(m => m.achieved).length,
+    [milestones]
+  );
+  
+  const nextMilestone = useMemo(() => 
+    milestones.find(m => !m.achieved),
+    [milestones]
+  );
 
   return (
     <Card className="bg-card border-border">
@@ -193,6 +208,8 @@ const TravelMilestones = ({ countries, familyMembers, totalContinents }: TravelM
       </CardContent>
     </Card>
   );
-};
+});
+
+TravelMilestones.displayName = "TravelMilestones";
 
 export default TravelMilestones;

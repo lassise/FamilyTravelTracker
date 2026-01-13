@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -81,26 +81,22 @@ export const useFlightPreferences = () => {
   const { user } = useAuth();
   const [preferences, setPreferences] = useState<FlightPreferences>(defaultPreferences);
   const [loading, setLoading] = useState(true);
+  const isFetching = useRef(false);
 
-  const fetchPreferences = async () => {
+  const fetchPreferences = useCallback(async () => {
     if (!user?.id) {
       setLoading(false);
       return;
     }
 
+    if (isFetching.current) return;
+    isFetching.current = true;
+
     try {
-      // Fetch both flight preferences and profile home_airports in parallel
+      // Fetch both in parallel
       const [flightPrefsResult, profileResult] = await Promise.all([
-        supabase
-          .from("flight_preferences")
-          .select("*")
-          .eq("user_id", user.id)
-          .single(),
-        supabase
-          .from("profiles")
-          .select("home_airports")
-          .eq("id", user.id)
-          .single()
+        supabase.from("flight_preferences").select("*").eq("user_id", user.id).single(),
+        supabase.from("profiles").select("home_airports").eq("id", user.id).single()
       ]);
 
       // Parse profile home_airports as fallback
@@ -120,7 +116,6 @@ export const useFlightPreferences = () => {
 
       if (flightPrefsResult.error) {
         if (flightPrefsResult.error.code === "PGRST116") {
-          // No preferences exist yet, create defaults with profile airports
           await createDefaultPreferences(profileHomeAirports);
         } else {
           throw flightPrefsResult.error;
@@ -128,7 +123,6 @@ export const useFlightPreferences = () => {
       } else if (flightPrefsResult.data) {
         const data = flightPrefsResult.data;
         
-        // Parse home_airports from flight preferences JSON
         let homeAirports: HomeAirport[] = [];
         if (data.home_airports) {
           if (typeof data.home_airports === 'string') {
@@ -142,20 +136,14 @@ export const useFlightPreferences = () => {
           }
         }
         
-        // Use profile home_airports as fallback if flight preferences don't have any
         if (homeAirports.length === 0 && profileHomeAirports.length > 0) {
           homeAirports = profileHomeAirports;
         }
         
-        // Parse alternate_airports - stored alongside home_airports or separately
-        let alternateAirports: AlternateAirport[] = [];
-        // For now, we'll store alternate_airports in the same JSON field or as a separate concept
-        // Since DB doesn't have this field yet, we'll initialize empty
-        
         setPreferences({
           id: data.id,
           home_airports: homeAirports,
-          alternate_airports: alternateAirports,
+          alternate_airports: [],
           preferred_airlines: data.preferred_airlines || [],
           avoided_airlines: data.avoided_airlines || [],
           preferred_alliances: data.preferred_alliances || [],
@@ -176,7 +164,6 @@ export const useFlightPreferences = () => {
           default_checked_bags: data.default_checked_bags || 0,
           carry_on_only: data.carry_on_only || false,
           search_mode: (data.search_mode as "cash" | "points" | "hybrid") || "cash",
-          // Priority settings
           nonstop_priority: "strong",
           departure_time_priority: "nice_to_have",
           airline_priority: "nice_to_have",
@@ -188,10 +175,11 @@ export const useFlightPreferences = () => {
       console.error("Error fetching flight preferences:", error);
     } finally {
       setLoading(false);
+      isFetching.current = false;
     }
-  };
+  }, [user?.id]);
 
-  const createDefaultPreferences = async (profileHomeAirports: HomeAirport[] = []) => {
+  const createDefaultPreferences = useCallback(async (profileHomeAirports: HomeAirport[] = []) => {
     if (!user?.id) return;
 
     try {
@@ -236,9 +224,9 @@ export const useFlightPreferences = () => {
     } catch (error) {
       console.error("Error creating default preferences:", error);
     }
-  };
+  }, [user?.id]);
 
-  const updatePreferences = async (updates: Partial<FlightPreferences>) => {
+  const updatePreferences = useCallback(async (updates: Partial<FlightPreferences>) => {
     if (!user?.id) return;
 
     const newPreferences = { ...preferences, ...updates };
@@ -260,11 +248,11 @@ export const useFlightPreferences = () => {
       console.error("Error updating preferences:", error);
       toast.error("Failed to save preferences");
     }
-  };
+  }, [user?.id, preferences]);
 
   useEffect(() => {
     fetchPreferences();
-  }, [user?.id]);
+  }, [fetchPreferences]);
 
   return {
     preferences,

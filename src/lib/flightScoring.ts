@@ -504,7 +504,7 @@ const buildGoogleFlightsUrl = (
   return `https://www.google.com/travel/flights/search?q=flights%20from%20${departureAirport}%20to%20${arrivalAirport}%20on%20${departureDate}${returnDate ? `%20return%20${returnDate}` : ''}&curr=USD`;
 };
 
-// Main scoring function
+// Main scoring function - optimized
 export const scoreFlights = (
   flights: FlightResult[],
   preferences: FlightPreferences,
@@ -513,27 +513,41 @@ export const scoreFlights = (
 ): ScoredFlight[] => {
   if (!flights || flights.length === 0) return [];
 
-  // Get price range for normalization
+  // Pre-calculate price range
   const prices = allFlightPrices || flights.map(f => f.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const priceRange = maxPrice - minPrice || 1;
 
-  // Get travel time range
-  const travelTimes = flights.map(f => {
+  // Pre-calculate travel times and range
+  const travelTimes: number[] = new Array(flights.length);
+  for (let i = 0; i < flights.length; i++) {
     let total = 0;
-    for (const it of f.itineraries) {
+    for (const it of flights[i].itineraries) {
       for (const seg of it.segments) {
         total += parseDuration(seg.duration);
       }
     }
-    return total;
-  });
+    travelTimes[i] = total;
+  }
+  
   const minTime = Math.min(...travelTimes);
   const maxTime = Math.max(...travelTimes);
   const timeRange = maxTime - minTime || 1;
 
-  const scoredFlights: ScoredFlight[] = flights.map((flight, index) => {
+  // Cache airline lookups
+  const airlineCache = new Map<string, ReturnType<typeof AIRLINES.find>>();
+  const getAirlineCached = (code: string) => {
+    if (!airlineCache.has(code)) {
+      airlineCache.set(code, AIRLINES.find(a => code.startsWith(a.code) || code === a.name));
+    }
+    return airlineCache.get(code);
+  };
+
+  const scoredFlights: ScoredFlight[] = new Array(flights.length);
+
+  for (let index = 0; index < flights.length; index++) {
+    const flight = flights[index];
     const breakdown: ScoreBreakdown = {
       nonstop: 0,
       travelTime: 0,
@@ -550,22 +564,19 @@ export const scoreFlights = (
     const hasOneStop = flight.itineraries.every(it => it.segments.length <= 2);
     breakdown.nonstop = isNonstop ? 100 : hasOneStop ? 60 : 30;
 
-    // Penalize if user prefers nonstop and this isn't
     if (preferences.prefer_nonstop && !isNonstop) {
       breakdown.nonstop = Math.max(0, breakdown.nonstop - 30);
     }
 
     // Score travel time (normalized)
-    const travelTime = travelTimes[index];
-    breakdown.travelTime = 100 - ((travelTime - minTime) / timeRange) * 100;
+    breakdown.travelTime = 100 - ((travelTimes[index] - minTime) / timeRange) * 100;
 
     // Score layover quality
     let layoverScore = 100;
     for (const it of flight.itineraries) {
       if (it.segments.length > 1) {
         for (let i = 0; i < it.segments.length - 1; i++) {
-          const connectionAirport = it.segments[i].arrivalAirport;
-          const quality = getAirportQuality(connectionAirport);
+          const quality = getAirportQuality(it.segments[i].arrivalAirport);
           layoverScore = Math.min(layoverScore, quality.score);
         }
       }
@@ -574,25 +585,18 @@ export const scoreFlights = (
 
     // Score departure time
     const firstSegment = flight.itineraries[0]?.segments[0];
-    breakdown.departureTime = scoreDepartureTime(
-      getHour(firstSegment?.departureTime),
-      preferences
-    );
+    breakdown.departureTime = scoreDepartureTime(getHour(firstSegment?.departureTime), preferences);
 
     // Score arrival time
     const lastItinerary = flight.itineraries[0];
     const lastSegment = lastItinerary?.segments[lastItinerary.segments.length - 1];
     const arrivalHour = getHour(lastSegment?.arrivalTime);
-    // Prefer arrivals before 10pm
     breakdown.arrivalTime = arrivalHour >= 22 ? 50 : arrivalHour <= 6 ? 60 : 85;
 
     // Score airline reliability
-    breakdown.airlineReliability = scoreAirlineReliability(
-      firstSegment?.airline || "",
-      preferences
-    );
+    breakdown.airlineReliability = scoreAirlineReliability(firstSegment?.airline || "", preferences);
 
-    // Score price (normalized, lower is better)
+    // Score price (normalized)
     breakdown.price = 100 - ((flight.price - minPrice) / priceRange) * 100;
 
     // Calculate weighted total
@@ -603,8 +607,7 @@ export const scoreFlights = (
         breakdown.departureTime * WEIGHTS.departureTime +
         breakdown.arrivalTime * WEIGHTS.arrivalTime +
         breakdown.airlineReliability * WEIGHTS.airlineReliability +
-        breakdown.price * WEIGHTS.price) /
-        100
+        breakdown.price * WEIGHTS.price) / 100
     );
 
     // Assign badges
@@ -616,14 +619,12 @@ export const scoreFlights = (
 
     // Warnings
     const warnings: string[] = [];
-    if (!preferences.red_eye_allowed) {
-      const depHour = getHour(firstSegment?.departureTime);
-      if (depHour >= 21 || depHour < 5) {
-        warnings.push("Red-eye flight (you prefer to avoid these)");
-      }
+    const depHour = getHour(firstSegment?.departureTime);
+    if (!preferences.red_eye_allowed && (depHour >= 21 || depHour < 5)) {
+      warnings.push("Red-eye flight (you prefer to avoid these)");
     }
 
-    // Generate preference matches (positives and negatives)
+    // Generate preference matches
     const preferenceMatches: PreferenceMatch[] = [];
     
     // Positive matches
@@ -637,7 +638,7 @@ export const scoreFlights = (
       preferenceMatches.push({ type: "positive", label: "Preferred departure time" });
     }
     
-    const airline = AIRLINES.find(a => (firstSegment?.airline || "").startsWith(a.code));
+    const airline = getAirlineCached(firstSegment?.airline || "");
     if (airline && preferences.preferred_airlines.includes(airline.name)) {
       preferenceMatches.push({ type: "positive", label: `${airline.name}`, detail: "Your preferred airline" });
     }
@@ -646,7 +647,7 @@ export const scoreFlights = (
       preferenceMatches.push({ type: "positive", label: "Highly reliable", detail: `${breakdown.airlineReliability}% reliability` });
     }
     
-    if (travelTime <= minTime + 30) {
+    if (travelTimes[index] <= minTime + 30) {
       preferenceMatches.push({ type: "positive", label: "Short travel time" });
     }
     
@@ -654,14 +655,17 @@ export const scoreFlights = (
       preferenceMatches.push({ type: "positive", label: "Great price", detail: "Among the cheapest" });
     }
 
-    // Check for wifi in extensions
-    const hasWifi = flight.itineraries.some(it => 
-      it.segments.some(seg => 
-        (seg.extensions || []).some((ext: string) => 
-          ext?.toLowerCase().includes('wi-fi') || ext?.toLowerCase().includes('wifi')
-        )
-      )
-    );
+    // Check for wifi
+    let hasWifi = false;
+    for (const it of flight.itineraries) {
+      for (const seg of it.segments) {
+        if (seg.extensions?.some((ext: string) => ext?.toLowerCase().includes('wi-fi') || ext?.toLowerCase().includes('wifi'))) {
+          hasWifi = true;
+          break;
+        }
+      }
+      if (hasWifi) break;
+    }
     if (hasWifi) {
       preferenceMatches.push({ type: "positive", label: "Has WiFi" });
     }
@@ -671,8 +675,7 @@ export const scoreFlights = (
       preferenceMatches.push({ type: "negative", label: "Has stops", detail: "You prefer non-stop" });
     }
     
-    const depHourCheck = getHour(firstSegment?.departureTime);
-    if ((depHourCheck >= 21 || depHourCheck < 5) && !preferences.red_eye_allowed) {
+    if ((depHour >= 21 || depHour < 5) && !preferences.red_eye_allowed) {
       preferenceMatches.push({ type: "negative", label: "Red-eye flight", detail: "You prefer to avoid" });
     }
     
@@ -685,7 +688,7 @@ export const scoreFlights = (
     }
 
     // Check for long layovers
-    for (const it of flight.itineraries) {
+    outer: for (const it of flight.itineraries) {
       if (it.segments.length > 1) {
         for (let i = 0; i < it.segments.length - 1; i++) {
           const arrival = new Date(it.segments[i].arrivalTime);
@@ -694,38 +697,35 @@ export const scoreFlights = (
           
           if (connectionMinutes > preferences.max_layover_hours * 60) {
             preferenceMatches.push({ type: "negative", label: "Long layover", detail: `${Math.round(connectionMinutes / 60)}h layover exceeds your ${preferences.max_layover_hours}h max` });
-            break;
+            break outer;
           } else if (connectionMinutes <= 75) {
             preferenceMatches.push({ type: "negative", label: "Tight connection", detail: `${connectionMinutes}min layover is tight` });
-            break;
+            break outer;
           }
         }
       }
     }
 
-    // Check for no wifi (if we can determine it)
-    if (!hasWifi && flight.itineraries.some(it => it.segments.some(seg => seg.extensions && seg.extensions.length > 0))) {
-      preferenceMatches.push({ type: "negative", label: "No WiFi listed" });
-    }
-
-    // Budget airline warnings (extra fees)
-    if (["NK", "F9"].includes(firstSegment?.airline || "")) {
+    // Budget airline warnings
+    const firstAirline = firstSegment?.airline || "";
+    if (firstAirline === "NK" || firstAirline === "F9") {
       preferenceMatches.push({ type: "negative", label: "Carry-on fee", detail: "Carry-on bags cost extra" });
       if (!preferences.carry_on_only) {
         preferenceMatches.push({ type: "negative", label: "Bag fees extra", detail: "Ultra low-cost carrier" });
       }
     }
     
+    let familyStressScore: number | undefined;
     if (preferences.family_mode) {
-      const stressScore = calculateFamilyStressScore(flight, preferences);
-      if (stressScore > 50) {
+      familyStressScore = calculateFamilyStressScore(flight, preferences);
+      if (familyStressScore > 50) {
         preferenceMatches.push({ type: "negative", label: "High family stress", detail: "Tight connections or late arrivals" });
-      } else if (stressScore < 20) {
+      } else if (familyStressScore < 20) {
         preferenceMatches.push({ type: "positive", label: "Family-friendly", detail: "Good timing and connections" });
       }
     }
 
-    // Build booking URL with correct dates from the actual flight
+    // Build booking URL
     const departureAirport = firstSegment?.departureAirport || "";
     const arrivalAirport = lastSegment?.arrivalAirport || "";
     const departureDateStr = firstSegment?.departureTime ? new Date(firstSegment.departureTime).toISOString().split('T')[0] : "";
@@ -736,12 +736,8 @@ export const scoreFlights = (
       ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengers)
       : undefined;
 
-    // Calculate per-ticket pricing
     const pricePerTicket = passengers > 0 ? flight.price / passengers : flight.price;
-    
-    // Calculate price insight
-    const allPrices = flights.map(f => f.price);
-    const priceInsight = calculatePriceInsight(flight.price, allPrices);
+    const priceInsight = calculatePriceInsight(flight.price, prices);
 
     const scoredFlight: ScoredFlight = {
       ...flight,
@@ -750,9 +746,7 @@ export const scoreFlights = (
       badges,
       explanation: "",
       warnings,
-      familyStressScore: preferences.family_mode
-        ? calculateFamilyStressScore(flight, preferences)
-        : undefined,
+      familyStressScore,
       delayRisk: estimateDelayRisk(flight),
       hiddenCosts: detectHiddenCosts(flight, preferences),
       preferenceMatches,
@@ -764,19 +758,18 @@ export const scoreFlights = (
 
     scoredFlight.explanation = generateExplanation(scoredFlight, preferences);
     
-    // Generate match explanation for non-perfect scores
     if (breakdown.total < 100) {
       scoredFlight.matchExplanation = generateMatchExplanation(scoredFlight, preferences);
     }
 
-    return scoredFlight;
-  });
+    scoredFlights[index] = scoredFlight;
+  }
 
   // Sort by score descending
   return scoredFlights.sort((a, b) => b.score - a.score);
 };
 
-// Get categorized results
+// Get categorized results - optimized with single pass where possible
 export const categorizeFlights = (scoredFlights: ScoredFlight[]): {
   bestOverall: ScoredFlight | null;
   fastest: ScoredFlight | null;
@@ -787,12 +780,21 @@ export const categorizeFlights = (scoredFlights: ScoredFlight[]): {
     return { bestOverall: null, fastest: null, cheapest: null, bestForFamilies: null };
   }
 
-  const bestOverall = scoredFlights[0];
-  const fastest = [...scoredFlights].sort((a, b) => b.breakdown.travelTime - a.breakdown.travelTime)[0];
-  const cheapest = [...scoredFlights].sort((a, b) => a.price - b.price)[0];
-  const bestForFamilies = [...scoredFlights].sort((a, b) => 
-    (a.familyStressScore || 100) - (b.familyStressScore || 100)
-  )[0];
+  let fastest = scoredFlights[0];
+  let cheapest = scoredFlights[0];
+  let bestForFamilies = scoredFlights[0];
 
-  return { bestOverall, fastest, cheapest, bestForFamilies };
+  for (let i = 1; i < scoredFlights.length; i++) {
+    const f = scoredFlights[i];
+    if (f.breakdown.travelTime > fastest.breakdown.travelTime) fastest = f;
+    if (f.price < cheapest.price) cheapest = f;
+    if ((f.familyStressScore || 100) < (bestForFamilies.familyStressScore || 100)) bestForFamilies = f;
+  }
+
+  return { 
+    bestOverall: scoredFlights[0], 
+    fastest, 
+    cheapest, 
+    bestForFamilies 
+  };
 };
