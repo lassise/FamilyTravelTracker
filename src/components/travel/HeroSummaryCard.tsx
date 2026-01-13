@@ -1,3 +1,4 @@
+import { useMemo, memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Globe2, Users, Plane, Calendar } from "lucide-react";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
@@ -9,25 +10,31 @@ interface HeroSummaryCardProps {
   totalContinents: number;
 }
 
-const HeroSummaryCard = ({ countries, familyMembers, totalContinents }: HeroSummaryCardProps) => {
+const HeroSummaryCard = memo(({ countries, familyMembers, totalContinents }: HeroSummaryCardProps) => {
   const { visitDetails } = useVisitDetails();
-  const visitedCountries = countries.filter(c => c.visitedBy.length > 0);
   
-  // Calculate the earliest year from visit details
-  const earliestYear = visitDetails.reduce((earliest, visit) => {
-    let year: number | null = null;
-    if (visit.visit_date) {
-      year = new Date(visit.visit_date).getFullYear();
-    } else if (visit.approximate_year) {
-      year = visit.approximate_year;
-    }
-    if (year && (!earliest || year < earliest)) {
-      return year;
-    }
-    return earliest;
-  }, null as number | null);
+  const visitedCountries = useMemo(() => 
+    countries.filter(c => c.visitedBy.length > 0),
+    [countries]
+  );
+  
+  // Memoize earliest year calculation
+  const earliestYear = useMemo(() => {
+    return visitDetails.reduce((earliest, visit) => {
+      let year: number | null = null;
+      if (visit.visit_date) {
+        year = new Date(visit.visit_date).getFullYear();
+      } else if (visit.approximate_year) {
+        year = visit.approximate_year;
+      }
+      if (year && (!earliest || year < earliest)) {
+        return year;
+      }
+      return earliest;
+    }, null as number | null);
+  }, [visitDetails]);
 
-  const stats = [
+  const stats = useMemo(() => [
     {
       icon: Globe2,
       value: visitedCountries.length,
@@ -56,7 +63,12 @@ const HeroSummaryCard = ({ countries, familyMembers, totalContinents }: HeroSumm
       color: "text-muted-foreground",
       bgColor: "bg-muted",
     }] : []),
-  ];
+  ], [visitedCountries.length, totalContinents, familyMembers.length, earliestYear]);
+
+  const progressPercent = useMemo(() => 
+    Math.round((visitedCountries.length / 195) * 100),
+    [visitedCountries.length]
+  );
 
   return (
     <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5 border-primary/20 overflow-hidden">
@@ -81,8 +93,7 @@ const HeroSummaryCard = ({ countries, familyMembers, totalContinents }: HeroSumm
             return (
               <div
                 key={index}
-                className="flex flex-col items-center text-center p-3 rounded-xl bg-background/60 backdrop-blur-sm animate-fade-in"
-                style={{ animationDelay: `${index * 50}ms` }}
+                className="flex flex-col items-center text-center p-3 rounded-xl bg-background/60 backdrop-blur-sm"
               >
                 <div className={`p-2 rounded-full ${stat.bgColor} mb-2`}>
                   <Icon className={`h-5 w-5 ${stat.color}`} />
@@ -102,18 +113,20 @@ const HeroSummaryCard = ({ countries, familyMembers, totalContinents }: HeroSumm
         <div className="mt-4 pt-4 border-t border-border/50">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
             <span>World exploration</span>
-            <span>{Math.round((visitedCountries.length / 195) * 100)}% complete</span>
+            <span>{progressPercent}% complete</span>
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-1000 ease-out"
-              style={{ width: `${Math.min((visitedCountries.length / 195) * 100, 100)}%` }}
+              className="h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 ease-out"
+              style={{ width: `${Math.min(progressPercent, 100)}%` }}
             />
           </div>
         </div>
       </CardContent>
     </Card>
   );
-};
+});
+
+HeroSummaryCard.displayName = "HeroSummaryCard";
 
 export default HeroSummaryCard;

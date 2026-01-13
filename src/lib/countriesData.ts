@@ -18,14 +18,21 @@ const continentNames: Record<string, string> = {
   SA: 'South America',
 };
 
-// Get all countries as options
+// Cache the country list - computed once
+let cachedCountries: CountryOption[] | null = null;
+
+// Get all countries as options (memoized)
 export const getAllCountries = (): CountryOption[] => {
-  return Object.entries(countries).map(([code, data]) => ({
+  if (cachedCountries) return cachedCountries;
+  
+  cachedCountries = Object.entries(countries).map(([code, data]) => ({
     name: data.name,
     flag: getEmojiFlag(code as TCountryCode),
     continent: continentNames[data.continent] || data.continent,
     code,
   })).sort((a, b) => a.name.localeCompare(b.name));
+  
+  return cachedCountries;
 };
 
 // Country aliases for common alternative names
@@ -40,7 +47,9 @@ const countryAliases: Record<string, string[]> = {
 
 // Search countries by name (including aliases)
 export const searchCountries = (query: string): CountryOption[] => {
-  const lowercaseQuery = query.toLowerCase();
+  const lowercaseQuery = query.toLowerCase().trim();
+  if (!lowercaseQuery) return [];
+  
   const allCountries = getAllCountries();
   
   return allCountries.filter(country => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface VisitDetail {
@@ -42,9 +42,17 @@ export const useVisitDetails = () => {
   const [cityVisits, setCityVisits] = useState<CityVisit[]>([]);
   const [travelSettings, setTravelSettings] = useState<TravelSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const isFetching = useRef(false);
+  const isInitialLoad = useRef(true);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = useCallback(async () => {
+    if (isFetching.current) return;
+    isFetching.current = true;
+    
+    if (isInitialLoad.current) {
+      setLoading(true);
+    }
+    
     try {
       const [visitsResult, citiesResult, settingsResult] = await Promise.all([
         supabase.from("country_visit_details").select("*"),
@@ -63,39 +71,36 @@ export const useVisitDetails = () => {
       console.error("Error fetching visit details:", error);
     } finally {
       setLoading(false);
+      isFetching.current = false;
+      isInitialLoad.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
 
-    // Set up realtime subscriptions
+    // Debounce realtime updates
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchData, 300);
+    };
+
     const channel = supabase
       .channel("visit_details_changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "country_visit_details" },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "city_visits" },
-        () => fetchData()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "travel_settings" },
-        () => fetchData()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "country_visit_details" }, debouncedFetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "city_visits" }, debouncedFetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "travel_settings" }, debouncedFetch)
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchData]);
 
-  // Calculate summary per country
-  const getCountrySummary = (countryId: string): CountryVisitSummary => {
+  // Memoize getCountrySummary
+  const getCountrySummary = useCallback((countryId: string): CountryVisitSummary => {
     const countryVisits = visitDetails.filter((v) => v.country_id === countryId);
     const countryCities = cityVisits.filter((c) => c.country_id === countryId);
 
@@ -106,18 +111,17 @@ export const useVisitDetails = () => {
       citiesCount: countryCities.length,
       cities: countryCities.map((c) => c.city_name),
     };
-  };
+  }, [visitDetails, cityVisits]);
 
-  // Calculate total days abroad (excluding home country)
-  const getTotalDaysAbroad = (homeCountryName: string): number => {
-    // We need to match with countries table, but for now we sum all visit days
-    // The caller should filter by comparing country names
+  // Calculate total days abroad
+  const getTotalDaysAbroad = useCallback((homeCountryName: string): number => {
     return visitDetails.reduce((sum, v) => sum + (v.number_of_days || 0), 0);
-  };
+  }, [visitDetails]);
 
-  // Get all summaries
-  const getAllSummaries = (): Map<string, CountryVisitSummary> => {
-    const countryIds = new Set(visitDetails.map((v) => v.country_id));
+  // Memoize getAllSummaries
+  const getAllSummaries = useCallback((): Map<string, CountryVisitSummary> => {
+    const countryIds = new Set<string>();
+    visitDetails.forEach((v) => countryIds.add(v.country_id));
     cityVisits.forEach((c) => countryIds.add(c.country_id));
 
     const summaries = new Map<string, CountryVisitSummary>();
@@ -126,7 +130,7 @@ export const useVisitDetails = () => {
     });
 
     return summaries;
-  };
+  }, [visitDetails, cityVisits, getCountrySummary]);
 
   return {
     visitDetails,

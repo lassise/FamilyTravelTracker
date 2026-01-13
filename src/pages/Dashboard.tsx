@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTrips } from "@/hooks/useTrips";
@@ -40,6 +40,30 @@ const Dashboard = () => {
     }
   }, [user, authLoading, profile, needsOnboarding, navigate]);
 
+  // Memoize computed values
+  const upcomingTrips = useMemo(() => 
+    trips.filter((t) => t.status === "upcoming" || t.status === "planning"),
+    [trips]
+  );
+  
+  const activeTrips = useMemo(() => 
+    trips.filter((t) => t.status === "active"),
+    [trips]
+  );
+  
+  const visitedCountriesCount = useMemo(() => 
+    countries.filter(c => c.visitedBy.length > 0).length,
+    [countries]
+  );
+
+  const formatDate = useCallback((date: string | null) => {
+    if (!date) return "";
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
+
   if (authLoading || tripsLoading || familyLoading) {
     return (
       <AppLayout>
@@ -49,18 +73,6 @@ const Dashboard = () => {
       </AppLayout>
     );
   }
-
-  const upcomingTrips = trips.filter((t) => t.status === "upcoming" || t.status === "planning");
-  const activeTrips = trips.filter((t) => t.status === "active");
-  const visitedCountriesCount = countries.filter(c => c.visitedBy.length > 0).length;
-
-  const formatDate = (date: string | null) => {
-    if (!date) return "";
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   return (
     <AppLayout>
