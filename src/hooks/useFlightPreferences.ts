@@ -16,7 +16,7 @@ export interface AlternateAirport {
   minSavings: number; // Minimum savings required to consider this airport
 }
 
-export type PreferencePriority = "non_negotiable" | "strong" | "nice_to_have";
+export type PreferencePriority = "none" | "nice_to_have" | "must_have";
 
 export interface FlightPreferences {
   id?: string;
@@ -40,7 +40,13 @@ export interface FlightPreferences {
   default_checked_bags: number;
   carry_on_only: boolean;
   search_mode: "cash" | "points" | "hybrid";
-  // Preference priorities
+  // Amenity preferences with Must Have / Nice to Have priority
+  entertainment_seatback: PreferencePriority;
+  entertainment_mobile: PreferencePriority;
+  usb_charging: PreferencePriority;
+  legroom_preference: PreferencePriority;
+  min_legroom_inches: number | null;
+  // Preference priorities (legacy - kept for compatibility)
   nonstop_priority: PreferencePriority;
   departure_time_priority: PreferencePriority;
   airline_priority: PreferencePriority;
@@ -69,11 +75,17 @@ const defaultPreferences: FlightPreferences = {
   default_checked_bags: 0,
   carry_on_only: false,
   search_mode: "cash",
+  // Amenity defaults
+  entertainment_seatback: "nice_to_have",
+  entertainment_mobile: "nice_to_have",
+  usb_charging: "nice_to_have",
+  legroom_preference: "nice_to_have",
+  min_legroom_inches: null,
   // Default priorities
-  nonstop_priority: "strong",
+  nonstop_priority: "nice_to_have",
   departure_time_priority: "nice_to_have",
   airline_priority: "nice_to_have",
-  layover_priority: "strong",
+  layover_priority: "nice_to_have",
   seat_priority: "nice_to_have",
 };
 
@@ -164,10 +176,16 @@ export const useFlightPreferences = () => {
           default_checked_bags: data.default_checked_bags || 0,
           carry_on_only: data.carry_on_only || false,
           search_mode: (data.search_mode as "cash" | "points" | "hybrid") || "cash",
-          nonstop_priority: "strong",
+          // Amenity preferences
+          entertainment_seatback: (data.entertainment_seatback as PreferencePriority) || "nice_to_have",
+          entertainment_mobile: (data.entertainment_mobile as PreferencePriority) || "nice_to_have",
+          usb_charging: (data.usb_charging as PreferencePriority) || "nice_to_have",
+          legroom_preference: (data.legroom_preference as PreferencePriority) || "nice_to_have",
+          min_legroom_inches: data.min_legroom_inches || null,
+          nonstop_priority: "nice_to_have",
           departure_time_priority: "nice_to_have",
           airline_priority: "nice_to_have",
-          layover_priority: "strong",
+          layover_priority: "nice_to_have",
           seat_priority: "nice_to_have",
         });
       }

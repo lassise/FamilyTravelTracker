@@ -170,6 +170,7 @@ const Flights = () => {
           returnDate: tripType === "roundtrip" ? returnDate : null,
           passengers,
           tripType,
+          cabinClass: preferences.cabin_class,
           alternateAirports: preferences.alternate_airports,
         },
       });
@@ -187,7 +188,7 @@ const Flights = () => {
       
       // Score and categorize flights with preference matching info
       const passengerBreakdown = { adults, children, infantsInSeat, infantsOnLap };
-      const scored = scoreFlights(rawFlights, preferences, undefined, passengerBreakdown);
+      const scored = scoreFlights(rawFlights, preferences, undefined, passengerBreakdown, preferences.cabin_class);
       
       // Calculate savings from primary for alternate airport flights
       if (primaryCheapest) {
@@ -970,6 +971,36 @@ const Flights = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Amenity Preferences */}
+                <div className="space-y-4 pt-4 border-t">
+                  <Label className="font-medium">Amenity Preferences (Must Have / Nice to Have)</Label>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {[
+                      { key: 'entertainment_seatback', label: 'Seatback Entertainment' },
+                      { key: 'entertainment_mobile', label: 'WiFi / Streaming' },
+                      { key: 'usb_charging', label: 'USB / Power Outlet' },
+                      { key: 'legroom_preference', label: 'Extra Legroom' },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between gap-2">
+                        <span className="text-sm">{label}</span>
+                        <Select 
+                          value={preferences[key as keyof typeof preferences] as string || 'nice_to_have'} 
+                          onValueChange={(v) => updatePreferences({ [key]: v })}
+                        >
+                          <SelectTrigger className="w-[140px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Don't care</SelectItem>
+                            <SelectItem value="nice_to_have">Nice to have</SelectItem>
+                            <SelectItem value="must_have">Must have</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 {/* Alternate Airports for Savings */}
                 <AlternateAirportsSection 

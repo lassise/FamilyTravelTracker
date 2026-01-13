@@ -20,6 +20,7 @@ interface SearchRequest {
   returnDate?: string;
   passengers: number;
   tripType: 'roundtrip' | 'oneway';
+  cabinClass?: 'economy' | 'premium_economy' | 'business' | 'first';
   alternateAirports?: AlternateAirport[];
 }
 
@@ -32,8 +33,18 @@ async function searchFlightsFromOrigin(
   tripType: string,
   serpApiKey: string,
   isAlternate: boolean = false,
-  minSavings: number = 0
+  minSavings: number = 0,
+  cabinClass: string = 'economy'
 ): Promise<{ flights: any[]; error?: string }> {
+  // Map cabin class to SerpAPI travel_class values
+  // SerpAPI: 1 = Economy, 2 = Premium Economy, 3 = Business, 4 = First
+  const cabinClassMap: Record<string, string> = {
+    'economy': '1',
+    'premium_economy': '2', 
+    'business': '3',
+    'first': '4',
+  };
+  
   const searchParams = new URLSearchParams({
     api_key: serpApiKey,
     engine: 'google_flights',
@@ -44,6 +55,7 @@ async function searchFlightsFromOrigin(
     currency: 'USD',
     hl: 'en',
     type: tripType === 'roundtrip' ? '1' : '2',
+    travel_class: cabinClassMap[cabinClass] || '1',
   });
   
   if (returnDate && tripType === 'roundtrip') {
@@ -172,8 +184,11 @@ serve(async (req) => {
       returnDate, 
       passengers, 
       tripType,
+      cabinClass = 'economy',
       alternateAirports = []
     }: SearchRequest = await req.json();
+
+    console.log(`Cabin class: ${cabinClass}`);
 
     console.log(`User ${userId} searching flights: ${origin} -> ${destination}, ${departureDate}${returnDate ? ` - ${returnDate}` : ''}, ${passengers} passengers`);
     if (alternateAirports.length > 0) {
@@ -196,13 +211,13 @@ serve(async (req) => {
 
     // Search from primary origin
     const primarySearch = searchFlightsFromOrigin(
-      origin, destination, departureDate, returnDate, passengers, tripType, serpApiKey, false, 0
+      origin, destination, departureDate, returnDate, passengers, tripType, serpApiKey, false, 0, cabinClass
     );
 
     // Search from alternate airports in parallel
     const alternateSearches = alternateAirports.map(alt => 
       searchFlightsFromOrigin(
-        alt.code, destination, departureDate, returnDate, passengers, tripType, serpApiKey, true, alt.minSavings
+        alt.code, destination, departureDate, returnDate, passengers, tripType, serpApiKey, true, alt.minSavings, cabinClass
       )
     );
 

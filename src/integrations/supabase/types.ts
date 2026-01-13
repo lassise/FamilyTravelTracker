@@ -475,15 +475,19 @@ export type Database = {
           carry_on_only: boolean | null
           created_at: string
           default_checked_bags: number | null
+          entertainment_mobile: string | null
+          entertainment_seatback: string | null
           family_min_connection_minutes: number | null
           family_mode: boolean | null
           home_airports: Json | null
           id: string
+          legroom_preference: string | null
           max_extra_drive_minutes: number | null
           max_layover_hours: number | null
           max_stops: number | null
           max_total_travel_hours: number | null
           min_connection_minutes: number | null
+          min_legroom_inches: number | null
           min_savings_for_further_airport: number | null
           needs_window_for_car_seat: boolean | null
           prefer_nonstop: boolean | null
@@ -494,6 +498,7 @@ export type Database = {
           search_mode: string | null
           seat_preference: string | null
           updated_at: string
+          usb_charging: string | null
           user_id: string
           willing_to_drive_further: boolean | null
         }
@@ -503,15 +508,19 @@ export type Database = {
           carry_on_only?: boolean | null
           created_at?: string
           default_checked_bags?: number | null
+          entertainment_mobile?: string | null
+          entertainment_seatback?: string | null
           family_min_connection_minutes?: number | null
           family_mode?: boolean | null
           home_airports?: Json | null
           id?: string
+          legroom_preference?: string | null
           max_extra_drive_minutes?: number | null
           max_layover_hours?: number | null
           max_stops?: number | null
           max_total_travel_hours?: number | null
           min_connection_minutes?: number | null
+          min_legroom_inches?: number | null
           min_savings_for_further_airport?: number | null
           needs_window_for_car_seat?: boolean | null
           prefer_nonstop?: boolean | null
@@ -522,6 +531,7 @@ export type Database = {
           search_mode?: string | null
           seat_preference?: string | null
           updated_at?: string
+          usb_charging?: string | null
           user_id: string
           willing_to_drive_further?: boolean | null
         }
@@ -531,15 +541,19 @@ export type Database = {
           carry_on_only?: boolean | null
           created_at?: string
           default_checked_bags?: number | null
+          entertainment_mobile?: string | null
+          entertainment_seatback?: string | null
           family_min_connection_minutes?: number | null
           family_mode?: boolean | null
           home_airports?: Json | null
           id?: string
+          legroom_preference?: string | null
           max_extra_drive_minutes?: number | null
           max_layover_hours?: number | null
           max_stops?: number | null
           max_total_travel_hours?: number | null
           min_connection_minutes?: number | null
+          min_legroom_inches?: number | null
           min_savings_for_further_airport?: number | null
           needs_window_for_car_seat?: boolean | null
           prefer_nonstop?: boolean | null
@@ -550,6 +564,7 @@ export type Database = {
           search_mode?: string | null
           seat_preference?: string | null
           updated_at?: string
+          usb_charging?: string | null
           user_id?: string
           willing_to_drive_further?: boolean | null
         }

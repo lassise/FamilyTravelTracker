@@ -75,6 +75,7 @@ export interface ScoreBreakdown {
   arrivalTime: number;
   airlineReliability: number;
   price: number;
+  amenities: number;
   total: number;
 }
 
@@ -86,14 +87,19 @@ export interface HiddenCost {
 
 // Weights for scoring (sum to 100)
 const WEIGHTS = {
-  nonstop: 25,
-  travelTime: 20,
-  layoverQuality: 10,
+  nonstop: 22,
+  travelTime: 18,
+  layoverQuality: 8,
   departureTime: 10,
   arrivalTime: 5,
-  airlineReliability: 15,
+  airlineReliability: 14,
   price: 15,
+  amenities: 8, // New amenities weight
 };
+
+// Amenity scoring constants
+const AMENITY_MUST_HAVE_PENALTY = 25; // Heavy penalty for missing must-have amenity
+const AMENITY_NICE_TO_HAVE_BOOST = 10; // Boost for having nice-to-have amenity
 
 // Parse duration - can be ISO 8601 string "PT5H30M" or number (minutes)
 const parseDuration = (duration: string | number | undefined | null): number => {
@@ -309,6 +315,145 @@ const estimateDelayRisk = (flight: FlightResult): "low" | "medium" | "high" => {
   if (riskScore >= 40) return "high";
   if (riskScore >= 20) return "medium";
   return "low";
+};
+
+// Detect amenities from flight extensions
+interface FlightAmenities {
+  hasSeatbackEntertainment: boolean;
+  hasMobileEntertainment: boolean;
+  hasUsbCharging: boolean;
+  hasPowerOutlet: boolean;
+  legroom: string | null;
+  legroomInches: number | null;
+}
+
+const detectAmenities = (flight: FlightResult): FlightAmenities => {
+  const amenities: FlightAmenities = {
+    hasSeatbackEntertainment: false,
+    hasMobileEntertainment: false,
+    hasUsbCharging: false,
+    hasPowerOutlet: false,
+    legroom: null,
+    legroomInches: null,
+  };
+
+  for (const itinerary of flight.itineraries) {
+    for (const segment of itinerary.segments) {
+      const extensions = segment.extensions || [];
+      const extLower = extensions.map((e: string) => e?.toLowerCase() || '');
+      
+      // Check for seatback entertainment
+      if (extLower.some(e => 
+        e.includes('personal device') || 
+        e.includes('seatback') || 
+        e.includes('in-seat') ||
+        e.includes('on-demand') ||
+        e.includes('entertainment')
+      )) {
+        amenities.hasSeatbackEntertainment = true;
+      }
+      
+      // Check for mobile/streaming entertainment
+      if (extLower.some(e => 
+        e.includes('stream') || 
+        e.includes('wi-fi') || 
+        e.includes('wifi')
+      )) {
+        amenities.hasMobileEntertainment = true;
+      }
+      
+      // Check for USB/power
+      if (extLower.some(e => 
+        e.includes('usb') || 
+        e.includes('power outlet') ||
+        e.includes('in-seat power')
+      )) {
+        amenities.hasUsbCharging = true;
+        amenities.hasPowerOutlet = true;
+      }
+      
+      // Check legroom
+      if (segment.legroom) {
+        amenities.legroom = segment.legroom;
+        // Try to parse legroom inches (e.g., "32 in" or "32")
+        const match = segment.legroom.match(/(\d+)/);
+        if (match) {
+          amenities.legroomInches = parseInt(match[1], 10);
+        }
+      }
+    }
+  }
+
+  return amenities;
+};
+
+// Score amenities based on user preferences
+const scoreAmenities = (amenities: FlightAmenities, preferences: FlightPreferences): {
+  score: number;
+  matches: { type: 'positive' | 'negative'; label: string; detail?: string }[];
+} => {
+  let score = 70; // Base score
+  const matches: { type: 'positive' | 'negative'; label: string; detail?: string }[] = [];
+
+  // Seatback Entertainment
+  if (preferences.entertainment_seatback === 'must_have') {
+    if (!amenities.hasSeatbackEntertainment) {
+      score -= AMENITY_MUST_HAVE_PENALTY;
+      matches.push({ type: 'negative', label: 'No seatback screen', detail: 'Must-have not available' });
+    } else {
+      score += AMENITY_NICE_TO_HAVE_BOOST;
+      matches.push({ type: 'positive', label: 'Seatback entertainment', detail: 'Has your required feature' });
+    }
+  } else if (preferences.entertainment_seatback === 'nice_to_have' && amenities.hasSeatbackEntertainment) {
+    score += AMENITY_NICE_TO_HAVE_BOOST;
+    matches.push({ type: 'positive', label: 'Seatback entertainment' });
+  }
+
+  // Mobile Entertainment
+  if (preferences.entertainment_mobile === 'must_have') {
+    if (!amenities.hasMobileEntertainment) {
+      score -= AMENITY_MUST_HAVE_PENALTY;
+      matches.push({ type: 'negative', label: 'No streaming', detail: 'Must-have not available' });
+    } else {
+      score += AMENITY_NICE_TO_HAVE_BOOST;
+      matches.push({ type: 'positive', label: 'Streaming available', detail: 'Has your required feature' });
+    }
+  } else if (preferences.entertainment_mobile === 'nice_to_have' && amenities.hasMobileEntertainment) {
+    score += AMENITY_NICE_TO_HAVE_BOOST;
+    matches.push({ type: 'positive', label: 'WiFi streaming' });
+  }
+
+  // USB Charging
+  if (preferences.usb_charging === 'must_have') {
+    if (!amenities.hasUsbCharging) {
+      score -= AMENITY_MUST_HAVE_PENALTY;
+      matches.push({ type: 'negative', label: 'No USB/power', detail: 'Must-have not available' });
+    } else {
+      score += AMENITY_NICE_TO_HAVE_BOOST;
+      matches.push({ type: 'positive', label: 'USB charging', detail: 'Has your required feature' });
+    }
+  } else if (preferences.usb_charging === 'nice_to_have' && amenities.hasUsbCharging) {
+    score += AMENITY_NICE_TO_HAVE_BOOST;
+    matches.push({ type: 'positive', label: 'Power outlets' });
+  }
+
+  // Legroom
+  if (preferences.legroom_preference === 'must_have' || preferences.legroom_preference === 'nice_to_have') {
+    const avgLegroom = 31; // Average economy legroom
+    const minRequired = preferences.min_legroom_inches || (avgLegroom + 2);
+    
+    if (amenities.legroomInches !== null) {
+      if (amenities.legroomInches >= minRequired) {
+        score += preferences.legroom_preference === 'must_have' ? AMENITY_NICE_TO_HAVE_BOOST * 1.5 : AMENITY_NICE_TO_HAVE_BOOST;
+        matches.push({ type: 'positive', label: `${amenities.legroomInches}" legroom`, detail: 'Above average space' });
+      } else if (preferences.legroom_preference === 'must_have') {
+        score -= AMENITY_MUST_HAVE_PENALTY;
+        matches.push({ type: 'negative', label: `${amenities.legroomInches}" legroom`, detail: `Below your ${minRequired}" requirement` });
+      }
+    }
+  }
+
+  return { score: Math.max(0, Math.min(100, score)), matches };
 };
 
 // Ranking category for flight quality
@@ -557,7 +702,8 @@ export const scoreFlights = (
   flights: FlightResult[],
   preferences: FlightPreferences,
   allFlightPrices?: number[],
-  passengerBreakdown?: PassengerBreakdown
+  passengerBreakdown?: PassengerBreakdown,
+  cabinClass: string = "economy"
 ): ScoredFlight[] => {
   if (!flights || flights.length === 0) return [];
   
@@ -608,6 +754,7 @@ export const scoreFlights = (
       arrivalTime: 0,
       airlineReliability: 0,
       price: 0,
+      amenities: 0,
       total: 0,
     };
 
@@ -651,6 +798,11 @@ export const scoreFlights = (
     // Score price (normalized)
     breakdown.price = 100 - ((flight.price - minPrice) / priceRange) * 100;
 
+    // Score amenities (with Must Have penalty / Nice to Have boost)
+    const flightAmenities = detectAmenities(flight);
+    const amenityResult = scoreAmenities(flightAmenities, preferences);
+    breakdown.amenities = amenityResult.score;
+
     // Calculate weighted total
     breakdown.total = Math.round(
       (breakdown.nonstop * WEIGHTS.nonstop +
@@ -659,7 +811,8 @@ export const scoreFlights = (
         breakdown.departureTime * WEIGHTS.departureTime +
         breakdown.arrivalTime * WEIGHTS.arrivalTime +
         breakdown.airlineReliability * WEIGHTS.airlineReliability +
-        breakdown.price * WEIGHTS.price) / 100
+        breakdown.price * WEIGHTS.price +
+        breakdown.amenities * WEIGHTS.amenities) / 100
     );
 
     // Assign badges
@@ -707,7 +860,7 @@ export const scoreFlights = (
       preferenceMatches.push({ type: "positive", label: "Great price", detail: "Among the cheapest" });
     }
 
-    // Check for wifi
+    // Check for wifi (legacy - kept for compatibility but amenity scoring handles this better)
     let hasWifi = false;
     for (const it of flight.itineraries) {
       for (const seg of it.segments) {
@@ -718,8 +871,14 @@ export const scoreFlights = (
       }
       if (hasWifi) break;
     }
-    if (hasWifi) {
+    if (hasWifi && preferences.entertainment_mobile === 'none') {
+      // Only show generic WiFi badge if user hasn't set specific preferences
       preferenceMatches.push({ type: "positive", label: "Has WiFi" });
+    }
+    
+    // Add amenity preference matches from scoring
+    for (const match of amenityResult.matches) {
+      preferenceMatches.push(match);
     }
     
     // Negative matches
@@ -785,7 +944,7 @@ export const scoreFlights = (
     const returnDateStr = returnSegment?.departureTime ? new Date(returnSegment.departureTime).toISOString().split('T')[0] : "";
     
     const bookingUrl = departureAirport && arrivalAirport && departureDateStr
-      ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengerBreakdown)
+      ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengerBreakdown, cabinClass)
       : undefined;
 
     const pricePerTicket = totalPassengers > 0 ? flight.price / totalPassengers : flight.price;
