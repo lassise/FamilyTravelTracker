@@ -365,19 +365,35 @@ const CountryQuickActionDialog = ({
                 )}
               </>
             ) : (
-              <Button
-                onClick={handleRemoveVisited}
-                disabled={loading !== null}
-                className="w-full justify-start gap-2"
-                variant="outline"
-              >
-                {loading === 'remove-visited' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4" />
+              <>
+                {/* State tracking - show first for visited countries with state tracking */}
+                {hasStateTracking && onOpenStateTracking && (
+                  <Button
+                    onClick={handleOpenStateTracking}
+                    disabled={loading !== null}
+                    className="w-full justify-start gap-2"
+                    variant="default"
+                  >
+                    <Map className="h-4 w-4" />
+                    Track States/Regions
+                  </Button>
                 )}
-                Remove from Visited
-              </Button>
+
+                {/* Remove from Visited - at the bottom with red styling */}
+                <Button
+                  onClick={handleRemoveVisited}
+                  disabled={loading !== null}
+                  className="w-full justify-start gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  variant="destructive"
+                >
+                  {loading === 'remove-visited' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                  Remove from Visited
+                </Button>
+              </>
             )}
 
             {/* Remove from wishlist */}
@@ -385,8 +401,8 @@ const CountryQuickActionDialog = ({
               <Button
                 onClick={handleRemoveWishlist}
                 disabled={loading !== null}
-                className="w-full justify-start gap-2"
-                variant="outline"
+                className="w-full justify-start gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="destructive"
               >
                 {loading === 'remove-wishlist' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -394,19 +410,6 @@ const CountryQuickActionDialog = ({
                   <X className="h-4 w-4" />
                 )}
                 Remove from Wishlist
-              </Button>
-            )}
-
-            {/* State tracking - only for visited countries with state tracking */}
-            {isVisited && hasStateTracking && onOpenStateTracking && (
-              <Button
-                onClick={handleOpenStateTracking}
-                disabled={loading !== null}
-                className="w-full justify-start gap-2"
-                variant="outline"
-              >
-                <Map className="h-4 w-4" />
-                Track States/Regions
               </Button>
             )}
           </div>
