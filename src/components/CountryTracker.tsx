@@ -10,7 +10,7 @@ import CountryDialog from "./CountryDialog";
 import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
-import { getAllCountries } from "@/lib/countriesData";
+import { getAllCountries, getRegionCode } from "@/lib/countriesData";
 import { cn } from "@/lib/utils";
 import CountryFlag from "./common/CountryFlag";
 
@@ -114,10 +114,13 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
             const displayName = parsed?.[2] || country.name;
 
             // Derive ISO2 code: check stored flag if it's a code, then name prefix, then lookup
+            // Also check for region codes like GB-SCT for Scotland
             const storedFlag = (country.flag || "").trim().toUpperCase();
-            const isStoredFlagACode = /^[A-Z]{2}$/.test(storedFlag);
+            const isStoredFlagACode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
+            const regionCode = getRegionCode(displayName) || getRegionCode(country.name);
             const countryCode = (
               (isStoredFlagACode ? storedFlag : "") || 
+              regionCode ||
               codeFromName || 
               getCountryCode(displayName) || 
               getCountryCode(country.name) || 
@@ -138,8 +141,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
                       <div className="flex items-center gap-3">
                         <CountryFlag countryCode={countryCode} countryName={displayName} size="xl" />
                         <div>
-                          <h3 className="font-semibold text-foreground flex items-center gap-2">
-                            <CountryFlag countryCode={countryCode} countryName={displayName} size="sm" />
+                          <h3 className="font-semibold text-foreground">
                             {displayName}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">

@@ -36,8 +36,11 @@ export const CountryFlag = ({
   
   // Validate and normalize country code
   const normalizedCode = (countryCode || '').trim().toUpperCase();
-  const isValidCode = /^[A-Z]{2}$/.test(normalizedCode);
-  const codeLower = normalizedCode.toLowerCase();
+  
+  // Handle subdivision codes like GB-SCT (Scotland), GB-WLS (Wales), GB-ENG (England)
+  const isSubdivisionCode = /^[A-Z]{2}-[A-Z]{3}$/.test(normalizedCode);
+  const isValidCode = /^[A-Z]{2}$/.test(normalizedCode) || isSubdivisionCode;
+  const codeLower = normalizedCode.toLowerCase().replace('-', '-');
   
   // FlagCDN URL - use w80 for retina quality, CSS will handle display size
   const flagUrl = `https://flagcdn.com/w80/${codeLower}.png`;
