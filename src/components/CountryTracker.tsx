@@ -170,7 +170,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-5 h-5 text-accent" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                         <ChevronDown 
                           className={cn(
                             "w-5 h-5 text-muted-foreground transition-transform duration-200",
