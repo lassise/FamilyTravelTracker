@@ -8,7 +8,7 @@ import { Globe, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStateVisits } from '@/hooks/useStateVisits';
 import { countriesWithStates, countryNameToCode, getStatesForCountry } from '@/lib/statesData';
-import { getAllCountries, searchCountries } from '@/lib/countriesData';
+import { getAllCountries } from '@/lib/countriesData';
 import { useHomeCountry } from '@/hooks/useHomeCountry';
 import StateMapDialog from './StateMapDialog';
 import CountryQuickActionDialog from './CountryQuickActionDialog';
@@ -148,58 +148,19 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     return map;
   }, [countries]);
 
-  // Resolve home country into a canonical {name, iso2, iso3}
-  const resolvedHomeCountry = useMemo(() => {
-    if (!homeCountry) return { name: null as string | null, iso2: null as string | null, iso3: null as string | null };
-
-    const raw = homeCountry.trim();
-    const upper = raw.toUpperCase();
-
-    if (upper.length === 2) {
-      const match = getAllCountries().find(c => c.code === upper);
-      return {
-        name: match?.name ?? raw,
-        iso2: upper,
-        iso3: iso2ToIso3[upper] ?? null,
-      };
-    }
-
-    if (upper.length === 3 && iso3ToIso2[upper]) {
-      const iso2 = iso3ToIso2[upper];
-      const match = getAllCountries().find(c => c.code === iso2);
-      return {
-        name: match?.name ?? raw,
-        iso2,
-        iso3: upper,
-      };
-    }
-
-    const matchBySearch = searchCountries(raw)[0];
-    const canonicalName = matchBySearch?.name ?? raw;
-    const iso2 = matchBySearch?.code ?? null;
-
-    return {
-      name: canonicalName,
-      iso2,
-      iso3: countryToISO3[canonicalName] ?? (iso2 ? iso2ToIso3[iso2] : null) ?? null,
-    };
-  }, [homeCountry]);
-
-  const homeCountryISO = resolvedHomeCountry.iso3;
+  // Use resolved home country ISO3 for map coloring
+  const homeCountryISO = resolvedHome.iso3;
 
   // Countries that support state-level tracking (visited OR home country)
   const countriesWithStateTracking = useMemo(
     () =>
       countries.filter((c) => {
         const code = countryNameToCode[c.name];
-        const isHomeCountry =
-          !!resolvedHomeCountry.name &&
-          (c.name === resolvedHomeCountry.name || (!!resolvedHomeCountry.iso2 && code === resolvedHomeCountry.iso2));
-
+        const isHome = resolvedHome.isHomeCountry(c.name);
         const isVisited = c.visitedBy.length > 0;
-        return (isVisited || isHomeCountry) && code && countriesWithStates.includes(code);
+        return (isVisited || isHome) && code && countriesWithStates.includes(code);
       }),
-    [countries, resolvedHomeCountry]
+    [countries, resolvedHome]
   );
 
   const wishlistCountries = useMemo(
@@ -303,7 +264,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       if (!iso2 || !countriesWithStates.includes(iso2)) return;
 
       const canonical = getAllCountries().find((c) => c.code === iso2);
-      const countryName = canonical?.name ?? resolvedHomeCountry.name;
+      const countryName = canonical?.name ?? resolvedHome.name;
       if (!countryName) return;
 
       const inMemory = countries.find((c) => c.name === countryName);
@@ -355,7 +316,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
         console.error('Failed to open state tracking dialog:', err);
       }
     },
-    [countries, resolvedHomeCountry.name]
+    [countries, resolvedHome.name]
   );
 
   const handleOpenStateTracking = useCallback((countryId: string, countryName: string) => {

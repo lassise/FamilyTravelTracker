@@ -48,17 +48,6 @@ const TravelHistory = () => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  const getHomeCountryCode = () => {
-    if (!homeCountry) return 'US';
-    const countryCodeMap: Record<string, string> = {
-      'united states': 'US', 'usa': 'US', 'canada': 'CA', 'united kingdom': 'GB',
-      'uk': 'GB', 'australia': 'AU', 'germany': 'DE', 'france': 'FR',
-      'italy': 'IT', 'spain': 'ES', 'japan': 'JP', 'china': 'CN',
-      'india': 'IN', 'brazil': 'BR', 'mexico': 'MX',
-    };
-    return countryCodeMap[homeCountry.toLowerCase()] || 'US';
-  };
-
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
@@ -175,7 +164,7 @@ const TravelHistory = () => {
                   <InteractiveWorldMap countries={countries} wishlist={wishlist} homeCountry={homeCountry} onRefetch={refetch} />
                   <TravelMilestones countries={countries} familyMembers={familyMembers} totalContinents={totalContinents} />
                   <div className="grid lg:grid-cols-2 gap-6">
-                    <TravelDNA countries={countries} homeCountryCode={getHomeCountryCode()} />
+                    <TravelDNA countries={countries} homeCountryCode={resolvedHome.iso2 || 'US'} />
                     <TravelStreaks />
                   </div>
                 </div>
