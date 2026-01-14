@@ -37,12 +37,27 @@ export const getAllCountries = (): CountryOption[] => {
 
 // Country aliases for common alternative names
 const countryAliases: Record<string, string[]> = {
-  'GB': ['england', 'uk', 'britain', 'great britain', 'scotland', 'wales', 'northern ireland'],
+  'GB': ['uk', 'britain', 'great britain'],
+  'GB-SCT': ['scotland'],
+  'GB-WLS': ['wales'],
+  'GB-ENG': ['england'],
+  'GB-NIR': ['northern ireland'],
   'US': ['usa', 'america', 'united states of america'],
   'AE': ['uae', 'emirates', 'dubai', 'abu dhabi'],
   'KR': ['south korea', 'korea'],
   'CZ': ['czechia'],
   'NL': ['holland'],
+};
+
+// Get code for special regions (returns subdivision code for UK nations)
+export const getRegionCode = (name: string): string => {
+  const lowerName = name.toLowerCase().trim();
+  for (const [code, aliases] of Object.entries(countryAliases)) {
+    if (aliases.includes(lowerName)) {
+      return code;
+    }
+  }
+  return '';
 };
 
 // Search countries by name (including aliases)
