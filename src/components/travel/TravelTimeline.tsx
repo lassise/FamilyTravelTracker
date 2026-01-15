@@ -8,6 +8,7 @@ import { Calendar, MapPin, Clock, ChevronDown, Heart, Sparkles, Image as ImageIc
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
+import CountryFlag from '@/components/common/CountryFlag';
 
 interface TravelTimelineProps {
   countries: Country[];
@@ -96,14 +97,27 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
 
   const getCountryData = (countryId: string) => {
     const country = countries.find(c => c.id === countryId);
-    if (!country) return { flag: '🏳️', name: 'Unknown' };
+    if (!country) return { flag: '🏳️', name: 'Unknown', countryCode: '', isSubdivision: false };
     
-    // Check if flag is a code (2 letters) or already an emoji
-    const flag = country.flag && /^[A-Za-z]{2}(-[A-Za-z]{3})?$/.test(country.flag.trim())
-      ? codeToEmoji(country.flag.trim().substring(0, 2))
+    const storedFlag = (country.flag || '').trim().toUpperCase();
+    
+    // Check if it's a subdivision code (e.g., GB-SCT for Scotland)
+    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(storedFlag);
+    
+    // Check if flag is a 2-letter code
+    const isTwoLetterCode = /^[A-Z]{2}$/.test(storedFlag);
+    
+    // For subdivisions, we'll use CountryFlag component, for others use emoji
+    if (isSubdivision) {
+      return { flag: '', name: country.name, countryCode: storedFlag, isSubdivision: true };
+    }
+    
+    // Convert 2-letter codes to emoji
+    const flag = isTwoLetterCode
+      ? codeToEmoji(storedFlag)
       : (country.flag || '🏳️');
     
-    return { flag, name: country.name };
+    return { flag, name: country.name, countryCode: storedFlag, isSubdivision: false };
   };
 
   // Get photos for a specific country
@@ -191,7 +205,7 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
           
           <div className="space-y-6">
             {displayedVisits.map((visit, index) => {
-              const { flag, name } = getCountryData(visit.country_id);
+              const { flag, name, countryCode, isSubdivision } = getCountryData(visit.country_id);
               const countryPhotos = getCountryPhotos(visit.country_id);
               const memory = getVisitMemory(visit);
               
@@ -211,8 +225,13 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
                   <div className="bg-muted/50 rounded-lg p-4 hover:bg-muted transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-foreground text-lg">
-                          {flag} {name}
+                        <h4 className="font-semibold text-foreground text-lg flex items-center gap-2">
+                          {isSubdivision ? (
+                            <CountryFlag countryCode={countryCode} countryName={name} size="md" />
+                          ) : (
+                            <span>{flag}</span>
+                          )}
+                          {name}
                         </h4>
                         <span className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                           <Calendar className="h-3 w-3" />
