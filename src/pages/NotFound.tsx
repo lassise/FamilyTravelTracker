@@ -8,8 +8,8 @@ const NotFound = () => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
   }, [location.pathname]);
 
-  // Redirect all 404s to /family
-  return <Navigate to="/family" replace />;
+  // Redirect all 404s to root
+  return <Navigate to="/" replace />;
 };
 
 export default NotFound;

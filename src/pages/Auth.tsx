@@ -59,7 +59,7 @@ const Auth = () => {
       if (needsOnboarding) {
         navigate("/onboarding");
       } else {
-        navigate("/family");
+        navigate("/");
       }
     }
   }, [user, authLoading, profile, needsOnboarding, navigate]);
@@ -104,7 +104,7 @@ const Auth = () => {
       }
     } else {
       toast.success("Welcome back!");
-      navigate("/family");
+      navigate("/");
     }
   };
 
@@ -180,7 +180,7 @@ const Auth = () => {
           refresh_token: data.session.refresh_token,
         });
         toast.success(data.message || "Welcome to the demo!");
-        navigate("/family");
+        navigate("/");
       }
     } catch (error) {
       console.error("Demo login error:", error);
