@@ -73,9 +73,9 @@ const StateCard = memo(({
         </span>
       </div>
       
-      {/* Selection Indicator - only one checkmark */}
+      {/* Selection Indicator - single checkmark in top-left */}
       {isSelected && (
-        <div className="absolute top-1.5 right-1.5 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center bg-emerald-500">
+        <div className="absolute top-1.5 left-1.5 w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center bg-emerald-500">
           <Check className="w-3 h-3 md:w-4 md:h-4 text-white" />
         </div>
       )}
@@ -88,13 +88,6 @@ const StateCard = memo(({
       )}>
         {name}
       </div>
-      
-      {/* Visited Badge */}
-      {isSelected && (
-        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-emerald-500 rounded text-[8px] md:text-[10px] font-bold text-white uppercase tracking-wider">
-          ✓
-        </div>
-      )}
     </button>
   );
 });
