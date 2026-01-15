@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect } from 'react';
 import CountryFlag from '@/components/common/CountryFlag';
-
+import { getRegionCode } from '@/lib/countriesData';
 interface TravelTimelineProps {
   countries: Country[];
 }
@@ -98,26 +98,29 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
   const getCountryData = (countryId: string) => {
     const country = countries.find(c => c.id === countryId);
     if (!country) return { flag: '🏳️', name: 'Unknown', countryCode: '', isSubdivision: false };
-    
+
     const storedFlag = (country.flag || '').trim().toUpperCase();
-    
-    // Check if it's a subdivision code (e.g., GB-SCT for Scotland)
-    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(storedFlag);
-    
-    // Check if flag is a 2-letter code
-    const isTwoLetterCode = /^[A-Z]{2}$/.test(storedFlag);
-    
-    // For subdivisions, we'll use CountryFlag component, for others use emoji
+
+    // Scotland (and other UK nations) can end up stored as "GB" in the DB.
+    // Prefer region mapping by name to ensure the correct regional flag.
+    const regionCode = getRegionCode(country.name);
+
+    const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
+    const codeFromStoredFlag = storedFlagIsCode ? storedFlag : '';
+
+    const effectiveCode = (regionCode || codeFromStoredFlag).toUpperCase();
+    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(effectiveCode);
+    const isTwoLetterCode = /^[A-Z]{2}$/.test(effectiveCode);
+
     if (isSubdivision) {
-      return { flag: '', name: country.name, countryCode: storedFlag, isSubdivision: true };
+      return { flag: '', name: country.name, countryCode: effectiveCode, isSubdivision: true };
     }
-    
-    // Convert 2-letter codes to emoji
+
     const flag = isTwoLetterCode
-      ? codeToEmoji(storedFlag)
+      ? codeToEmoji(effectiveCode)
       : (country.flag || '🏳️');
-    
-    return { flag, name: country.name, countryCode: storedFlag, isSubdivision: false };
+
+    return { flag, name: country.name, countryCode: effectiveCode, isSubdivision: false };
   };
 
   // Get photos for a specific country

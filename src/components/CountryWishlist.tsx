@@ -11,6 +11,8 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import CountryFlag from "@/components/common/CountryFlag";
+import { getRegionCode } from "@/lib/countriesData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Heart, Plus, X, ChevronDown, Star } from "lucide-react";
@@ -128,16 +130,30 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                     <DropdownMenuLabel className="text-xs text-muted-foreground uppercase tracking-wider">
                       {continent} ({continentCountries.length})
                     </DropdownMenuLabel>
-                    {continentCountries.map((country) => (
-                      <DropdownMenuItem
-                        key={country.id}
-                        onClick={() => handleAddToWishlist(country.id)}
-                        className="cursor-pointer"
-                      >
-                        <span className="mr-2">{country.flag}</span>
-                        {country.name}
-                      </DropdownMenuItem>
-                    ))}
+                    {continentCountries.map((country) => {
+                      const regionCode = getRegionCode(country.name);
+                      const storedFlag = (country.flag || '').trim().toUpperCase();
+                      const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
+                      const effectiveCode = (regionCode || (storedFlagIsCode ? storedFlag : '')).toUpperCase();
+                      const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(effectiveCode);
+
+                      return (
+                        <DropdownMenuItem
+                          key={country.id}
+                          onClick={() => handleAddToWishlist(country.id)}
+                          className="cursor-pointer"
+                        >
+                          <span className="mr-2 inline-flex items-center">
+                            {isSubdivision ? (
+                              <CountryFlag countryCode={effectiveCode} countryName={country.name} size="sm" />
+                            ) : (
+                              <span>{country.flag}</span>
+                            )}
+                          </span>
+                          {country.name}
+                        </DropdownMenuItem>
+                      );
+                    })}
                     <DropdownMenuSeparator />
                   </div>
                 ))}
@@ -162,23 +178,37 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
             {wishlistCountries
               .sort((a, b) => a.name.localeCompare(b.name))
-              .map((country) => (
-                <div
-                  key={country.id}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border border-border/50 group hover:border-primary/50 transition-colors"
-                >
-                  <span className="text-xl">{country.flag}</span>
-                  <span className="text-sm truncate flex-1">{country.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleRemoveFromWishlist(country.id)}
+              .map((country) => {
+                const regionCode = getRegionCode(country.name);
+                const storedFlag = (country.flag || '').trim().toUpperCase();
+                const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
+                const effectiveCode = (regionCode || (storedFlagIsCode ? storedFlag : '')).toUpperCase();
+                const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(effectiveCode);
+
+                return (
+                  <div
+                    key={country.id}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border border-border/50 group hover:border-primary/50 transition-colors"
                   >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+                    <span className="text-xl inline-flex items-center">
+                      {isSubdivision ? (
+                        <CountryFlag countryCode={effectiveCode} countryName={country.name} size="md" />
+                      ) : (
+                        <span>{country.flag}</span>
+                      )}
+                    </span>
+                    <span className="text-sm truncate flex-1">{country.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleRemoveFromWishlist(country.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                );
+              })}
           </div>
         )}
       </CardContent>
