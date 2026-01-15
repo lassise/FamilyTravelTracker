@@ -82,9 +82,28 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
   const displayedVisits = showAllVisits ? filteredVisits : filteredVisits.slice(0, 10);
   const hasMore = filteredVisits.length > 10;
 
+  // Convert ISO country code to emoji flag
+  const codeToEmoji = (code: string): string => {
+    if (!code || code.length !== 2) return '🏳️';
+    const upperCode = code.toUpperCase();
+    // Check if it's already an emoji (starts with a high Unicode point)
+    if (code.charCodeAt(0) > 255) return code;
+    // Convert 2-letter code to regional indicator symbols
+    return String.fromCodePoint(
+      ...upperCode.split('').map(char => 127397 + char.charCodeAt(0))
+    );
+  };
+
   const getCountryData = (countryId: string) => {
     const country = countries.find(c => c.id === countryId);
-    return country ? { flag: country.flag, name: country.name } : { flag: '🏳️', name: 'Unknown' };
+    if (!country) return { flag: '🏳️', name: 'Unknown' };
+    
+    // Check if flag is a code (2 letters) or already an emoji
+    const flag = country.flag && /^[A-Za-z]{2}(-[A-Za-z]{3})?$/.test(country.flag.trim())
+      ? codeToEmoji(country.flag.trim().substring(0, 2))
+      : (country.flag || '🏳️');
+    
+    return { flag, name: country.name };
   };
 
   // Get photos for a specific country
