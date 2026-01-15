@@ -6,7 +6,7 @@ const navItems = [
   { href: "/family", label: "Countries", icon: Globe },
   { href: "/flights", label: "Flights", icon: PlaneTakeoff },
   { href: "/trips/new", label: "Plan Trip", icon: Sparkles },
-  { href: "/trips", label: "Memories", icon: Map },
+  { href: "/family?tab=memories", label: "Memories", icon: Map },
 ];
 
 export function BottomNav() {
