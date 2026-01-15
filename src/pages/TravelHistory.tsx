@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useFamilyData, Country } from "@/hooks/useFamilyData";
 import { useStateVisits } from "@/hooks/useStateVisits";
@@ -41,12 +41,19 @@ const TravelHistory = () => {
   const { getStateVisitCount } = useStateVisits();
   const resolvedHome = useHomeCountry(homeCountry);
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Read initial tab from URL or default to 'overview'
+  const tabFromUrl = searchParams.get('tab') as TabKey | null;
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    tabFromUrl && tabs.some(t => t.key === tabFromUrl) ? tabFromUrl : 'overview'
+  );
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
-  // Reset scroll to top when tab changes
+  // Reset scroll to top when tab changes and update URL
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
+    setSearchParams(tab === 'overview' ? {} : { tab });
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
