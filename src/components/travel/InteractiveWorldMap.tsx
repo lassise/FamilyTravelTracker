@@ -83,17 +83,43 @@ interface InteractiveWorldMapProps {
   onRefetch?: () => void;
 }
 
-// Load colors from localStorage
+// Validate that a color is a valid HSL/RGB/hex string
+const validateColor = (color: string | undefined | null, fallback: string): string => {
+  if (!color || typeof color !== 'string' || color.trim() === '') {
+    console.warn(`Invalid color value: "${color}", using fallback: ${fallback}`);
+    return fallback;
+  }
+  // Basic validation for hsl(), rgb(), or hex colors
+  const isValidFormat = 
+    color.startsWith('hsl(') || 
+    color.startsWith('rgb(') || 
+    color.startsWith('#') ||
+    color.startsWith('hsla(') ||
+    color.startsWith('rgba(');
+  if (!isValidFormat) {
+    console.warn(`Unrecognized color format: "${color}", using fallback: ${fallback}`);
+    return fallback;
+  }
+  return color;
+};
+
+// Load colors from localStorage with validation
 const loadMapColors = (): MapColors => {
   try {
     const saved = localStorage.getItem('map-colors');
     if (saved) {
-      return { ...defaultMapColors, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      return {
+        visited: validateColor(parsed.visited, defaultMapColors.visited),
+        wishlist: validateColor(parsed.wishlist, defaultMapColors.wishlist),
+        home: validateColor(parsed.home, defaultMapColors.home),
+      };
     }
-  } catch {
-    // Ignore
+  } catch (e) {
+    console.warn('Failed to parse saved map colors, using defaults:', e);
+    localStorage.removeItem('map-colors');
   }
-  return defaultMapColors;
+  return { ...defaultMapColors };
 };
 
 const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: InteractiveWorldMapProps) => {
@@ -127,10 +153,21 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
   // Use the home country hook for standardized handling
   const resolvedHome = useHomeCountry(homeCountry);
 
-  // Save colors to localStorage when they change
+  // Save colors to localStorage when they change - with validation
   const handleColorsChange = useCallback((newColors: MapColors) => {
-    setMapColors(newColors);
-    localStorage.setItem('map-colors', JSON.stringify(newColors));
+    const validatedColors: MapColors = {
+      visited: validateColor(newColors.visited, defaultMapColors.visited),
+      wishlist: validateColor(newColors.wishlist, defaultMapColors.wishlist),
+      home: validateColor(newColors.home, defaultMapColors.home),
+    };
+    setMapColors(validatedColors);
+    localStorage.setItem('map-colors', JSON.stringify(validatedColors));
+  }, []);
+
+  // Handle reset to defaults - clears localStorage and resets state
+  const handleResetColors = useCallback(() => {
+    localStorage.removeItem('map-colors');
+    setMapColors({ ...defaultMapColors });
   }, []);
 
   // Memoize country lists to prevent unnecessary recalculations
@@ -360,7 +397,13 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     fetchToken();
   }, []);
 
-  // Initialize map once
+  // Store a ref to the current colors to use in map initialization
+  const colorsRef = useRef(mapColors);
+  useEffect(() => {
+    colorsRef.current = mapColors;
+  }, [mapColors]);
+
+  // Initialize map once - do NOT include mapColors in dependencies
   useEffect(() => {
     if (!mapContainer.current || !mapToken || map.current) return;
 
@@ -385,57 +428,62 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     map.current.dragPan.enable();
 
     map.current.on('style.load', () => {
-      map.current?.setFog({
+      if (!map.current) return;
+      
+      map.current.setFog({
         color: 'rgb(255, 255, 255)',
         'high-color': 'rgb(200, 200, 225)',
         'horizon-blend': 0.2,
       });
 
-      map.current?.addSource('countries', {
+      map.current.addSource('countries', {
         type: 'vector',
         url: 'mapbox://mapbox.country-boundaries-v1',
       });
 
+      // Use defaultMapColors for initial layer creation - colors will be updated by separate effect
+      const initialColors = colorsRef.current;
+
       // Home country layer
-      map.current?.addLayer({
+      map.current.addLayer({
         id: 'home-country',
         type: 'fill',
         source: 'countries',
         'source-layer': 'country_boundaries',
         paint: {
-          'fill-color': mapColors.home,
+          'fill-color': validateColor(initialColors.home, defaultMapColors.home),
           'fill-opacity': 0.5,
         },
         filter: ['in', 'iso_3166_1_alpha_3', ''],
       });
 
       // Visited countries layer
-      map.current?.addLayer({
+      map.current.addLayer({
         id: 'visited-countries',
         type: 'fill',
         source: 'countries',
         'source-layer': 'country_boundaries',
         paint: {
-          'fill-color': mapColors.visited,
+          'fill-color': validateColor(initialColors.visited, defaultMapColors.visited),
           'fill-opacity': 0.6,
         },
         filter: ['in', 'iso_3166_1_alpha_3', ''],
       });
 
       // Wishlist countries layer
-      map.current?.addLayer({
+      map.current.addLayer({
         id: 'wishlist-countries',
         type: 'fill',
         source: 'countries',
         'source-layer': 'country_boundaries',
         paint: {
-          'fill-color': mapColors.wishlist,
+          'fill-color': validateColor(initialColors.wishlist, defaultMapColors.wishlist),
           'fill-opacity': 0.4,
         },
         filter: ['in', 'iso_3166_1_alpha_3', ''],
       });
 
-      map.current?.addLayer({
+      map.current.addLayer({
         id: 'country-borders',
         type: 'line',
         source: 'countries',
@@ -447,7 +495,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       });
 
       // Click layer for ALL countries
-      map.current?.addLayer({
+      map.current.addLayer({
         id: 'clickable-countries',
         type: 'fill',
         source: 'countries',
@@ -459,7 +507,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
         filter: ['has', 'iso_3166_1_alpha_3'],
       });
 
-      map.current?.on('click', 'clickable-countries', (e) => {
+      map.current.on('click', 'clickable-countries', (e) => {
         if (!e.features?.[0]) return;
         const iso3 = e.features[0].properties?.iso_3166_1_alpha_3 as string | undefined;
         if (iso3) {
@@ -467,12 +515,16 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
         }
       });
 
-      map.current?.on('mouseenter', 'clickable-countries', () => {
-        map.current!.getCanvas().style.cursor = 'pointer';
+      map.current.on('mouseenter', 'clickable-countries', () => {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = 'pointer';
+        }
       });
 
-      map.current?.on('mouseleave', 'clickable-countries', () => {
-        map.current!.getCanvas().style.cursor = '';
+      map.current.on('mouseleave', 'clickable-countries', () => {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = '';
+        }
       });
 
       setIsMapReady(true);
@@ -482,7 +534,8 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       map.current?.remove();
       map.current = null;
     };
-  }, [mapToken, initialCenter, homeCountryISO, handleCountryClick, mapColors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapToken, initialCenter, homeCountryISO, handleCountryClick]);
 
   // Update filters when countries change (without re-creating map)
   useEffect(() => {
@@ -493,17 +546,26 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     map.current.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
   }, [visitedCountries, wishlistCountries, homeCountryISO, isMapReady]);
 
-  // Update colors when they change
+  // Update colors when they change - with layer existence checks and validation
   useEffect(() => {
     if (!map.current || !isMapReady) return;
 
-    try {
-      map.current.setPaintProperty('home-country', 'fill-color', mapColors.home);
-      map.current.setPaintProperty('visited-countries', 'fill-color', mapColors.visited);
-      map.current.setPaintProperty('wishlist-countries', 'fill-color', mapColors.wishlist);
-    } catch {
-      // Layer might not exist yet
-    }
+    const updateLayerColor = (layerId: string, color: string, fallback: string) => {
+      try {
+        if (!map.current?.getLayer(layerId)) {
+          console.warn(`Layer "${layerId}" not found, skipping color update`);
+          return;
+        }
+        const validColor = validateColor(color, fallback);
+        map.current.setPaintProperty(layerId, 'fill-color', validColor);
+      } catch (err) {
+        console.error(`Failed to update color for layer "${layerId}":`, err);
+      }
+    };
+
+    updateLayerColor('home-country', mapColors.home, defaultMapColors.home);
+    updateLayerColor('visited-countries', mapColors.visited, defaultMapColors.visited);
+    updateLayerColor('wishlist-countries', mapColors.wishlist, defaultMapColors.wishlist);
   }, [mapColors, isMapReady]);
 
   if (!mapToken) {
@@ -535,7 +597,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
             <Globe className="h-5 w-5 text-primary" />
             World Explorer
           </CardTitle>
-          <MapColorSettings colors={mapColors} onColorsChange={handleColorsChange} />
+          <MapColorSettings colors={mapColors} onColorsChange={handleColorsChange} onReset={handleResetColors} />
         </div>
         <div className="flex gap-4 text-sm text-muted-foreground flex-wrap">
           {homeCountry && (

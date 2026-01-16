@@ -2,7 +2,7 @@ import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Settings2 } from 'lucide-react';
+import { Palette } from 'lucide-react';
 
 export interface MapColors {
   visited: string;
@@ -30,18 +30,33 @@ const colorPresets = [
 interface MapColorSettingsProps {
   colors: MapColors;
   onColorsChange: (colors: MapColors) => void;
+  onReset?: () => void;
 }
 
-const MapColorSettings = ({ colors, onColorsChange }: MapColorSettingsProps) => {
+const MapColorSettings = ({ colors, onColorsChange, onReset }: MapColorSettingsProps) => {
   const updateColor = (key: keyof MapColors, value: string) => {
     onColorsChange({ ...colors, [key]: value });
+  };
+
+  const handleReset = () => {
+    if (onReset) {
+      onReset();
+    } else {
+      onColorsChange({ ...defaultMapColors });
+    }
   };
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" title="Customize map colors">
-          <Settings2 className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8" 
+          title="Customize map colors"
+          aria-label="Change map colors"
+        >
+          <Palette className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-72" align="end">
@@ -109,7 +124,7 @@ const MapColorSettings = ({ colors, onColorsChange }: MapColorSettingsProps) => 
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={() => onColorsChange(defaultMapColors)}
+            onClick={handleReset}
           >
             Reset to Defaults
           </Button>
