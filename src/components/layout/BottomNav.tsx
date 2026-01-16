@@ -3,10 +3,10 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/family", label: "Countries", icon: Globe },
+  { href: "/family", label: "Overview", icon: Globe },
+  { href: "/family?tab=countries", label: "Countries", icon: Map },
+  { href: "/family?tab=memories", label: "Memories", icon: Sparkles },
   { href: "/flights", label: "Flights", icon: PlaneTakeoff },
-  { href: "/trips/new", label: "Plan Trip", icon: Sparkles },
-  { href: "/family?tab=memories", label: "Memories", icon: Map },
 ];
 
 export function BottomNav() {

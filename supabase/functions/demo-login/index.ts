@@ -234,17 +234,102 @@ async function seedDemoData(client: any, userId: string) {
       }
       await client.from("country_visits").insert(visits);
 
-      // Add some visit details
-      const visitDetails = insertedCountries.map((country: any, index: number) => ({
-        user_id: userId,
-        country_id: country.id,
-        trip_name: `${country.name} Adventure ${2020 + index}`,
-        visit_date: new Date(2020 + index, 5, 15).toISOString().split('T')[0],
-        end_date: new Date(2020 + index, 5, 25).toISOString().split('T')[0],
-        number_of_days: 10,
-        notes: `Amazing family trip to ${country.name}!`,
-      }));
-      await client.from("country_visit_details").insert(visitDetails);
+      // Add some visit details with realistic past dates (not future)
+      const now = new Date();
+      const visitDetails = [
+        {
+          user_id: userId,
+          country_id: insertedCountries[0].id, // France
+          trip_name: "Paris Spring Break 2023",
+          visit_date: "2023-04-10",
+          end_date: "2023-04-20",
+          number_of_days: 10,
+          highlight: "Eiffel Tower at sunset",
+          why_it_mattered: "First international trip as a family",
+          notes: "Amazing croissants and the kids loved the Louvre!",
+        },
+        {
+          user_id: userId,
+          country_id: insertedCountries[1].id, // Japan
+          trip_name: "Tokyo Cherry Blossom Adventure",
+          visit_date: "2024-03-25",
+          end_date: "2024-04-05",
+          number_of_days: 11,
+          highlight: "Cherry blossoms in Ueno Park",
+          why_it_mattered: "Cultural immersion experience",
+          notes: "Kids fell in love with Japanese culture and food!",
+        },
+        {
+          user_id: userId,
+          country_id: insertedCountries[3].id, // Italy
+          trip_name: "Rome & Tuscany Summer 2024",
+          visit_date: "2024-07-15",
+          end_date: "2024-07-28",
+          number_of_days: 13,
+          highlight: "Colosseum tour with gladiator experience",
+          why_it_mattered: "History came alive for the kids",
+          notes: "Best gelato ever!",
+        },
+        {
+          user_id: userId,
+          country_id: insertedCountries[4].id, // Thailand
+          trip_name: "Thai Beach Holiday",
+          visit_date: "2024-12-20",
+          end_date: "2025-01-02",
+          number_of_days: 13,
+          highlight: "Swimming with elephants at ethical sanctuary",
+          notes: "Beautiful beaches and amazing food",
+        },
+        {
+          user_id: userId,
+          country_id: insertedCountries[5].id, // Mexico
+          trip_name: "Cancun Family Getaway",
+          visit_date: "2022-06-10",
+          end_date: "2022-06-18",
+          number_of_days: 8,
+          highlight: "Snorkeling in the Caribbean",
+          notes: "Kids loved the all-inclusive resort",
+        },
+        {
+          user_id: userId,
+          country_id: insertedCountries[6].id, // Spain
+          trip_name: "Barcelona Summer 2021",
+          visit_date: "2021-08-01",
+          end_date: "2021-08-10",
+          number_of_days: 9,
+          highlight: "Sagrada Familia was breathtaking",
+          notes: "Great tapas and beach time",
+        },
+        {
+          user_id: userId,
+          country_id: insertedCountries[7].id, // Australia
+          trip_name: "Sydney & Melbourne Adventure",
+          visit_date: "2020-01-15",
+          end_date: "2020-01-30",
+          number_of_days: 15,
+          highlight: "Great Barrier Reef diving",
+          why_it_mattered: "Once in a lifetime experience",
+          notes: "Koalas and kangaroos everywhere!",
+        },
+      ];
+      
+      const { data: insertedVisitDetails } = await client.from("country_visit_details").insert(visitDetails).select();
+      
+      // Link visit details to family members (visit_family_members table)
+      if (insertedVisitDetails) {
+        const visitFamilyMembers = [];
+        for (const visit of insertedVisitDetails) {
+          // All family members on most trips
+          for (const member of members) {
+            visitFamilyMembers.push({
+              user_id: userId,
+              visit_id: visit.id,
+              family_member_id: member.id,
+            });
+          }
+        }
+        await client.from("visit_family_members").insert(visitFamilyMembers);
+      }
     }
 
     // Add wishlist countries
@@ -261,27 +346,49 @@ async function seedDemoData(client: any, userId: string) {
       );
     }
 
-    // Add a sample trip
-    await client.from("trips").insert({
-      user_id: userId,
-      title: "Summer in Barcelona",
-      destination: "Barcelona, Spain",
-      start_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end_date: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      status: "planning",
-      trip_type: "family",
-      budget_total: 5000,
-      currency: "USD",
-      interests: ["beaches", "culture", "food"],
-      kids_ages: [8, 12],
-      pace_preference: "relaxed",
-      notes: "Looking forward to exploring the city and beaches!",
-    });
+    // Add sample trips - one past, one current, one near future, one far future
+    const trips = [
+      {
+        user_id: userId,
+        title: "Greece Island Hopping",
+        destination: "Athens & Santorini, Greece",
+        start_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 year from now
+        end_date: new Date(Date.now() + 375 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: "planning",
+        trip_type: "family",
+        budget_total: 8000,
+        currency: "USD",
+        interests: ["beaches", "history", "culture", "food"],
+        kids_ages: [9, 13],
+        pace_preference: "relaxed",
+        notes: "Dream trip to the Greek islands - saving up for this one!",
+        cover_image: "https://images.unsplash.com/photo-1613395877344-13d4a8e0d49e?w=800",
+      },
+      {
+        user_id: userId,
+        title: "Summer in Barcelona",
+        destination: "Barcelona, Spain",
+        start_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+        end_date: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: "planning",
+        trip_type: "family",
+        budget_total: 5000,
+        currency: "USD",
+        interests: ["beaches", "culture", "food"],
+        kids_ages: [8, 12],
+        pace_preference: "relaxed",
+        notes: "Looking forward to exploring the city and beaches!",
+        cover_image: "https://images.unsplash.com/photo-1583422409516-2895a77efced?w=800",
+      },
+    ];
+    
+    await client.from("trips").insert(trips);
 
     // Update profile with home country
     await client.from("profiles").update({
       full_name: "Demo Traveler",
       home_country: "United States",
+      onboarding_completed: true,
     }).eq("id", userId);
 
     // Add travel settings

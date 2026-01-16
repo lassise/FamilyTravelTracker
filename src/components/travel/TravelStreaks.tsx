@@ -10,6 +10,9 @@ const TravelStreaks = () => {
   const stats = calculateStats();
   
   function calculateStats() {
+    const today = new Date();
+    
+    // Filter out future trips for streak calculations
     const visitsWithDates = visitDetails
       .filter(v => v.visit_date)
       .map(v => ({
@@ -20,10 +23,13 @@ const TravelStreaks = () => {
       }))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
     
-    // Days since last adventure
-    const mostRecentVisit = visitsWithDates[visitsWithDates.length - 1];
-    const daysSinceLastTrip = mostRecentVisit 
-      ? differenceInDays(new Date(), mostRecentVisit.endDate)
+    // Only past trips for "days since last adventure" - exclude future trips
+    const pastVisits = visitsWithDates.filter(v => v.endDate <= today);
+    
+    // Days since last adventure - only consider past trips
+    const mostRecentPastVisit = pastVisits[pastVisits.length - 1];
+    const daysSinceLastTrip = mostRecentPastVisit 
+      ? differenceInDays(today, mostRecentPastVisit.endDate)
       : null;
     
     // Get unique years with travel
@@ -84,11 +90,12 @@ const TravelStreaks = () => {
         }
       });
 
-      // Check if currently abroad
-      const today = new Date();
-      const latestPeriod = mergedPeriods[mergedPeriods.length - 1];
-      if (latestPeriod && today >= latestPeriod.start && today <= latestPeriod.end) {
-        currentConsecutiveDays = differenceInDays(today, latestPeriod.start) + 1;
+      // Check if currently abroad - find period that contains today
+      for (const period of mergedPeriods) {
+        if (today >= period.start && today <= period.end) {
+          currentConsecutiveDays = differenceInDays(today, period.start) + 1;
+          break;
+        }
       }
     }
 
@@ -154,7 +161,7 @@ const TravelStreaks = () => {
       totalTrips,
       uniqueTrips,
       monthsLeft,
-      mostRecentVisit,
+      mostRecentVisit: mostRecentPastVisit,
       maxConsecutiveDaysAbroad,
       currentConsecutiveDays,
       maxCountriesInOneTrip,
