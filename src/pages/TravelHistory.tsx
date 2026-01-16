@@ -28,13 +28,11 @@ import DashboardMemberFilter from "@/components/travel/DashboardMemberFilter";
 import { Loader2, BarChart3, Globe2, Trophy, Map as MapIcon, Camera, Users, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type TabKey = 'overview' | 'analytics' | 'achievements' | 'countries' | 'memories';
+type TabKey = 'overview' | 'countries' | 'memories';
 
 const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'overview', label: 'Overview', icon: Globe2 },
   { key: 'countries', label: 'Countries', icon: MapIcon },
-  { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { key: 'achievements', label: 'Achievements', icon: Trophy },
   { key: 'memories', label: 'Memories', icon: Camera },
 ];
 
@@ -244,31 +242,26 @@ const TravelHistory = () => {
                     earliestYear={filteredEarliestYear}
                   />
                   <InteractiveWorldMap countries={filteredCountries} wishlist={wishlist} homeCountry={homeCountry} onRefetch={refetch} />
+                  
+                  {/* Analytics & Achievements combined section */}
+                  <div className="space-y-6">
+                    <AnalyticsInsightCard countries={filteredCountries} />
+                    <EnhancedAchievements 
+                      countries={filteredCountries} 
+                      familyMembers={filteredFamilyMembers}
+                      totalContinents={filteredContinents}
+                    />
+                  </div>
+                  
                   <TravelMilestones countries={filteredCountries} familyMembers={filteredFamilyMembers} totalContinents={filteredContinents} />
                   <div className="grid lg:grid-cols-2 gap-6">
                     <TravelDNA countries={filteredCountries} homeCountryCode={resolvedHome.iso2 || 'US'} />
                     <TravelStreaks />
                   </div>
-                </div>
-              )}
-
-              {activeTab === 'analytics' && (
-                <div className="space-y-6">
-                  <AnalyticsInsightCard countries={filteredCountries} />
                   <div className="grid lg:grid-cols-2 gap-6">
                     <CountryComparison countries={filteredCountries} />
                     <TravelHeatmapCalendar />
                   </div>
-                </div>
-              )}
-
-              {activeTab === 'achievements' && (
-                <div className="space-y-6">
-                  <EnhancedAchievements 
-                    countries={filteredCountries} 
-                    familyMembers={filteredFamilyMembers}
-                    totalContinents={filteredContinents}
-                  />
                   <EnhancedBucketList />
                 </div>
               )}
