@@ -1,4 +1,4 @@
-import { useMemo, memo } from "react";
+import { useMemo, memo, ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Globe2, Users, Plane, Calendar, MapPin } from "lucide-react";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
@@ -11,9 +11,10 @@ interface HeroSummaryCardProps {
   familyMembers: FamilyMember[];
   totalContinents: number;
   homeCountry?: string | null;
+  filterComponent?: ReactNode;
 }
 
-const HeroSummaryCard = memo(({ countries, familyMembers, totalContinents, homeCountry }: HeroSummaryCardProps) => {
+const HeroSummaryCard = memo(({ countries, familyMembers, totalContinents, homeCountry, filterComponent }: HeroSummaryCardProps) => {
   const { visitDetails } = useVisitDetails();
   const resolvedHome = useHomeCountry(homeCountry);
   const { getStateVisitCount } = useStateVisits();
@@ -111,8 +112,8 @@ const HeroSummaryCard = memo(({ countries, familyMembers, totalContinents, homeC
   return (
     <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5 border-primary/20 overflow-hidden">
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="flex items-center justify-between mb-4 gap-4">
+          <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
               Your Travel Journey
             </h2>
@@ -123,6 +124,7 @@ const HeroSummaryCard = memo(({ countries, familyMembers, totalContinents, homeC
               }
             </p>
           </div>
+          {filterComponent}
         </div>
 
         <div className="grid grid-cols-4 gap-4">

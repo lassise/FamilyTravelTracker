@@ -5,11 +5,13 @@ import { useTrips } from "@/hooks/useTrips";
 import { useFamilyData } from "@/hooks/useFamilyData";
 import { useStateVisits } from "@/hooks/useStateVisits";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
+import { useDashboardFilter } from "@/hooks/useDashboardFilter";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
+import DashboardMemberFilter from "@/components/travel/DashboardMemberFilter";
 import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
 import TravelMilestones from "@/components/travel/TravelMilestones";
 import { 
@@ -36,6 +38,17 @@ const Dashboard = () => {
   const resolvedHome = useHomeCountry(homeCountry);
   const navigate = useNavigate();
 
+  // Dashboard filter state
+  const {
+    selectedMemberIds,
+    isAllSelected,
+    toggleMember,
+    toggleAll,
+    getFilteredCountries,
+    getFilteredContinents,
+    getFilterSummary,
+  } = useDashboardFilter(familyMembers);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
@@ -55,10 +68,22 @@ const Dashboard = () => {
     [trips]
   );
   
-  // Count visited countries excluding home country
+  // Apply member filter to countries
+  const filteredCountries = useMemo(() => 
+    getFilteredCountries(countries),
+    [countries, getFilteredCountries]
+  );
+
+  // Calculate filtered continents
+  const filteredContinents = useMemo(() => 
+    getFilteredContinents(countries),
+    [countries, getFilteredContinents]
+  );
+
+  // Count visited countries excluding home country (using filtered data)
   const visitedCountriesCount = useMemo(() => 
-    countries.filter(c => c.visitedBy.length > 0 && !resolvedHome.isHomeCountry(c.name)).length,
-    [countries, resolvedHome]
+    filteredCountries.filter(c => c.visitedBy.length > 0 && !resolvedHome.isHomeCountry(c.name)).length,
+    [filteredCountries, resolvedHome]
   );
 
   // Get states visited count for home country
@@ -74,6 +99,12 @@ const Dashboard = () => {
       day: "numeric",
     });
   }, []);
+
+  // Get filter summary for display
+  const filterSummary = useMemo(() => 
+    getFilterSummary(familyMembers),
+    [getFilterSummary, familyMembers]
+  );
 
   if (authLoading || tripsLoading || familyLoading) {
     return (
@@ -101,10 +132,20 @@ const Dashboard = () => {
         {/* Hero Summary - Countries Visited Overview */}
         <div className="mb-8">
           <HeroSummaryCard 
-            countries={countries} 
+            countries={filteredCountries} 
             familyMembers={familyMembers} 
-            totalContinents={totalContinents}
+            totalContinents={filteredContinents}
             homeCountry={homeCountry}
+            filterComponent={
+              <DashboardMemberFilter
+                familyMembers={familyMembers}
+                selectedMemberIds={selectedMemberIds}
+                onToggleMember={toggleMember}
+                onToggleAll={toggleAll}
+                isAllSelected={isAllSelected}
+                filterSummary={filterSummary}
+              />
+            }
           />
         </div>
 
@@ -347,7 +388,7 @@ const Dashboard = () => {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-6">
                 <Map className="h-8 w-8 text-secondary mb-2" />
-                <p className="text-3xl font-bold">{totalContinents}</p>
+                <p className="text-3xl font-bold">{filteredContinents}</p>
                 <p className="text-sm text-muted-foreground">Continents</p>
               </CardContent>
             </Card>
