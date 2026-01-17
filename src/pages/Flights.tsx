@@ -267,6 +267,160 @@ const Flights = () => {
           <p className="text-muted-foreground">Smart search optimized for your preferences</p>
         </div>
 
+        {/* Preferences Panel */}
+        <Collapsible open={showPreferences} onOpenChange={setShowPreferences} className="mb-6">
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Filter className="h-4 w-4" /> Your Preferences
+                  </CardTitle>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showPreferences ? 'rotate-180' : ''}`} />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-6">
+                {/* Seat Preference - Multiple Selection */}
+                <div>
+                  <Label className="mb-2 block">Seat Preference (select all that apply)</Label>
+                  <div className="flex gap-2 flex-wrap">
+                    {SEAT_OPTIONS.map(seat => (
+                      <Badge
+                        key={seat.value}
+                        variant={seatPreferences.includes(seat.value) ? "default" : "outline"}
+                        className="cursor-pointer px-3 py-1.5"
+                        onClick={() => toggleSeatPreference(seat.value)}
+                      >
+                        {seat.label}
+                      </Badge>
+                    ))}
+                    {seatPreferences.length === 0 && (
+                      <span className="text-xs text-muted-foreground">No preference</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Departure Times */}
+                <div>
+                  <Label className="mb-2 block">Preferred Times</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DEPARTURE_TIMES.map(time => (
+                      <Badge 
+                        key={time.value}
+                        variant={preferences.preferred_departure_times.includes(time.value) ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => togglePreference("preferred_departure_times", time.value)}
+                      >
+                        {time.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Airlines */}
+                <div>
+                  <Label className="mb-2 block">Preferred Airlines</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {AIRLINES.slice(0, 10).map(airline => (
+                      <Badge 
+                        key={airline.code}
+                        variant={preferences.preferred_airlines.includes(airline.name) ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => togglePreference("preferred_airlines", airline.name)}
+                      >
+                        {airline.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Avoided Airlines */}
+                <div>
+                  <Label className="mb-2 block">Avoid Airlines</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {AIRLINES.slice(0, 10).map(airline => (
+                      <Badge 
+                        key={`avoid-${airline.code}`}
+                        variant={preferences.avoided_airlines.includes(airline.name) ? "destructive" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => togglePreference("avoided_airlines", airline.name)}
+                      >
+                        {airline.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Layover Settings - Only show if nonstop not selected */}
+                {!preferences.prefer_nonstop && (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <Label>Max Layover Hours</Label>
+                        <span className="text-sm">{preferences.max_layover_hours}h</span>
+                      </div>
+                      <Slider 
+                        value={[preferences.max_layover_hours]} 
+                        onValueChange={([v]) => updatePreferences({ max_layover_hours: v })} 
+                        min={1} max={12} step={1} 
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-2">
+                        <Label>Min Connection Time (min)</Label>
+                        <span className="text-sm">{preferences.min_connection_minutes}m</span>
+                      </div>
+                      <Slider 
+                        value={[preferences.min_connection_minutes]} 
+                        onValueChange={([v]) => updatePreferences({ min_connection_minutes: v })} 
+                        min={30} max={180} step={15} 
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Amenity Preferences */}
+                <div className="space-y-4 pt-4 border-t">
+                  <Label className="font-medium">Amenity Preferences (Must Have / Nice to Have)</Label>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {[
+                      { key: 'entertainment_seatback', label: 'Seatback Entertainment' },
+                      { key: 'entertainment_mobile', label: 'WiFi / Streaming' },
+                      { key: 'usb_charging', label: 'USB / Power Outlet' },
+                      { key: 'legroom_preference', label: 'Extra Legroom' },
+                    ].map(({ key, label }) => (
+                      <div key={key} className="flex items-center justify-between gap-2">
+                        <span className="text-sm">{label}</span>
+                        <Select 
+                          value={preferences[key as keyof typeof preferences] as string || 'nice_to_have'} 
+                          onValueChange={(v) => updatePreferences({ [key]: v })}
+                        >
+                          <SelectTrigger className="w-[140px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Don't care</SelectItem>
+                            <SelectItem value="nice_to_have">Nice to have</SelectItem>
+                            <SelectItem value="must_have">Must have</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Alternate Airports for Savings */}
+                <AlternateAirportsSection 
+                  alternateAirports={preferences.alternate_airports}
+                  onUpdate={(airports) => updatePreferences({ alternate_airports: airports })}
+                />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
         {/* Search Form */}
         <Card className="mb-6">
           <CardContent className="pt-6 space-y-4">
@@ -856,160 +1010,6 @@ const Flights = () => {
             })}
           </div>
         )}
-
-        {/* Preferences Panel */}
-        <Collapsible open={showPreferences} onOpenChange={setShowPreferences} className="mt-6">
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-muted/50">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Filter className="h-4 w-4" /> Your Preferences
-                  </CardTitle>
-                  <ChevronDown className={`h-4 w-4 transition-transform ${showPreferences ? 'rotate-180' : ''}`} />
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="space-y-6">
-                {/* Seat Preference - Multiple Selection */}
-                <div>
-                  <Label className="mb-2 block">Seat Preference (select all that apply)</Label>
-                  <div className="flex gap-2 flex-wrap">
-                    {SEAT_OPTIONS.map(seat => (
-                      <Badge
-                        key={seat.value}
-                        variant={seatPreferences.includes(seat.value) ? "default" : "outline"}
-                        className="cursor-pointer px-3 py-1.5"
-                        onClick={() => toggleSeatPreference(seat.value)}
-                      >
-                        {seat.label}
-                      </Badge>
-                    ))}
-                    {seatPreferences.length === 0 && (
-                      <span className="text-xs text-muted-foreground">No preference</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Departure Times */}
-                <div>
-                  <Label className="mb-2 block">Preferred Times</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DEPARTURE_TIMES.map(time => (
-                      <Badge 
-                        key={time.value}
-                        variant={preferences.preferred_departure_times.includes(time.value) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => togglePreference("preferred_departure_times", time.value)}
-                      >
-                        {time.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Airlines */}
-                <div>
-                  <Label className="mb-2 block">Preferred Airlines</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {AIRLINES.slice(0, 10).map(airline => (
-                      <Badge 
-                        key={airline.code}
-                        variant={preferences.preferred_airlines.includes(airline.name) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => togglePreference("preferred_airlines", airline.name)}
-                      >
-                        {airline.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Avoided Airlines */}
-                <div>
-                  <Label className="mb-2 block">Avoid Airlines</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {AIRLINES.slice(0, 10).map(airline => (
-                      <Badge 
-                        key={`avoid-${airline.code}`}
-                        variant={preferences.avoided_airlines.includes(airline.name) ? "destructive" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => togglePreference("avoided_airlines", airline.name)}
-                      >
-                        {airline.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Layover Settings - Only show if nonstop not selected */}
-                {!preferences.prefer_nonstop && (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <Label>Max Layover Hours</Label>
-                        <span className="text-sm">{preferences.max_layover_hours}h</span>
-                      </div>
-                      <Slider 
-                        value={[preferences.max_layover_hours]} 
-                        onValueChange={([v]) => updatePreferences({ max_layover_hours: v })} 
-                        min={1} max={12} step={1} 
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-2">
-                        <Label>Min Connection Time (min)</Label>
-                        <span className="text-sm">{preferences.min_connection_minutes}m</span>
-                      </div>
-                      <Slider 
-                        value={[preferences.min_connection_minutes]} 
-                        onValueChange={([v]) => updatePreferences({ min_connection_minutes: v })} 
-                        min={30} max={180} step={15} 
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Amenity Preferences */}
-                <div className="space-y-4 pt-4 border-t">
-                  <Label className="font-medium">Amenity Preferences (Must Have / Nice to Have)</Label>
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {[
-                      { key: 'entertainment_seatback', label: 'Seatback Entertainment' },
-                      { key: 'entertainment_mobile', label: 'WiFi / Streaming' },
-                      { key: 'usb_charging', label: 'USB / Power Outlet' },
-                      { key: 'legroom_preference', label: 'Extra Legroom' },
-                    ].map(({ key, label }) => (
-                      <div key={key} className="flex items-center justify-between gap-2">
-                        <span className="text-sm">{label}</span>
-                        <Select 
-                          value={preferences[key as keyof typeof preferences] as string || 'nice_to_have'} 
-                          onValueChange={(v) => updatePreferences({ [key]: v })}
-                        >
-                          <SelectTrigger className="w-[140px] h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Don't care</SelectItem>
-                            <SelectItem value="nice_to_have">Nice to have</SelectItem>
-                            <SelectItem value="must_have">Must have</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Alternate Airports for Savings */}
-                <AlternateAirportsSection 
-                  alternateAirports={preferences.alternate_airports}
-                  onUpdate={(airports) => updatePreferences({ alternate_airports: airports })}
-                />
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
 
         {/* Price Alert Dialog */}
         <PriceAlertDialog
