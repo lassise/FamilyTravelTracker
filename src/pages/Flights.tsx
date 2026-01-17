@@ -135,12 +135,11 @@ const Flights = () => {
   };
   
   const toggleSeatPreference = (seat: string) => {
-    setSeatPreferences(prev => {
-      if (prev.includes(seat)) {
-        return prev.filter(s => s !== seat);
-      }
-      return [...prev, seat];
-    });
+    const updated = seatPreferences.includes(seat)
+      ? seatPreferences.filter(s => s !== seat)
+      : [...seatPreferences, seat];
+    setSeatPreferences(updated);
+    updatePreferences({ seat_preference: updated });
   };
 
   const searchFlights = async () => {
