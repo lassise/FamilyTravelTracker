@@ -1634,6 +1634,10 @@ export type Database = {
         Args: { _min_permission?: string; _trip_id: string; _user_id: string }
         Returns: boolean
       }
+      join_family_group_by_invite_code: {
+        Args: { _invite_code: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "member" | "viewer"
