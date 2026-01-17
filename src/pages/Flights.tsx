@@ -888,8 +888,8 @@ const Flights = () => {
                     {/* Explanation */}
                     <p className="text-sm text-muted-foreground mb-3 italic">{flight.explanation}</p>
 
-                    {/* Match Explanation for non-100 scores */}
-                    {flight.score < 100 && flight.matchExplanation && (
+                    {/* Match Explanation - only show detailed "best match" for #1, others get "not best match" */}
+                    {idx === 0 && sortBy === "score" && flight.score < 100 && flight.matchExplanation && (
                       <div className="mb-3 p-3 bg-muted/50 rounded-lg space-y-2">
                         <div className="flex items-center gap-1.5 text-sm font-medium">
                           <Lightbulb className="h-4 w-4 text-amber-500" />
@@ -917,6 +917,16 @@ const Flights = () => {
                             </ul>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* For non-first results, show why it's not the best match */}
+                    {idx > 0 && sortBy === "score" && flight.matchExplanation && flight.matchExplanation.whyNotPerfect.length > 0 && (
+                      <div className="mb-3 p-2 bg-muted/30 rounded-md">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium">Why this is not your best match:</span>{" "}
+                          {flight.matchExplanation.whyNotPerfect.slice(0, 2).join("; ")}
+                        </p>
                       </div>
                     )}
 
