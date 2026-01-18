@@ -50,17 +50,30 @@ const StateMapDialog = ({ open, onOpenChange, country }: StateMapDialogProps) =>
     return new Set(stateVisits.map(sv => sv.state_code));
   }, [stateVisits]);
 
-  // Initialize selected states from visits
-  useEffect(() => {
-    setSelectedStates(visitedStateCodes);
-  }, [visitedStateCodes]);
+  // Store original state when dialog opens to restore on cancel
+  const [originalStates, setOriginalStates] = useState<Set<string>>(new Set());
 
-  // Reset search when dialog opens/closes
+  // Initialize selected states from visits and save original state when dialog opens
+  useEffect(() => {
+    if (open) {
+      // Save the original state when dialog opens
+      setOriginalStates(new Set(visitedStateCodes));
+      setSelectedStates(new Set(visitedStateCodes));
+    }
+  }, [open, visitedStateCodes]);
+
+  // Reset search when dialog closes
   useEffect(() => {
     if (!open) {
       setSearchQuery('');
     }
   }, [open]);
+
+  // Handle cancel - restore original state
+  const handleCancel = () => {
+    setSelectedStates(new Set(originalStates));
+    onOpenChange(false);
+  };
 
   const handleStateToggle = (stateCode: string) => {
     setSelectedStates(prev => {
@@ -256,8 +269,8 @@ const StateMapDialog = ({ open, onOpenChange, country }: StateMapDialogProps) =>
           <p className="text-xs text-muted-foreground">
             Click on a {regionLabel.toLowerCase().replace(/s$/, '')} to toggle visited status
           </p>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <div className="flex gap-3">
+            <Button variant="outline" onClick={handleCancel}>
               Cancel
             </Button>
             <Button 

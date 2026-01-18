@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Trash2 } from "lucide-react";
@@ -20,6 +21,57 @@ interface FamilyMemberProps {
 
 const FamilyMember = ({ id, name, role, countriesVisited, avatar, color, countries, onUpdate }: FamilyMemberProps) => {
   const { toast } = useToast();
+  const [earliestYear, setEarliestYear] = useState<number | null>(null);
+
+  // Fetch the earliest visit year for this family member
+  useEffect(() => {
+    const fetchEarliestYear = async () => {
+      try {
+        // Get all visit IDs for this family member
+        const { data: visitMemberData } = await supabase
+          .from('visit_family_members')
+          .select('visit_id')
+          .eq('family_member_id', id);
+
+        if (!visitMemberData || visitMemberData.length === 0) {
+          setEarliestYear(null);
+          return;
+        }
+
+        const visitIds = visitMemberData.map(v => v.visit_id);
+
+        // Get the visit details for these visits
+        const { data: visitDetails } = await supabase
+          .from('country_visit_details')
+          .select('visit_date, approximate_year')
+          .in('id', visitIds);
+
+        if (!visitDetails || visitDetails.length === 0) {
+          setEarliestYear(null);
+          return;
+        }
+
+        // Find the earliest year
+        let earliest: number | null = null;
+        for (const visit of visitDetails) {
+          let year: number | null = null;
+          if (visit.visit_date) {
+            year = new Date(visit.visit_date).getFullYear();
+          } else if (visit.approximate_year) {
+            year = visit.approximate_year;
+          }
+          if (year && (!earliest || year < earliest)) {
+            earliest = year;
+          }
+        }
+        setEarliestYear(earliest);
+      } catch (error) {
+        console.error('Error fetching earliest year:', error);
+      }
+    };
+
+    fetchEarliestYear();
+  }, [id]);
 
   // Filter countries visited by this member
   const memberCountries = countries.filter(country => 
@@ -69,10 +121,12 @@ const FamilyMember = ({ id, name, role, countriesVisited, avatar, color, countri
               />
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="w-4 h-4" />
-              <span>Explorer since 2020</span>
-            </div>
+            {earliestYear && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="w-4 h-4" />
+                <span>Explorer since {earliestYear}</span>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <FamilyMemberDialog
