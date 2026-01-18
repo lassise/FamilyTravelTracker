@@ -11,6 +11,8 @@ import {
   CountryMetadata 
 } from "@/lib/countryMetadata";
 import GeographicDetailsDialog from "./GeographicDetailsDialog";
+import { useDistanceUnit } from "@/hooks/useDistanceUnit";
+import { formatArea, formatDensity } from "@/lib/distanceUtils";
 
 interface CountryComparisonProps {
   countries: Country[];
@@ -23,6 +25,7 @@ interface RegionData {
 }
 
 const CountryComparison = ({ countries }: CountryComparisonProps) => {
+  const { distanceUnit } = useDistanceUnit();
   const visitedCountries = countries.filter(c => c.visitedBy.length > 0);
   
   // Get metadata for all visited countries
@@ -205,9 +208,7 @@ const CountryComparison = ({ countries }: CountryComparisonProps) => {
             </h4>
             <div className="p-3 rounded-lg bg-muted/30">
               <p className="text-xl font-bold text-foreground">
-                {totalArea >= 1000000 
-                  ? `${(totalArea / 1000000).toFixed(1)}M`
-                  : `${Math.round(totalArea / 1000)}K`} km²
+                {formatArea(totalArea, distanceUnit)}
               </p>
               <p className="text-xs text-muted-foreground">
                 Total land area
@@ -248,7 +249,7 @@ const CountryComparison = ({ countries }: CountryComparisonProps) => {
                 <p className="text-xs text-red-500 font-medium">Most Dense</p>
                 <p className="text-sm font-medium text-foreground">{densityStats[0].name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round(densityStats[0].density).toLocaleString()} /km²
+                  {formatDensity(densityStats[0].density, distanceUnit)}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-green-500/10">
@@ -257,7 +258,7 @@ const CountryComparison = ({ countries }: CountryComparisonProps) => {
                   {densityStats[densityStats.length - 1].name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {Math.round(densityStats[densityStats.length - 1].density).toLocaleString()} /km²
+                  {formatDensity(densityStats[densityStats.length - 1].density, distanceUnit)}
                 </p>
               </div>
             </div>

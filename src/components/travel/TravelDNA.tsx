@@ -13,6 +13,8 @@ import {
 } from "@/lib/countryMetadata";
 import { format, differenceInDays, parseISO } from "date-fns";
 import GeographicDetailsDialog, { GeographicType } from "./GeographicDetailsDialog";
+import { useDistanceUnit } from "@/hooks/useDistanceUnit";
+import { formatDistance } from "@/lib/distanceUtils";
 
 interface TravelDNAProps {
   countries: Country[];
@@ -21,6 +23,7 @@ interface TravelDNAProps {
 
 const TravelDNA = ({ countries, homeCountryCode = 'US' }: TravelDNAProps) => {
   const { visitDetails } = useVisitDetails();
+  const { distanceUnit } = useDistanceUnit();
   
   const visitedCountries = countries.filter(c => c.visitedBy.length > 0);
   
@@ -200,14 +203,14 @@ const TravelDNA = ({ countries, homeCountryCode = 'US' }: TravelDNAProps) => {
         ? `${insights.furthestCountry.name}`
         : "Calculate more",
       sublabel: insights.furthestCountry 
-        ? `${Math.round(insights.furthestCountry.distance).toLocaleString()} km away`
+        ? `${formatDistance(insights.furthestCountry.distance, distanceUnit)} away`
         : undefined,
       gradient: "from-purple-500 to-pink-500",
     },
     {
       icon: Plane,
       label: "Total Distance",
-      value: `${Math.round(insights.totalDistance).toLocaleString()} km`,
+      value: formatDistance(insights.totalDistance, distanceUnit),
       sublabel: `~${Math.round(insights.totalDistance / 40075)} trips around Earth`,
       gradient: "from-orange-500 to-red-500",
     },

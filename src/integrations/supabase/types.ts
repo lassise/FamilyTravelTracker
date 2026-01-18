@@ -788,6 +788,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          distance_unit: string | null
           email: string | null
           full_name: string | null
           home_airports: Json | null
@@ -800,6 +801,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          distance_unit?: string | null
           email?: string | null
           full_name?: string | null
           home_airports?: Json | null
@@ -812,6 +814,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          distance_unit?: string | null
           email?: string | null
           full_name?: string | null
           home_airports?: Json | null
