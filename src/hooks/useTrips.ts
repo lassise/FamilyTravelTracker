@@ -19,6 +19,9 @@ export interface Trip {
   pace_preference: string | null;
   interests: string[] | null;
   notes: string | null;
+  has_lodging_booked: boolean | null;
+  provider_preferences: string[] | null;
+  lodging_address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +94,9 @@ export const useTrips = () => {
         interests: tripData.interests,
         notes: tripData.notes,
         family_group_id: tripData.family_group_id,
+        has_lodging_booked: tripData.has_lodging_booked,
+        provider_preferences: tripData.provider_preferences,
+        lodging_address: tripData.lodging_address,
         user_id: user.id,
       })
       .select()

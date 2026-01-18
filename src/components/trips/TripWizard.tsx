@@ -36,6 +36,8 @@ export interface TripFormData {
   plannerMode: 'personal' | 'planner';
   clientInfo: ClientInfo;
   extraContext: string;
+  // Booking preferences
+  providerPreferences: string[];
 }
 
 const STEPS = [
@@ -82,6 +84,7 @@ const TripWizard = () => {
       profileId: null,
     },
     extraContext: "",
+    providerPreferences: [],
   });
 
   const updateFormData = (updates: Partial<TripFormData>) => {
@@ -159,6 +162,8 @@ const TripWizard = () => {
         interests: formData.interests,
         pace_preference: formData.pacePreference,
         status: 'planning',
+        has_lodging_booked: formData.hasLodging,
+        provider_preferences: formData.providerPreferences,
       });
 
       if (tripError || !trip) {
@@ -194,6 +199,9 @@ const TripWizard = () => {
             preferNonstop: selectedProfile.prefer_nonstop,
             maxStops: selectedProfile.max_stops,
           } : null,
+          // Booking preferences
+          hasLodgingBooked: formData.hasLodging,
+          providerPreferences: formData.providerPreferences,
         },
       });
 
@@ -254,7 +262,7 @@ const TripWizard = () => {
             continue;
           }
 
-          // Save activities for this day
+          // Save activities for this day with new booking fields
           if (day.activities && savedDay) {
             const itemsToInsert = day.activities.map((activity: any, index: number) => ({
               itinerary_day_id: savedDay.id,
@@ -273,6 +281,20 @@ const TripWizard = () => {
               is_stroller_friendly: activity.isStrollerFriendly,
               requires_reservation: activity.requiresReservation,
               reservation_info: activity.reservationInfo,
+              // New booking fields
+              rating: activity.rating,
+              review_count: activity.reviewCount,
+              booking_url: activity.bookingUrl,
+              provider_type: activity.providerType,
+              why_it_fits: activity.whyItFits,
+              best_time_to_visit: activity.bestTimeToVisit,
+              crowd_level: activity.crowdLevel,
+              seasonal_notes: activity.seasonalNotes,
+              transport_mode: activity.transportMode,
+              transport_booking_url: activity.transportBookingUrl,
+              transport_station_notes: activity.transportStationNotes,
+              latitude: activity.latitude,
+              longitude: activity.longitude,
             }));
 
             const { error: itemsError } = await supabase
@@ -283,6 +305,68 @@ const TripWizard = () => {
               console.error('Error saving items:', itemsError);
             }
           }
+        }
+      }
+
+      // Save lodging suggestions if provided and lodging not booked
+      if (itinerary?.lodgingSuggestions && !formData.hasLodging) {
+        const lodgingToInsert = itinerary.lodgingSuggestions.map((lodging: any) => ({
+          trip_id: trip.id,
+          name: lodging.name,
+          lodging_type: lodging.lodgingType,
+          address: lodging.address,
+          description: lodging.description,
+          price_per_night: lodging.pricePerNight,
+          currency: lodging.currency,
+          rating: lodging.rating,
+          review_count: lodging.reviewCount,
+          booking_url: lodging.bookingUrl,
+          is_kid_friendly: lodging.isKidFriendly,
+          amenities: lodging.amenities,
+          distance_from_center: lodging.distanceFromCenter,
+          why_recommended: lodging.whyRecommended,
+          latitude: lodging.latitude,
+          longitude: lodging.longitude,
+        }));
+
+        const { error: lodgingError } = await supabase
+          .from('trip_lodging_suggestions')
+          .insert(lodgingToInsert);
+
+        if (lodgingError) {
+          console.error('Error saving lodging suggestions:', lodgingError);
+        }
+      }
+
+      // Save train segments if provided
+      if (itinerary?.trainSegments) {
+        const trainToInsert = itinerary.trainSegments.map((train: any) => ({
+          trip_id: trip.id,
+          origin_city: train.originCity,
+          origin_station: train.originStation,
+          origin_station_alternatives: train.originStationAlternatives,
+          destination_city: train.destinationCity,
+          destination_station: train.destinationStation,
+          destination_station_alternatives: train.destinationStationAlternatives,
+          departure_date: train.departureDate,
+          departure_time: train.departureTime,
+          arrival_time: train.arrivalTime,
+          duration_minutes: train.durationMinutes,
+          train_type: train.trainType,
+          booking_url: train.bookingUrl,
+          price_estimate: train.priceEstimate,
+          currency: train.currency,
+          station_guidance: train.stationGuidance,
+          station_warning: train.stationWarning,
+          itinerary_day_id: train.itineraryDayId,
+        }));
+
+        const { error: trainError } = await supabase
+          .from('trip_train_segments')
+          .insert(trainToInsert);
+
+        if (trainError) {
+          console.error('Error saving train segments:', trainError);
         }
       }
 

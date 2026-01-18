@@ -14,6 +14,8 @@ import {
   Loader2,
   CloudRain,
   RefreshCw,
+  Train,
+  Hotel,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -76,6 +78,44 @@ interface Trip {
   pace_preference: string | null;
   notes: string | null;
   cover_image: string | null;
+  has_lodging_booked: boolean | null;
+}
+
+interface TrainSegment {
+  id: string;
+  origin_city: string;
+  origin_station: string;
+  origin_station_alternatives: string[] | null;
+  destination_city: string;
+  destination_station: string;
+  destination_station_alternatives: string[] | null;
+  departure_time: string | null;
+  arrival_time: string | null;
+  duration_minutes: number | null;
+  train_type: string | null;
+  booking_url: string | null;
+  price_estimate: number | null;
+  currency: string | null;
+  station_guidance: string | null;
+  station_warning: string | null;
+  itinerary_day_id: string | null;
+}
+
+interface LodgingSuggestion {
+  id: string;
+  name: string;
+  lodging_type: string | null;
+  address: string | null;
+  description: string | null;
+  price_per_night: number | null;
+  currency: string | null;
+  rating: number | null;
+  review_count: number | null;
+  booking_url: string | null;
+  is_kid_friendly: boolean | null;
+  amenities: string[] | null;
+  distance_from_center: string | null;
+  why_recommended: string | null;
 }
 
 const TripDetail = () => {
@@ -84,6 +124,8 @@ const TripDetail = () => {
   const navigate = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [days, setDays] = useState<ItineraryDay[]>([]);
+  const [trainSegments, setTrainSegments] = useState<TrainSegment[]>([]);
+  const [lodgingSuggestions, setLodgingSuggestions] = useState<LodgingSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeDay, setActiveDay] = useState<string>("1");
 
@@ -123,6 +165,26 @@ const TripDetail = () => {
 
       if (daysError) throw daysError;
       setDays(daysData || []);
+
+      // Fetch train segments
+      const { data: trainData, error: trainError } = await supabase
+        .from("trip_train_segments")
+        .select("*")
+        .eq("trip_id", tripId);
+
+      if (!trainError && trainData) {
+        setTrainSegments(trainData);
+      }
+
+      // Fetch lodging suggestions
+      const { data: lodgingData, error: lodgingError } = await supabase
+        .from("trip_lodging_suggestions")
+        .select("*")
+        .eq("trip_id", tripId);
+
+      if (!lodgingError && lodgingData) {
+        setLodgingSuggestions(lodgingData);
+      }
     } catch (error: any) {
       console.error("Error fetching trip:", error);
       toast.error("Failed to load trip");
@@ -280,110 +342,183 @@ const TripDetail = () => {
           )}
         </div>
 
-        {/* Itinerary Tabs */}
-        {days.length > 0 ? (
-          <Tabs value={activeDay} onValueChange={setActiveDay}>
-            <TabsList className="mb-6 flex-wrap h-auto gap-1">
-              {days.map((day) => (
-                <TabsTrigger key={day.id} value={day.day_number.toString()} className="text-sm">
-                  Day {day.day_number}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+        {/* Main Content Tabs */}
+        <Tabs value={activeDay.startsWith("tab-") ? activeDay : "tab-itinerary"} onValueChange={(val) => {
+          if (val.startsWith("tab-")) setActiveDay(val);
+        }} className="space-y-6">
+          <TabsList className="mb-2">
+            <TabsTrigger value="tab-itinerary">Itinerary</TabsTrigger>
+            {trainSegments.length > 0 && (
+              <TabsTrigger value="tab-transport" className="flex items-center gap-1">
+                <Train className="h-4 w-4" />
+                Transport
+              </TabsTrigger>
+            )}
+            {lodgingSuggestions.length > 0 && !trip.has_lodging_booked && (
+              <TabsTrigger value="tab-lodging" className="flex items-center gap-1">
+                <Hotel className="h-4 w-4" />
+                Lodging
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-            {days.map((day) => (
-              <TabsContent key={day.id} value={day.day_number.toString()}>
-                <Card>
-                  <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div>
-                        <CardTitle className="text-xl">
-                          Day {day.day_number}: {day.title || "Explore"}
-                        </CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <Calendar className="h-4 w-4" />
-                          {formatDate(day.date)}
-                        </CardDescription>
-                      </div>
-                      <div className="flex gap-2">
-                        <CustomActivityDialog 
-                          itineraryDayId={day.id} 
-                          onActivityAdded={fetchTripData}
-                          existingItemsCount={day.itinerary_items?.length || 0}
-                        />
-                        <Button variant="outline" size="sm">
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Regenerate Day
-                        </Button>
-                      </div>
-                    </div>
+          {/* Itinerary Tab */}
+          <TabsContent value="tab-itinerary">
+            {days.length > 0 ? (
+              <Tabs value={activeDay.startsWith("tab-") ? "1" : activeDay} onValueChange={(val) => setActiveDay(val)}>
+                <TabsList className="mb-6 flex-wrap h-auto gap-1">
+                  {days.map((day) => (
+                    <TabsTrigger key={day.id} value={day.day_number.toString()} className="text-sm">
+                      Day {day.day_number}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-                    {day.weather_notes && (
-                      <div className="flex items-start gap-2 text-sm text-muted-foreground mt-3">
-                        <CloudRain className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        {day.weather_notes}
-                      </div>
-                    )}
-                  </CardHeader>
+                {days.map((day) => {
+                  // Get train segments for this day
+                  const dayTrains = trainSegments.filter(t => t.itinerary_day_id === day.id);
                   
-                  <CardContent className="space-y-6">
-                    {/* Activities */}
-                    <div className="space-y-4">
-                      {day.itinerary_items
-                        ?.sort((a, b) => a.sort_order - b.sort_order)
-                        .map((item) => (
-                          <div
-                            key={item.id}
-                            className="relative pl-8 pb-6 border-l-2 border-muted last:pb-0 last:border-transparent"
-                          >
-                            {/* Timeline dot */}
-                            <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-primary border-2 border-background" />
-                            
-                            <ActivityBookingCard 
-                              activity={item} 
-                              hasKids={!!(trip.kids_ages && trip.kids_ages.length > 0)} 
-                            />
+                  return (
+                    <TabsContent key={day.id} value={day.day_number.toString()}>
+                      <Card>
+                        <CardHeader>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div>
+                              <CardTitle className="text-xl">
+                                Day {day.day_number}: {day.title || "Explore"}
+                              </CardTitle>
+                              <CardDescription className="flex items-center gap-2 mt-1">
+                                <Calendar className="h-4 w-4" />
+                                {formatDate(day.date)}
+                              </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                              <CustomActivityDialog 
+                                itineraryDayId={day.id} 
+                                onActivityAdded={fetchTripData}
+                                existingItemsCount={day.itinerary_items?.length || 0}
+                              />
+                              <Button variant="outline" size="sm">
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Regenerate Day
+                              </Button>
+                            </div>
                           </div>
-                        ))}
-                    </div>
 
-                    {/* Plan B */}
-                    {day.plan_b && (
-                      <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
-                        <h4 className="font-semibold flex items-center gap-2 text-blue-600">
-                          <CloudRain className="h-4 w-4" />
-                          Plan B (Rain or Tired Kids)
-                        </h4>
-                        <p className="text-sm mt-2">{day.plan_b}</p>
-                      </div>
-                    )}
+                          {day.weather_notes && (
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground mt-3">
+                              <CloudRain className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              {day.weather_notes}
+                            </div>
+                          )}
+                        </CardHeader>
+                        
+                        <CardContent className="space-y-6">
+                          {/* Train segments for this day */}
+                          {dayTrains.length > 0 && (
+                            <div className="space-y-3">
+                              <h4 className="font-semibold flex items-center gap-2">
+                                <Train className="h-4 w-4" />
+                                Train Journeys Today
+                              </h4>
+                              {dayTrains.map((train) => (
+                                <TrainSegmentCard key={train.id} segment={train} />
+                              ))}
+                            </div>
+                          )}
 
-                    {/* Notes */}
-                    {day.notes && (
-                      <div className="bg-muted/30 rounded-lg p-4">
-                        <h4 className="font-semibold mb-2">Tips for Today</h4>
-                        <p className="text-sm text-muted-foreground">{day.notes}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            ))}
-          </Tabs>
-        ) : (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Calendar className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold mb-2">No itinerary yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                This trip doesn't have an itinerary. Generate one to get started!
-              </p>
-              <Button>Generate Itinerary</Button>
-            </CardContent>
-          </Card>
-        )}
+                          {/* Activities */}
+                          <div className="space-y-4">
+                            {day.itinerary_items
+                              ?.sort((a, b) => a.sort_order - b.sort_order)
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="relative pl-8 pb-6 border-l-2 border-muted last:pb-0 last:border-transparent"
+                                >
+                                  {/* Timeline dot */}
+                                  <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-primary border-2 border-background" />
+                                  
+                                  <ActivityBookingCard 
+                                    activity={item} 
+                                    hasKids={!!(trip.kids_ages && trip.kids_ages.length > 0)} 
+                                  />
+                                </div>
+                              ))}
+                          </div>
+
+                          {/* Plan B */}
+                          {day.plan_b && (
+                            <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
+                              <h4 className="font-semibold flex items-center gap-2 text-blue-600">
+                                <CloudRain className="h-4 w-4" />
+                                Plan B (Rain or Tired Kids)
+                              </h4>
+                              <p className="text-sm mt-2">{day.plan_b}</p>
+                            </div>
+                          )}
+
+                          {/* Notes */}
+                          {day.notes && (
+                            <div className="bg-muted/30 rounded-lg p-4">
+                              <h4 className="font-semibold mb-2">Tips for Today</h4>
+                              <p className="text-sm text-muted-foreground">{day.notes}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            ) : (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <Calendar className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold mb-2">No itinerary yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    This trip doesn't have an itinerary. Generate one to get started!
+                  </p>
+                  <Button>Generate Itinerary</Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Transport Tab */}
+          {trainSegments.length > 0 && (
+            <TabsContent value="tab-transport">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Train className="h-5 w-5" />
+                    Train Journeys
+                  </CardTitle>
+                  <CardDescription>
+                    All train travel for your trip with booking links
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {trainSegments.map((train) => (
+                    <TrainSegmentCard key={train.id} segment={train} />
+                  ))}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Lodging Tab */}
+          {lodgingSuggestions.length > 0 && !trip.has_lodging_booked && (
+            <TabsContent value="tab-lodging">
+              <LodgingSuggestionsCard 
+                suggestions={lodgingSuggestions}
+                tripTitle={trip.title}
+              />
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
     </AppLayout>
   );
