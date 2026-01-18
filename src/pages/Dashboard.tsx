@@ -416,7 +416,7 @@ const Dashboard = () => {
               <CardContent className="flex flex-col items-center justify-center py-6">
                 <Plane className="h-8 w-8 text-accent mb-2" />
                 <p className="text-3xl font-bold">{trips.length}</p>
-                <p className="text-sm text-muted-foreground">Total Trips</p>
+                <p className="text-sm text-muted-foreground">Planned Trips</p>
               </CardContent>
             </Card>
             {!resolvedHome.hasStateTracking && (

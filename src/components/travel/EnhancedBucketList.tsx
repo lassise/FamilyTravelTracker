@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { 
   Target, Plus, Trash2, CheckCircle2, Circle, 
   Sparkles, Mountain, Camera, Utensils, Compass,
-  Pin, Baby, ChevronDown, Star
+  Pin, Baby, ChevronDown, Star, Filter, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +63,11 @@ const EnhancedBucketList = () => {
   const [selectedCategory, setSelectedCategory] = useState<BucketListItem['category']>('experience');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isKidFriendly, setIsKidFriendly] = useState(false);
+  
+  // Filter state
+  const [filterCategory, setFilterCategory] = useState<BucketListItem['category'] | 'all'>('all');
+  const [showKidFriendlyOnly, setShowKidFriendlyOnly] = useState(false);
+  const [showCompletedOnly, setShowCompletedOnly] = useState(false);
 
   const completedCount = items.filter(i => i.completed).length;
   const progress = items.length > 0 ? (completedCount / items.length) * 100 : 0;
@@ -100,8 +105,16 @@ const EnhancedBucketList = () => {
     setItems(items.filter(item => item.id !== id));
   };
 
+  // Apply filters
+  const filteredItems = items.filter(item => {
+    if (filterCategory !== 'all' && item.category !== filterCategory) return false;
+    if (showKidFriendlyOnly && !item.kidFriendly) return false;
+    if (showCompletedOnly && !item.completed) return false;
+    return true;
+  });
+
   // Sort: pinned first, then incomplete, then completed
-  const sortedItems = [...items].sort((a, b) => {
+  const sortedItems = [...filteredItems].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
     if (a.completed && !b.completed) return 1;
@@ -110,6 +123,14 @@ const EnhancedBucketList = () => {
   });
 
   const visibleItems = isExpanded ? sortedItems : sortedItems.slice(0, 8);
+  
+  const hasActiveFilters = filterCategory !== 'all' || showKidFriendlyOnly || showCompletedOnly;
+  
+  const clearFilters = () => {
+    setFilterCategory('all');
+    setShowKidFriendlyOnly(false);
+    setShowCompletedOnly(false);
+  };
 
   return (
     <Card className="bg-card border-border">
@@ -164,6 +185,63 @@ const EnhancedBucketList = () => {
         )}
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Filter controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Filter:</span>
+          </div>
+          <div className="flex gap-1">
+            <Badge
+              variant={filterCategory === 'all' ? "default" : "outline"}
+              className="cursor-pointer text-xs"
+              onClick={() => setFilterCategory('all')}
+            >
+              All
+            </Badge>
+            {Object.entries(categoryIcons).map(([cat, Icon]) => (
+              <Badge
+                key={cat}
+                variant={filterCategory === cat ? "default" : "outline"}
+                className="cursor-pointer text-xs gap-1"
+                onClick={() => setFilterCategory(cat as BucketListItem['category'])}
+              >
+                <Icon className="h-3 w-3" />
+              </Badge>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+              <Checkbox 
+                checked={showKidFriendlyOnly} 
+                onCheckedChange={(checked) => setShowKidFriendlyOnly(checked as boolean)}
+                className="h-3.5 w-3.5"
+              />
+              <Baby className="h-3 w-3" />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+              <Checkbox 
+                checked={showCompletedOnly} 
+                onCheckedChange={(checked) => setShowCompletedOnly(checked as boolean)}
+                className="h-3.5 w-3.5"
+              />
+              <CheckCircle2 className="h-3 w-3" />
+            </label>
+          </div>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={clearFilters}>
+              <X className="h-3 w-3 mr-1" /> Clear
+            </Button>
+          )}
+        </div>
+        
+        {/* Filter results count */}
+        {hasActiveFilters && (
+          <p className="text-xs text-muted-foreground">
+            Showing {filteredItems.length} of {items.length} items
+          </p>
+        )}
+        
         {/* Add new item */}
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -264,14 +342,14 @@ const EnhancedBucketList = () => {
           })}
         </div>
 
-        {items.length > 8 && (
+        {filteredItems.length > 8 && (
           <Button 
             variant="ghost" 
             size="sm" 
             className="w-full text-muted-foreground"
             onClick={() => setIsExpanded(!isExpanded)}
           >
-            {isExpanded ? 'Show less' : `View all ${items.length} items`}
+            {isExpanded ? 'Show less' : `View all ${filteredItems.length} items`}
             <ChevronDown className={cn("ml-1 h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
           </Button>
         )}

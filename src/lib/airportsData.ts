@@ -85,25 +85,89 @@ export interface Airline {
   name: string;
   alliance?: string;
   reliability: number; // 0-100 score
+  region?: 'us' | 'international';
 }
 
-export const AIRLINES: Airline[] = [
-  { code: "AA", name: "American Airlines", alliance: "Oneworld", reliability: 78 },
-  { code: "DL", name: "Delta Air Lines", alliance: "SkyTeam", reliability: 85 },
-  { code: "UA", name: "United Airlines", alliance: "Star Alliance", reliability: 80 },
-  { code: "WN", name: "Southwest Airlines", reliability: 82 },
-  { code: "B6", name: "JetBlue Airways", reliability: 75 },
-  { code: "AS", name: "Alaska Airlines", alliance: "Oneworld", reliability: 83 },
-  { code: "NK", name: "Spirit Airlines", reliability: 65 },
-  { code: "F9", name: "Frontier Airlines", reliability: 68 },
-  { code: "HA", name: "Hawaiian Airlines", reliability: 80 },
-  { code: "BA", name: "British Airways", alliance: "Oneworld", reliability: 82 },
-  { code: "AF", name: "Air France", alliance: "SkyTeam", reliability: 79 },
-  { code: "LH", name: "Lufthansa", alliance: "Star Alliance", reliability: 84 },
-  { code: "EK", name: "Emirates", reliability: 88 },
-  { code: "SQ", name: "Singapore Airlines", alliance: "Star Alliance", reliability: 91 },
-  { code: "QR", name: "Qatar Airways", alliance: "Oneworld", reliability: 87 },
+// Major US Airlines (shown first)
+export const MAJOR_US_AIRLINES: Airline[] = [
+  { code: "AA", name: "American Airlines", alliance: "Oneworld", reliability: 78, region: 'us' },
+  { code: "DL", name: "Delta Air Lines", alliance: "SkyTeam", reliability: 85, region: 'us' },
+  { code: "UA", name: "United Airlines", alliance: "Star Alliance", reliability: 80, region: 'us' },
+  { code: "WN", name: "Southwest Airlines", reliability: 82, region: 'us' },
+  { code: "B6", name: "JetBlue Airways", reliability: 75, region: 'us' },
+  { code: "AS", name: "Alaska Airlines", alliance: "Oneworld", reliability: 83, region: 'us' },
+  { code: "NK", name: "Spirit Airlines", reliability: 65, region: 'us' },
+  { code: "F9", name: "Frontier Airlines", reliability: 68, region: 'us' },
+  { code: "HA", name: "Hawaiian Airlines", reliability: 80, region: 'us' },
+  { code: "SY", name: "Sun Country Airlines", reliability: 72, region: 'us' },
+  { code: "G4", name: "Allegiant Air", reliability: 67, region: 'us' },
+  { code: "MX", name: "Breeze Airways", reliability: 74, region: 'us' },
+  { code: "VX", name: "Avelo Airlines", reliability: 70, region: 'us' },
 ];
+
+// International Airlines (shown in "more" section)
+export const INTERNATIONAL_AIRLINES: Airline[] = [
+  // Europe
+  { code: "BA", name: "British Airways", alliance: "Oneworld", reliability: 82, region: 'international' },
+  { code: "AF", name: "Air France", alliance: "SkyTeam", reliability: 79, region: 'international' },
+  { code: "LH", name: "Lufthansa", alliance: "Star Alliance", reliability: 84, region: 'international' },
+  { code: "KL", name: "KLM", alliance: "SkyTeam", reliability: 81, region: 'international' },
+  { code: "IB", name: "Iberia", alliance: "Oneworld", reliability: 76, region: 'international' },
+  { code: "AZ", name: "ITA Airways", alliance: "SkyTeam", reliability: 72, region: 'international' },
+  { code: "LX", name: "Swiss International", alliance: "Star Alliance", reliability: 86, region: 'international' },
+  { code: "OS", name: "Austrian Airlines", alliance: "Star Alliance", reliability: 78, region: 'international' },
+  { code: "SK", name: "SAS Scandinavian", alliance: "SkyTeam", reliability: 77, region: 'international' },
+  { code: "AY", name: "Finnair", alliance: "Oneworld", reliability: 83, region: 'international' },
+  { code: "TP", name: "TAP Air Portugal", alliance: "Star Alliance", reliability: 74, region: 'international' },
+  { code: "EI", name: "Aer Lingus", reliability: 79, region: 'international' },
+  { code: "VS", name: "Virgin Atlantic", reliability: 81, region: 'international' },
+  { code: "FR", name: "Ryanair", reliability: 70, region: 'international' },
+  { code: "U2", name: "easyJet", reliability: 72, region: 'international' },
+  { code: "VY", name: "Vueling", reliability: 71, region: 'international' },
+  { code: "W6", name: "Wizz Air", reliability: 68, region: 'international' },
+  { code: "TK", name: "Turkish Airlines", alliance: "Star Alliance", reliability: 80, region: 'international' },
+  // Middle East & Africa
+  { code: "EK", name: "Emirates", reliability: 88, region: 'international' },
+  { code: "QR", name: "Qatar Airways", alliance: "Oneworld", reliability: 87, region: 'international' },
+  { code: "EY", name: "Etihad Airways", reliability: 85, region: 'international' },
+  { code: "SV", name: "Saudia", alliance: "SkyTeam", reliability: 75, region: 'international' },
+  { code: "RJ", name: "Royal Jordanian", alliance: "Oneworld", reliability: 73, region: 'international' },
+  { code: "SA", name: "South African Airways", alliance: "Star Alliance", reliability: 70, region: 'international' },
+  { code: "ET", name: "Ethiopian Airlines", alliance: "Star Alliance", reliability: 76, region: 'international' },
+  // Asia Pacific
+  { code: "SQ", name: "Singapore Airlines", alliance: "Star Alliance", reliability: 91, region: 'international' },
+  { code: "CX", name: "Cathay Pacific", alliance: "Oneworld", reliability: 84, region: 'international' },
+  { code: "NH", name: "ANA (All Nippon Airways)", alliance: "Star Alliance", reliability: 90, region: 'international' },
+  { code: "JL", name: "Japan Airlines", alliance: "Oneworld", reliability: 89, region: 'international' },
+  { code: "KE", name: "Korean Air", alliance: "SkyTeam", reliability: 83, region: 'international' },
+  { code: "OZ", name: "Asiana Airlines", alliance: "Star Alliance", reliability: 81, region: 'international' },
+  { code: "TG", name: "Thai Airways", alliance: "Star Alliance", reliability: 78, region: 'international' },
+  { code: "MH", name: "Malaysia Airlines", alliance: "Oneworld", reliability: 76, region: 'international' },
+  { code: "GA", name: "Garuda Indonesia", alliance: "SkyTeam", reliability: 74, region: 'international' },
+  { code: "PR", name: "Philippine Airlines", reliability: 72, region: 'international' },
+  { code: "VN", name: "Vietnam Airlines", alliance: "SkyTeam", reliability: 75, region: 'international' },
+  { code: "CI", name: "China Airlines", alliance: "SkyTeam", reliability: 77, region: 'international' },
+  { code: "BR", name: "EVA Air", alliance: "Star Alliance", reliability: 85, region: 'international' },
+  { code: "CA", name: "Air China", alliance: "Star Alliance", reliability: 73, region: 'international' },
+  { code: "MU", name: "China Eastern", alliance: "SkyTeam", reliability: 72, region: 'international' },
+  { code: "CZ", name: "China Southern", alliance: "SkyTeam", reliability: 73, region: 'international' },
+  { code: "HU", name: "Hainan Airlines", reliability: 78, region: 'international' },
+  { code: "AI", name: "Air India", alliance: "Star Alliance", reliability: 68, region: 'international' },
+  { code: "QF", name: "Qantas", alliance: "Oneworld", reliability: 86, region: 'international' },
+  { code: "NZ", name: "Air New Zealand", alliance: "Star Alliance", reliability: 85, region: 'international' },
+  // Americas (non-US)
+  { code: "AC", name: "Air Canada", alliance: "Star Alliance", reliability: 79, region: 'international' },
+  { code: "WS", name: "WestJet", reliability: 77, region: 'international' },
+  { code: "AM", name: "Aeromexico", alliance: "SkyTeam", reliability: 74, region: 'international' },
+  { code: "LA", name: "LATAM Airlines", alliance: "Oneworld", reliability: 76, region: 'international' },
+  { code: "AV", name: "Avianca", alliance: "Star Alliance", reliability: 73, region: 'international' },
+  { code: "CM", name: "Copa Airlines", alliance: "Star Alliance", reliability: 80, region: 'international' },
+  { code: "JJ", name: "LATAM Brasil", alliance: "Oneworld", reliability: 74, region: 'international' },
+  { code: "G3", name: "GOL Linhas Aéreas", reliability: 71, region: 'international' },
+];
+
+// Combined list for backward compatibility
+export const AIRLINES: Airline[] = [...MAJOR_US_AIRLINES, ...INTERNATIONAL_AIRLINES];
 
 export const ALLIANCES = ["Star Alliance", "Oneworld", "SkyTeam"];
 
