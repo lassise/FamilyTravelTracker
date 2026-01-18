@@ -18,6 +18,7 @@ export interface FlightSegment {
 }
 
 export interface FlightItinerary {
+  type?: 'outbound' | 'return' | string;
   segments: FlightSegment[];
 }
 

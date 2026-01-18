@@ -21,7 +21,7 @@ import {
   PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
   Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown, Bell,
-  TrendingDown, TrendingUp, Minus, Lightbulb
+  TrendingDown, TrendingUp, Minus, Lightbulb, ArrowLeft, ArrowRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -1309,74 +1309,113 @@ const Flights = () => {
                     )}
 
                     {/* Flight segments */}
-                    {flight.itineraries?.map((itinerary, itIdx) => (
-                      <div key={itIdx} className="space-y-2 mb-2">
-                        {itIdx > 0 && <div className="text-xs text-muted-foreground border-t pt-2">Return</div>}
-                        {itinerary.segments?.map((seg, segIdx) => {
-                          // Get layover info for connection risk indicator
-                          const layover = flight.layovers?.[segIdx];
-                          const hasLayover = segIdx < itinerary.segments.length - 1 && layover;
-                          
-                          return (
-                            <div key={segIdx} className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <Badge variant={isAvoided ? "destructive" : "outline"}>{seg.airline} {seg.flightNumber}</Badge>
-                                <div className="flex items-center gap-2 text-center">
-                                  <div>
-                                    <p className="font-medium">{formatTime(seg.departureTime)}</p>
-                                    <p className="text-xs text-muted-foreground">{formatDate(seg.departureTime)}</p>
-                                    <p className="text-xs text-muted-foreground">{seg.departureAirport}</p>
-                                  </div>
-                                  <div className="px-2">
-                                    <p className="text-xs text-muted-foreground">{typeof seg.duration === 'number' ? `${Math.floor(seg.duration / 60)}h ${seg.duration % 60}m` : seg.duration || '—'}</p>
-                                    <div className="w-16 h-px bg-border" />
-                                    <p className="text-xs">{seg.stops === 0 ? 'Nonstop' : `${seg.stops} stop`}</p>
-                                  </div>
-                                  <div>
-                                    <p className="font-medium">{formatTime(seg.arrivalTime)}</p>
-                                    <p className="text-xs text-muted-foreground">{formatDate(seg.arrivalTime)}</p>
-                                    <p className="text-xs text-muted-foreground">{seg.arrivalAirport}</p>
-                                  </div>
-                                </div>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => {
-                                    const googleFlightsUrl = buildGoogleFlightsUrl(
-                                      seg.departureAirport,
-                                      seg.arrivalAirport,
-                                      seg.departureTime ? new Date(seg.departureTime).toISOString().split('T')[0] : departDate,
-                                      tripType === "roundtrip" ? returnDate : undefined,
-                                      passengers,
-                                      cabinClass
-                                    );
-                                    window.open(googleFlightsUrl, '_blank');
-                                  }}
-                                  className="gap-1"
-                                  title="Book on Google Flights - final price confirmed there"
-                                >
-                                  Book on Google <ExternalLink className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              
-                              {/* Connection Risk Indicator - show between segments */}
-                              {hasLayover && layover && (
-                                <div className="flex items-center gap-2 pl-4 py-1 border-l-2 border-dashed border-muted ml-4">
-                                  <Clock className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground">
-                                    {layover.duration}min layover at {layover.airport || layover.airportName}
-                                  </span>
-                                  <ConnectionRiskIndicator
-                                    layoverMinutes={layover.duration}
-                                    hasKids={preferences.family_mode || children > 0 || infantsInSeat > 0}
-                                    isInternational={origin.length === 3 && destination.length === 3}
-                                  />
-                                </div>
+                    {flight.itineraries?.map((itinerary, itIdx) => {
+                      const isReturn = itinerary.type === 'return' || itIdx > 0;
+                      return (
+                        <div key={itIdx} className="space-y-2 mb-3">
+                          {/* Itinerary header */}
+                          <div className={`flex items-center gap-2 ${itIdx > 0 ? 'border-t pt-3' : ''}`}>
+                            <Badge variant={isReturn ? "secondary" : "default"} className="text-xs">
+                              {isReturn ? (
+                                <>
+                                  <ArrowLeft className="h-3 w-3 mr-1" />
+                                  Return Flight
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowRight className="h-3 w-3 mr-1" />
+                                  Outbound Flight
+                                </>
                               )}
-                            </div>
-                          );
-                        })}
+                            </Badge>
+                            {itinerary.segments?.length > 1 && (
+                              <span className="text-xs text-muted-foreground">
+                                ({itinerary.segments.length - 1} connection{itinerary.segments.length > 2 ? 's' : ''})
+                              </span>
+                            )}
+                          </div>
+                          
+                          {itinerary.segments?.map((seg, segIdx) => {
+                            // Get layover info for connection risk indicator
+                            const layover = flight.layovers?.[segIdx];
+                            const hasLayover = segIdx < itinerary.segments.length - 1 && layover;
+                            
+                            return (
+                              <div key={segIdx} className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <Badge variant={isAvoided ? "destructive" : "outline"}>{seg.airline} {seg.flightNumber}</Badge>
+                                  <div className="flex items-center gap-2 text-center">
+                                    <div>
+                                      <p className="font-medium">{formatTime(seg.departureTime)}</p>
+                                      <p className="text-xs text-muted-foreground">{formatDate(seg.departureTime)}</p>
+                                      <p className="text-xs text-muted-foreground">{seg.departureAirport}</p>
+                                    </div>
+                                    <div className="px-2">
+                                      <p className="text-xs text-muted-foreground">{typeof seg.duration === 'number' ? `${Math.floor(seg.duration / 60)}h ${seg.duration % 60}m` : seg.duration || '—'}</p>
+                                      <div className="w-16 h-px bg-border" />
+                                      <p className="text-xs">{seg.stops === 0 ? 'Nonstop' : `${seg.stops} stop`}</p>
+                                    </div>
+                                    <div>
+                                      <p className="font-medium">{formatTime(seg.arrivalTime)}</p>
+                                      <p className="text-xs text-muted-foreground">{formatDate(seg.arrivalTime)}</p>
+                                      <p className="text-xs text-muted-foreground">{seg.arrivalAirport}</p>
+                                    </div>
+                                  </div>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => {
+                                      const googleFlightsUrl = buildGoogleFlightsUrl(
+                                        seg.departureAirport,
+                                        seg.arrivalAirport,
+                                        seg.departureTime ? new Date(seg.departureTime).toISOString().split('T')[0] : departDate,
+                                        tripType === "roundtrip" ? returnDate : undefined,
+                                        passengers,
+                                        cabinClass
+                                      );
+                                      window.open(googleFlightsUrl, '_blank');
+                                    }}
+                                    className="gap-1"
+                                    title="Book on Google Flights - final price confirmed there"
+                                  >
+                                    Book on Google <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                
+                                {/* Connection Risk Indicator - show between segments */}
+                                {hasLayover && layover && (
+                                  <div className="flex items-center gap-2 pl-4 py-1 border-l-2 border-dashed border-muted ml-4">
+                                    <Clock className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">
+                                      {layover.duration}min layover at {layover.airport || layover.airportName}
+                                    </span>
+                                    <ConnectionRiskIndicator
+                                      layoverMinutes={layover.duration}
+                                      hasKids={preferences.family_mode || children > 0 || infantsInSeat > 0}
+                                      isInternational={origin.length === 3 && destination.length === 3}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Round-trip return flight note */}
+                    {tripType === "roundtrip" && flight.itineraries?.length === 1 && (
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 mb-3">
+                        <div className="flex items-start gap-2">
+                          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                          <div className="text-xs text-blue-700 dark:text-blue-300">
+                            <p className="font-medium mb-1">Return flight options</p>
+                            <p className="text-blue-600 dark:text-blue-400">
+                              This price includes round-trip. Click "View Round Trip" to see return flight options for {returnDate} on Google Flights.
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    ))}
+                    )}
                     
                     {/* Transparency Panel - What's included */}
                     <FlightTransparencyPanel
@@ -1406,9 +1445,33 @@ const Flights = () => {
                       }}
                     />
                     
+                    {/* View Round Trip CTA for round-trip searches */}
+                    {tripType === "roundtrip" && (
+                      <Button 
+                        className="w-full mt-3 gap-2"
+                        onClick={() => {
+                          const firstSeg = flight.itineraries[0]?.segments[0];
+                          const googleFlightsUrl = buildGoogleFlightsUrl(
+                            firstSeg?.departureAirport || origin,
+                            firstSeg?.arrivalAirport || destination,
+                            departDate,
+                            returnDate,
+                            passengers,
+                            cabinClass
+                          );
+                          window.open(googleFlightsUrl, '_blank');
+                        }}
+                      >
+                        View Round Trip on Google Flights <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    )}
+                    
                     {/* Disclaimer */}
                     <p className="text-[10px] text-muted-foreground mt-2">
-                      Estimated fare shown. Final price and inclusions confirmed on Google Flights/airline site.
+                      {tripType === "roundtrip" 
+                        ? "Price shown is for round-trip. Final price and return flight options confirmed on Google Flights."
+                        : "Estimated fare shown. Final price and inclusions confirmed on Google Flights/airline site."
+                      }
                     </p>
                   </CardContent>
                 </Card>

@@ -90,10 +90,36 @@ async function searchFlightsFromOrigin(
     const allFlights = [...bestFlights, ...otherFlights];
 
     // Transform flights and tag with origin info
+    // Note: For round-trip searches, SerpAPI returns outbound flights first.
+    // Return flights require a second API call using departure_token.
+    // We include the departure_token so the booking flow can use it.
     const flights = allFlights.map((flight: any, index: number) => {
-      const flightLegs = flight.flights || [];
-      const totalDuration = flight.total_duration || flightLegs.reduce((sum: number, leg: any) => sum + (leg.duration || 0), 0);
-      const stops = flightLegs.length - 1;
+      const outboundLegs = flight.flights || [];
+      const totalDuration = flight.total_duration || outboundLegs.reduce((sum: number, leg: any) => sum + (leg.duration || 0), 0);
+      const stops = outboundLegs.length - 1;
+      
+      // Build outbound itinerary
+      const outboundItinerary = {
+        type: 'outbound',
+        segments: outboundLegs.map((leg: any) => ({
+          departureAirport: leg.departure_airport?.id || origin,
+          departureTime: leg.departure_airport?.time || '',
+          arrivalAirport: leg.arrival_airport?.id || destination,
+          arrivalTime: leg.arrival_airport?.time || '',
+          airline: leg.airline || 'Unknown',
+          airlineLogo: leg.airline_logo,
+          flightNumber: leg.flight_number || '',
+          duration: leg.duration || 0,
+          stops: 0,
+          cabin: leg.travel_class || 'Economy',
+          airplane: leg.airplane,
+          legroom: leg.legroom,
+          extensions: leg.extensions || [],
+          overnight: leg.overnight || false,
+        })),
+      };
+      
+      const itineraries: Array<{ type: string; segments: any[] }> = [outboundItinerary];
       
       return {
         id: `serpapi-${origin}-${index}-${Date.now()}`,
@@ -106,24 +132,8 @@ async function searchFlightsFromOrigin(
         departureAirport: origin,
         isAlternateOrigin: isAlternate,
         minSavingsRequired: minSavings,
-        itineraries: [{
-          segments: flightLegs.map((leg: any) => ({
-            departureAirport: leg.departure_airport?.id || origin,
-            departureTime: leg.departure_airport?.time || '',
-            arrivalAirport: leg.arrival_airport?.id || destination,
-            arrivalTime: leg.arrival_airport?.time || '',
-            airline: leg.airline || 'Unknown',
-            airlineLogo: leg.airline_logo,
-            flightNumber: leg.flight_number || '',
-            duration: leg.duration || 0,
-            stops: 0,
-            cabin: leg.travel_class || 'Economy',
-            airplane: leg.airplane,
-            legroom: leg.legroom,
-            extensions: leg.extensions || [],
-            overnight: leg.overnight || false,
-          })),
-        }],
+        tripType: tripType,
+        itineraries,
         layovers: flight.layovers?.map((layover: any) => ({
           airport: layover.id,
           airportName: layover.name,
@@ -132,6 +142,8 @@ async function searchFlightsFromOrigin(
         })) || [],
         extensions: flight.extensions || [],
         bookingToken: flight.booking_token,
+        // Include departure_token for round-trip return flight lookup
+        departureToken: flight.departure_token,
       };
     });
 
