@@ -21,6 +21,13 @@ export interface FlightItinerary {
   segments: FlightSegment[];
 }
 
+export interface LayoverInfo {
+  airport?: string;
+  airportName?: string;
+  duration: number;
+  overnight?: boolean;
+}
+
 export interface FlightResult {
   id: string;
   price: number;
@@ -29,6 +36,7 @@ export interface FlightResult {
   departureAirport?: string;
   isAlternateOrigin?: boolean;
   minSavingsRequired?: number;
+  layovers?: LayoverInfo[];
 }
 
 export interface PreferenceMatch {

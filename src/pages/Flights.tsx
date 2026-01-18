@@ -15,6 +15,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlternateAirportsSection } from "@/components/flights/AlternateAirportsSection";
 import { PriceAlertDialog } from "@/components/flights/PriceAlertDialog";
+import { FlightTransparencyPanel } from "@/components/flights/FlightTransparencyPanel";
+import { ConnectionRiskIndicator } from "@/components/flights/ConnectionRiskIndicator";
 import { 
   PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, 
   Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle,
@@ -25,6 +27,46 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { scoreFlights, categorizeFlights, type ScoredFlight, type FlightResult, type PassengerBreakdown } from "@/lib/flightScoring";
 import { searchAirports, AIRLINES, type Airport } from "@/lib/airportsData";
+
+// Build Google Flights deep link for booking handoff
+const buildGoogleFlightsUrl = (
+  origin: string,
+  destination: string,
+  departDate: string,
+  returnDate?: string,
+  passengers?: number,
+  cabinClass?: string
+): string => {
+  const cabinMap: Record<string, string> = {
+    'economy': '1',
+    'premium_economy': '2',
+    'business': '3',
+    'first': '4',
+  };
+  
+  const baseUrl = 'https://www.google.com/travel/flights';
+  const params = new URLSearchParams();
+  
+  // Build the query string for Google Flights
+  const tripType = returnDate ? 'roundtrip' : 'oneway';
+  const cabin = cabinMap[cabinClass || 'economy'] || '1';
+  
+  // Format: Flights from [origin] to [destination] on [date]
+  let query = `Flights from ${origin} to ${destination}`;
+  if (departDate) {
+    query += ` on ${departDate}`;
+  }
+  if (returnDate) {
+    query += ` returning ${returnDate}`;
+  }
+  
+  params.set('q', query);
+  if (passengers && passengers > 1) {
+    params.set('pax', passengers.toString());
+  }
+  
+  return `${baseUrl}?${params.toString()}`;
+};
 
 const DEPARTURE_TIMES = [
   { value: "early_morning", label: "Early (5-8am)" },
@@ -1232,50 +1274,104 @@ const Flights = () => {
                     {flight.itineraries?.map((itinerary, itIdx) => (
                       <div key={itIdx} className="space-y-2 mb-2">
                         {itIdx > 0 && <div className="text-xs text-muted-foreground border-t pt-2">Return</div>}
-                        {itinerary.segments?.map((seg, segIdx) => (
-                          <div key={segIdx} className="flex items-center justify-between text-sm">
-                            <Badge variant={isAvoided ? "destructive" : "outline"}>{seg.airline} {seg.flightNumber}</Badge>
-                            <div className="flex items-center gap-2 text-center">
-                              <div>
-                                <p className="font-medium">{formatTime(seg.departureTime)}</p>
-                                <p className="text-xs text-muted-foreground">{formatDate(seg.departureTime)}</p>
-                                <p className="text-xs text-muted-foreground">{seg.departureAirport}</p>
+                        {itinerary.segments?.map((seg, segIdx) => {
+                          // Get layover info for connection risk indicator
+                          const layover = flight.layovers?.[segIdx];
+                          const hasLayover = segIdx < itinerary.segments.length - 1 && layover;
+                          
+                          return (
+                            <div key={segIdx} className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <Badge variant={isAvoided ? "destructive" : "outline"}>{seg.airline} {seg.flightNumber}</Badge>
+                                <div className="flex items-center gap-2 text-center">
+                                  <div>
+                                    <p className="font-medium">{formatTime(seg.departureTime)}</p>
+                                    <p className="text-xs text-muted-foreground">{formatDate(seg.departureTime)}</p>
+                                    <p className="text-xs text-muted-foreground">{seg.departureAirport}</p>
+                                  </div>
+                                  <div className="px-2">
+                                    <p className="text-xs text-muted-foreground">{typeof seg.duration === 'number' ? `${Math.floor(seg.duration / 60)}h ${seg.duration % 60}m` : seg.duration || '—'}</p>
+                                    <div className="w-16 h-px bg-border" />
+                                    <p className="text-xs">{seg.stops === 0 ? 'Nonstop' : `${seg.stops} stop`}</p>
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{formatTime(seg.arrivalTime)}</p>
+                                    <p className="text-xs text-muted-foreground">{formatDate(seg.arrivalTime)}</p>
+                                    <p className="text-xs text-muted-foreground">{seg.arrivalAirport}</p>
+                                  </div>
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const googleFlightsUrl = buildGoogleFlightsUrl(
+                                      seg.departureAirport,
+                                      seg.arrivalAirport,
+                                      seg.departureTime ? new Date(seg.departureTime).toISOString().split('T')[0] : departDate,
+                                      tripType === "roundtrip" ? returnDate : undefined,
+                                      passengers,
+                                      cabinClass
+                                    );
+                                    window.open(googleFlightsUrl, '_blank');
+                                  }}
+                                  className="gap-1"
+                                  title="Book on Google Flights - final price confirmed there"
+                                >
+                                  Book on Google <ExternalLink className="h-3 w-3" />
+                                </Button>
                               </div>
-                              <div className="px-2">
-                                <p className="text-xs text-muted-foreground">{seg.duration || '—'}</p>
-                                <div className="w-16 h-px bg-border" />
-                                <p className="text-xs">{seg.stops === 0 ? 'Nonstop' : `${seg.stops} stop`}</p>
-                              </div>
-                              <div>
-                                <p className="font-medium">{formatTime(seg.arrivalTime)}</p>
-                                <p className="text-xs text-muted-foreground">{formatDate(seg.arrivalTime)}</p>
-                                <p className="text-xs text-muted-foreground">{seg.arrivalAirport}</p>
-                              </div>
+                              
+                              {/* Connection Risk Indicator - show between segments */}
+                              {hasLayover && layover && (
+                                <div className="flex items-center gap-2 pl-4 py-1 border-l-2 border-dashed border-muted ml-4">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">
+                                    {layover.duration}min layover at {layover.airport || layover.airportName}
+                                  </span>
+                                  <ConnectionRiskIndicator
+                                    layoverMinutes={layover.duration}
+                                    hasKids={preferences.family_mode || children > 0 || infantsInSeat > 0}
+                                    isInternational={origin.length === 3 && destination.length === 3}
+                                  />
+                                </div>
+                              )}
                             </div>
-                            {flight.bookingUrl ? (
-                              <Button 
-                                size="sm" 
-                                onClick={() => window.open(flight.bookingUrl, '_blank')}
-                                className="gap-1"
-                              >
-                                Book <ExternalLink className="h-3 w-3" />
-                              </Button>
-                            ) : (
-                              <Button 
-                                size="sm" 
-                                onClick={() => {
-                                  const searchUrl = `https://www.google.com/travel/flights?q=Flights%20to%20${seg.arrivalAirport}%20from%20${seg.departureAirport}%20on%20${seg.departureTime ? new Date(seg.departureTime).toISOString().split('T')[0] : ''}`;
-                                  window.open(searchUrl, '_blank');
-                                }}
-                                className="gap-1"
-                              >
-                                Book <ExternalLink className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ))}
+                    
+                    {/* Transparency Panel - What's included */}
+                    <FlightTransparencyPanel
+                      cabinClass={cabinClass === "any" ? "economy" : cabinClass}
+                      isBasicEconomy={flight.badges?.includes("Basic Economy")}
+                      fareFamily={flight.itineraries[0]?.segments[0]?.cabin}
+                      inclusions={{
+                        carryOn: cabinClass === "business" || cabinClass === "first" ? true : 'fee',
+                        checkedBag: cabinClass === "business" || cabinClass === "first" ? true : 'fee',
+                        seatSelection: cabinClass === "business" || cabinClass === "first" ? true : (cabinClass === "premium_economy" ? true : 'fee'),
+                        mealIncluded: cabinClass === "business" || cabinClass === "first" ? true : false,
+                        wifi: 'fee',
+                        power: cabinClass === "business" || cabinClass === "first" ? true : false,
+                        entertainment: true,
+                        changeable: cabinClass === "economy" ? 'fee' : true,
+                        refundable: cabinClass === "business" || cabinClass === "first" ? true : false,
+                      }}
+                      restrictions={flight.badges?.includes("Basic Economy") ? [
+                        "No carry-on bag (personal item only)",
+                        "Seat assigned at check-in",
+                        "Board last",
+                        "No changes or refunds"
+                      ] : []}
+                      estimatedBagFees={{
+                        firstBag: cabinClass === "business" || cabinClass === "first" ? 0 : 35,
+                        secondBag: cabinClass === "business" || cabinClass === "first" ? 0 : 45,
+                      }}
+                    />
+                    
+                    {/* Disclaimer */}
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      Estimated fare shown. Final price and inclusions confirmed on Google Flights/airline site.
+                    </p>
                   </CardContent>
                 </Card>
               );

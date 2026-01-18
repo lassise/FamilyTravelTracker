@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Train,
   Hotel,
+  Share2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
