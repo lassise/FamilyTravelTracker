@@ -198,23 +198,49 @@ const TripWizard = () => {
       });
 
       if (itineraryError) {
-        throw itineraryError;
+        // Handle specific error codes with user-friendly messages
+        const errorData = itineraryError.message ? JSON.parse(itineraryError.message) : {};
+        const errorCode = errorData.code;
+        
+        switch (errorCode) {
+          case 'RATE_LIMITED':
+          case 'AI_RATE_LIMITED':
+            toast.error("You're making requests too quickly. Please wait a moment and try again.");
+            break;
+          case 'CREDITS_EXHAUSTED':
+            toast.error("AI credits are exhausted. Please add credits to continue.");
+            break;
+          case 'VALIDATION_ERROR':
+            toast.error("Please check your trip details: " + (errorData.details?.[0] || "Invalid input"));
+            break;
+          default:
+            toast.error(errorData.error || "Failed to generate itinerary. Please try again.");
+        }
+        throw new Error(errorData.error || 'Generation failed');
       }
 
-      const { itinerary } = itineraryData;
+      const { itinerary, meta } = itineraryData;
+      
+      // Check if any days need regeneration
+      if (meta?.daysNeedingRegeneration?.length > 0) {
+        toast.warning(`Generated itinerary with ${meta.daysNeedingRegeneration.length} day(s) that may need regeneration.`);
+      }
 
       // Save the itinerary days and items to the database
+      // Use exact dates from formData to ensure date integrity
       if (itinerary?.days) {
         for (const day of itinerary.days) {
+          // Calculate exact date based on user's start date
           const dayDate = new Date(formData.startDate);
           dayDate.setDate(dayDate.getDate() + day.dayNumber - 1);
+          const exactDate = dayDate.toISOString().split('T')[0];
 
           const { data: savedDay, error: dayError } = await supabase
             .from('itinerary_days')
             .insert({
               trip_id: trip.id,
               day_number: day.dayNumber,
-              date: dayDate.toISOString().split('T')[0],
+              date: exactDate, // Always use calculated date, never AI's date
               title: day.title,
               notes: day.notes,
               weather_notes: day.weather_notes,
@@ -265,7 +291,10 @@ const TripWizard = () => {
       
     } catch (error: any) {
       console.error('Error generating itinerary:', error);
-      toast.error(error.message || "Failed to generate itinerary. Please try again.");
+      // Error already shown via toast above for known errors
+      if (!error.message?.includes('Generation failed')) {
+        toast.error("Something went wrong. Please try again.");
+      }
     } finally {
       setIsGenerating(false);
     }
