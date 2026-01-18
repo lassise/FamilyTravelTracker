@@ -83,21 +83,10 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
   const displayedVisits = showAllVisits ? filteredVisits : filteredVisits.slice(0, 10);
   const hasMore = filteredVisits.length > 10;
 
-  // Convert ISO country code to emoji flag
-  const codeToEmoji = (code: string): string => {
-    if (!code || code.length !== 2) return '🏳️';
-    const upperCode = code.toUpperCase();
-    // Check if it's already an emoji (starts with a high Unicode point)
-    if (code.charCodeAt(0) > 255) return code;
-    // Convert 2-letter code to regional indicator symbols
-    return String.fromCodePoint(
-      ...upperCode.split('').map(char => 127397 + char.charCodeAt(0))
-    );
-  };
 
   const getCountryData = (countryId: string) => {
     const country = countries.find(c => c.id === countryId);
-    if (!country) return { flag: '🏳️', name: 'Unknown', countryCode: '', isSubdivision: false };
+    if (!country) return { name: 'Unknown', countryCode: '' };
 
     const storedFlag = (country.flag || '').trim().toUpperCase();
 
@@ -109,18 +98,8 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
     const codeFromStoredFlag = storedFlagIsCode ? storedFlag : '';
 
     const effectiveCode = (regionCode || codeFromStoredFlag).toUpperCase();
-    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(effectiveCode);
-    const isTwoLetterCode = /^[A-Z]{2}$/.test(effectiveCode);
 
-    if (isSubdivision) {
-      return { flag: '', name: country.name, countryCode: effectiveCode, isSubdivision: true };
-    }
-
-    const flag = isTwoLetterCode
-      ? codeToEmoji(effectiveCode)
-      : (country.flag || '🏳️');
-
-    return { flag, name: country.name, countryCode: effectiveCode, isSubdivision: false };
+    return { name: country.name, countryCode: effectiveCode };
   };
 
   // Get photos for a specific country
@@ -208,7 +187,7 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
           
           <div className="space-y-6">
             {displayedVisits.map((visit, index) => {
-              const { flag, name, countryCode, isSubdivision } = getCountryData(visit.country_id);
+              const { name, countryCode } = getCountryData(visit.country_id);
               const countryPhotos = getCountryPhotos(visit.country_id);
               const memory = getVisitMemory(visit);
               
@@ -229,11 +208,7 @@ const TravelTimeline = memo(({ countries }: TravelTimelineProps) => {
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                       <div className="flex-1">
                         <h4 className="font-semibold text-foreground text-lg flex items-center gap-2">
-                          {isSubdivision ? (
-                            <CountryFlag countryCode={countryCode} countryName={name} size="md" />
-                          ) : (
-                            <span>{flag}</span>
-                          )}
+                          <CountryFlag countryCode={countryCode} countryName={name} size="md" />
                           {name}
                         </h4>
                         <span className="text-sm text-muted-foreground flex items-center gap-1 mt-1">

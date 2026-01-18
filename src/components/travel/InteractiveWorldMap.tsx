@@ -248,53 +248,6 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     return [30, 20];
   }, [homeCountryISO]);
 
-  // Handle country click from map
-  const handleCountryClick = useCallback((iso3: string) => {
-    const countryName = iso3ToCountryName[iso3];
-    if (!countryName) {
-      // Try to get name from Mapbox data via countries-list
-      const allCountries = getAllCountries();
-      const iso2 = iso3ToIso2[iso3];
-      const match = iso2 ? allCountries.find(c => c.code === iso2) : null;
-      if (!match) return;
-      
-      setClickedCountryInfo({
-        iso3,
-        name: match.name,
-        flag: match.flag,
-        continent: match.continent,
-      });
-    } else {
-      const allCountries = getAllCountries();
-      const match = allCountries.find(c => c.name === countryName);
-      
-      setClickedCountryInfo({
-        iso3,
-        name: countryName,
-        flag: match?.flag ?? '🏳️',
-        continent: match?.continent ?? 'Unknown',
-      });
-    }
-    setQuickActionOpen(true);
-  }, []);
-
-  // Check if clicked country is the home country
-  const isClickedCountryHomeCountry = useMemo(() => {
-    if (!clickedCountryInfo || !resolvedHome.name) return false;
-    return resolvedHome.isHomeCountry(clickedCountryInfo.name);
-  }, [clickedCountryInfo, resolvedHome]);
-
-  // Check if clicked country is visited or wishlisted
-  const isClickedCountryVisited = useMemo(() => {
-    if (!clickedCountryInfo) return false;
-    return visitedCountries.includes(clickedCountryInfo.iso3);
-  }, [clickedCountryInfo, visitedCountries]);
-
-  const isClickedCountryWishlisted = useMemo(() => {
-    if (!clickedCountryInfo) return false;
-    return wishlistCountries.includes(clickedCountryInfo.iso3);
-  }, [clickedCountryInfo, wishlistCountries]);
-
   const openStateTrackingDialogForIso3 = useCallback(
     async (iso3?: string) => {
       if (!iso3) return;
@@ -356,6 +309,69 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     },
     [countries, resolvedHome.name]
   );
+
+  // Handle country click from map
+  const handleCountryClick = useCallback(async (iso3: string) => {
+    const countryName = iso3ToCountryName[iso3];
+    const allCountries = getAllCountries();
+    const iso2 = iso3ToIso2[iso3];
+    
+    let clickedInfo: typeof clickedCountryInfo = null;
+    
+    if (!countryName) {
+      // Try to get name from Mapbox data via countries-list
+      const match = iso2 ? allCountries.find(c => c.code === iso2) : null;
+      if (!match) return;
+      
+      clickedInfo = {
+        iso3,
+        name: match.name,
+        flag: match.flag,
+        continent: match.continent,
+      };
+    } else {
+      const match = allCountries.find(c => c.name === countryName);
+      
+      clickedInfo = {
+        iso3,
+        name: countryName,
+        flag: match?.flag ?? '🏳️',
+        continent: match?.continent ?? 'Unknown',
+      };
+    }
+
+    // Check if this country is visited
+    const isVisited = visitedCountries.includes(iso3);
+    const isHome = resolvedHome.isHomeCountry(clickedInfo.name);
+    
+    // For visited countries or home country - navigate directly to states/cities
+    if (isVisited || isHome) {
+      // Open state tracking dialog directly
+      await openStateTrackingDialogForIso3(iso3);
+      return;
+    }
+    
+    // For unvisited countries - show the quick action dialog
+    setClickedCountryInfo(clickedInfo);
+    setQuickActionOpen(true);
+  }, [visitedCountries, resolvedHome, openStateTrackingDialogForIso3]);
+
+  // Check if clicked country is the home country
+  const isClickedCountryHomeCountry = useMemo(() => {
+    if (!clickedCountryInfo || !resolvedHome.name) return false;
+    return resolvedHome.isHomeCountry(clickedCountryInfo.name);
+  }, [clickedCountryInfo, resolvedHome]);
+
+  // Check if clicked country is visited or wishlisted
+  const isClickedCountryVisited = useMemo(() => {
+    if (!clickedCountryInfo) return false;
+    return visitedCountries.includes(clickedCountryInfo.iso3);
+  }, [clickedCountryInfo, visitedCountries]);
+
+  const isClickedCountryWishlisted = useMemo(() => {
+    if (!clickedCountryInfo) return false;
+    return wishlistCountries.includes(clickedCountryInfo.iso3);
+  }, [clickedCountryInfo, wishlistCountries]);
 
   const handleOpenStateTracking = useCallback((countryId: string, countryName: string) => {
     const country = countries.find(c => c.id === countryId || c.name === countryName);
