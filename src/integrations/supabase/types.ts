@@ -1184,6 +1184,77 @@ export type Database = {
         }
         Relationships: []
       }
+      travel_profiles: {
+        Row: {
+          budget_level: string | null
+          created_at: string
+          custom_preferences: Json | null
+          domestic_vs_international: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          kid_friendly_priority: string | null
+          max_stops: number | null
+          name: string
+          pace: string | null
+          prefer_nonstop: boolean | null
+          preferred_seat_features: string[] | null
+          preferred_seat_types: string[] | null
+          trip_length_max: number | null
+          trip_length_min: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_level?: string | null
+          created_at?: string
+          custom_preferences?: Json | null
+          domestic_vs_international?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          kid_friendly_priority?: string | null
+          max_stops?: number | null
+          name: string
+          pace?: string | null
+          prefer_nonstop?: boolean | null
+          preferred_seat_features?: string[] | null
+          preferred_seat_types?: string[] | null
+          trip_length_max?: number | null
+          trip_length_min?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_level?: string | null
+          created_at?: string
+          custom_preferences?: Json | null
+          domestic_vs_international?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          kid_friendly_priority?: string | null
+          max_stops?: number | null
+          name?: string
+          pace?: string | null
+          prefer_nonstop?: boolean | null
+          preferred_seat_features?: string[] | null
+          preferred_seat_types?: string[] | null
+          trip_length_max?: number | null
+          trip_length_min?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "travel_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       travel_settings: {
         Row: {
           created_at: string | null

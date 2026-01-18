@@ -12,14 +12,31 @@ const navItems = [
 export function BottomNav() {
   const location = useLocation();
   
-  const isActive = (path: string) => {
-    if (path === "/trips" && location.pathname === "/trips") return true;
-    if (path === "/trips/new" && location.pathname === "/trips/new") return true;
-    return location.pathname === path;
+  const isActive = (href: string) => {
+    // Handle query params in the href
+    const [path, query] = href.split('?');
+    const currentPath = location.pathname;
+    const currentSearch = location.search;
+    
+    if (path !== currentPath) return false;
+    
+    // If href has a query param, check it matches
+    if (query) {
+      return currentSearch.includes(query);
+    }
+    
+    // For base paths without query, only active if no tab query
+    return !currentSearch.includes('tab=');
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur-lg border-t border-border safe-area-bottom">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 z-[100] md:hidden bg-background/95 backdrop-blur-lg border-t border-border"
+      style={{ 
+        paddingBottom: 'max(env(safe-area-inset-bottom), 8px)',
+        WebkitTransform: 'translateZ(0)', // Force GPU layer for iOS
+      }}
+    >
       <div className="flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -30,10 +47,10 @@ export function BottomNav() {
               key={item.href}
               to={item.href}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 flex-1 py-2 px-1 rounded-lg transition-all duration-200",
+                "flex flex-col items-center justify-center gap-1 flex-1 py-2 px-1 rounded-lg transition-all duration-200 touch-manipulation",
                 active 
                   ? "text-primary" 
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground active:text-foreground"
               )}
             >
               <div className={cn(
