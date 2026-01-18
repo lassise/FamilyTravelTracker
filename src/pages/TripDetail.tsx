@@ -53,6 +53,16 @@ interface ItineraryItem {
   transport_mode: string | null;
   transport_booking_url: string | null;
   transport_station_notes: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  distance_from_previous: number | null;
+  distance_unit: string | null;
+  travel_time_minutes: number | null;
+  recommended_transit_mode: string | null;
+  transit_details: string | null;
+  is_wheelchair_accessible: boolean | null;
+  accessibility_notes: string | null;
+  stroller_notes: string | null;
 }
 
 interface ItineraryDay {
@@ -79,6 +89,9 @@ interface Trip {
   notes: string | null;
   cover_image: string | null;
   has_lodging_booked: boolean | null;
+  needs_wheelchair_access: boolean | null;
+  has_stroller: boolean | null;
+  lodging_address: string | null;
 }
 
 interface TrainSegment {
@@ -431,20 +444,33 @@ const TripDetail = () => {
                           <div className="space-y-4">
                             {day.itinerary_items
                               ?.sort((a, b) => a.sort_order - b.sort_order)
-                              .map((item) => (
-                                <div
-                                  key={item.id}
-                                  className="relative pl-8 pb-6 border-l-2 border-muted last:pb-0 last:border-transparent"
-                                >
-                                  {/* Timeline dot */}
-                                  <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-primary border-2 border-background" />
-                                  
-                                  <ActivityBookingCard 
-                                    activity={item} 
-                                    hasKids={!!(trip.kids_ages && trip.kids_ages.length > 0)} 
-                                  />
-                                </div>
-                              ))}
+                              .map((item, index, sortedItems) => {
+                                const previousItem = index > 0 ? sortedItems[index - 1] : null;
+                                const previousLocation = previousItem && (previousItem.latitude || previousItem.location_address) ? {
+                                  lat: previousItem.latitude ?? 0,
+                                  lng: previousItem.longitude ?? 0,
+                                  address: previousItem.location_address ?? undefined
+                                } : undefined;
+                                
+                                return (
+                                  <div
+                                    key={item.id}
+                                    className="relative pl-8 pb-6 border-l-2 border-muted last:pb-0 last:border-transparent"
+                                  >
+                                    {/* Timeline dot */}
+                                    <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-primary border-2 border-background" />
+                                    
+                                    <ActivityBookingCard 
+                                      activity={item} 
+                                      hasKids={!!(trip.kids_ages && trip.kids_ages.length > 0)}
+                                      needsWheelchairAccess={trip.needs_wheelchair_access || false}
+                                      hasStroller={trip.has_stroller || false}
+                                      previousLocation={previousLocation}
+                                      lodgingLocation={trip.lodging_address ? { lat: 0, lng: 0, address: trip.lodging_address } : undefined}
+                                    />
+                                  </div>
+                                );
+                              })}
                           </div>
 
                           {/* Plan B */}
