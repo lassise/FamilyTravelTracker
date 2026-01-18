@@ -1,4 +1,4 @@
-import type { DistanceUnit } from '@/hooks/useDistanceUnit';
+export type DistanceUnit = 'miles' | 'kilometers';
 
 // Conversion constants
 const KM_TO_MILES = 0.621371;

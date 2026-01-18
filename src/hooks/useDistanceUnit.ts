@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import type { DistanceUnit } from '@/lib/distanceUtils';
 
-export type DistanceUnit = 'miles' | 'kilometers';
+export type { DistanceUnit };
 
 // Detect if user's locale is likely metric
 const detectMetricLocale = (): boolean => {
