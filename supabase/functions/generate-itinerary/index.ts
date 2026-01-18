@@ -64,6 +64,9 @@ const TripDetailsSchema = z.object({
   extraContext: z.string().trim().max(2000).optional(),
   hasLodgingBooked: z.boolean().optional().default(false),
   providerPreferences: z.array(z.string()).optional().default(['any']),
+  // Accessibility preferences
+  needsWheelchairAccess: z.boolean().optional().default(false),
+  hasStroller: z.boolean().optional().default(false),
   clientInfo: z.object({
     numAdults: z.number().int().min(1).max(20),
     numKids: z.number().int().min(0).max(15),
@@ -82,7 +85,7 @@ const TripDetailsSchema = z.object({
   regenerateDayNumber: z.number().int().min(1).max(30).optional(),
 });
 
-// Enhanced activity schema with booking and seasonal info
+// Enhanced activity schema with booking, seasonal, and accessibility info
 const ActivitySchema = z.object({
   timeSlot: z.enum(["morning", "afternoon", "evening"]),
   startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
@@ -118,6 +121,15 @@ const ActivitySchema = z.object({
   // Coordinates
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  // Distance and travel info (new fields)
+  distanceFromPrevious: z.number().optional(),
+  distanceUnit: z.enum(['km', 'miles']).optional(),
+  travelTimeMinutes: z.number().int().min(0).optional(),
+  recommendedTransitMode: z.enum(['walk', 'taxi', 'metro', 'bus', 'train', 'ferry', 'car', 'bike', 'rideshare']).optional(),
+  transitDetails: z.string().max(300).optional(),
+  // Accessibility info (new fields)
+  isWheelchairAccessible: z.boolean().optional(),
+  accessibilityNotes: z.string().max(300).optional(),
 });
 
 const MealSuggestionSchema = z.object({

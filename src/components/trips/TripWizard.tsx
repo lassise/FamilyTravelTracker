@@ -38,6 +38,9 @@ export interface TripFormData {
   extraContext: string;
   // Booking preferences
   providerPreferences: string[];
+  // Accessibility
+  needsWheelchairAccess: boolean;
+  hasStroller: boolean;
 }
 
 const STEPS = [
@@ -85,6 +88,9 @@ const TripWizard = () => {
     },
     extraContext: "",
     providerPreferences: [],
+    // Accessibility
+    needsWheelchairAccess: false,
+    hasStroller: false,
   });
 
   const updateFormData = (updates: Partial<TripFormData>) => {
@@ -164,6 +170,8 @@ const TripWizard = () => {
         status: 'planning',
         has_lodging_booked: formData.hasLodging,
         provider_preferences: formData.providerPreferences,
+        needs_wheelchair_access: formData.needsWheelchairAccess,
+        has_stroller: formData.hasStroller || formData.strollerNeeds,
       });
 
       if (tripError || !trip) {
@@ -202,6 +210,9 @@ const TripWizard = () => {
           // Booking preferences
           hasLodgingBooked: formData.hasLodging,
           providerPreferences: formData.providerPreferences,
+          // Accessibility preferences
+          needsWheelchairAccess: formData.needsWheelchairAccess,
+          hasStroller: formData.hasStroller || formData.strollerNeeds,
         },
       });
 
@@ -295,6 +306,15 @@ const TripWizard = () => {
               transport_station_notes: activity.transportStationNotes,
               latitude: activity.latitude,
               longitude: activity.longitude,
+              // Distance and accessibility fields
+              distance_from_previous: activity.distanceFromPrevious,
+              distance_unit: activity.distanceUnit || 'km',
+              travel_time_minutes: activity.travelTimeMinutes,
+              recommended_transit_mode: activity.recommendedTransitMode,
+              transit_details: activity.transitDetails,
+              accessibility_notes: activity.accessibilityNotes,
+              is_wheelchair_accessible: activity.isWheelchairAccessible,
+              stroller_notes: activity.strollerNotes,
             }));
 
             const { error: itemsError } = await supabase

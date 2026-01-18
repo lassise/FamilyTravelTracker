@@ -22,6 +22,8 @@ export interface Trip {
   has_lodging_booked: boolean | null;
   provider_preferences: string[] | null;
   lodging_address: string | null;
+  needs_wheelchair_access: boolean | null;
+  has_stroller: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +99,8 @@ export const useTrips = () => {
         has_lodging_booked: tripData.has_lodging_booked,
         provider_preferences: tripData.provider_preferences,
         lodging_address: tripData.lodging_address,
+        needs_wheelchair_access: tripData.needs_wheelchair_access,
+        has_stroller: tripData.has_stroller,
         user_id: user.id,
       })
       .select()

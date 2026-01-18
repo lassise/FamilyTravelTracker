@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TripFormData } from "../TripWizard";
-import { Baby, Plus, X, Users } from "lucide-react";
+import { Baby, Plus, X, Users, Accessibility, ShoppingCart } from "lucide-react";
 
 interface KidsStepProps {
   formData: TripFormData;
@@ -61,19 +61,42 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
 
   const hasYoungKids = formData.kidsAges.some(age => age <= 4);
 
-  // If not traveling with kids, show a simple message
+  // If not traveling with kids, show accessibility options only
   if (!formData.travelingWithKids) {
     return (
       <div className="space-y-6">
-        <div className="text-center py-8">
+        <div className="text-center py-4">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
             <Users className="h-8 w-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold mb-2">Adults-Only Trip</h3>
           <p className="text-muted-foreground max-w-sm mx-auto">
-            Great! We'll tailor recommendations for an adult travel experience. 
-            You can proceed to the next step.
+            Great! We'll tailor recommendations for an adult travel experience.
           </p>
+        </div>
+
+        {/* Accessibility options for adults-only trips */}
+        <div className="border-t pt-6 space-y-4">
+          <h4 className="font-medium flex items-center gap-2">
+            <Accessibility className="h-4 w-4" />
+            Accessibility & Mobility
+          </h4>
+          
+          <div className="flex items-center space-x-3">
+            <Checkbox
+              id="wheelchair-adult"
+              checked={formData.needsWheelchairAccess}
+              onCheckedChange={(checked) =>
+                updateFormData({ needsWheelchairAccess: checked as boolean })
+              }
+            />
+            <Label htmlFor="wheelchair-adult" className="font-normal cursor-pointer">
+              Wheelchair-accessible options needed
+              <span className="block text-xs text-muted-foreground">
+                We'll prioritize step-free access, elevators, and accessible venues
+              </span>
+            </Label>
+          </div>
         </div>
       </div>
     );
@@ -182,20 +205,48 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
           <div className="flex items-center space-x-3 pt-2">
             <Checkbox
               id="stroller"
-              checked={formData.strollerNeeds}
-              onCheckedChange={(checked) =>
-                updateFormData({ strollerNeeds: checked as boolean })
-              }
+              checked={formData.strollerNeeds || formData.hasStroller}
+              onCheckedChange={(checked) => {
+                updateFormData({ 
+                  strollerNeeds: checked as boolean,
+                  hasStroller: checked as boolean 
+                });
+              }}
             />
             <Label htmlFor="stroller" className="font-normal cursor-pointer">
+              <ShoppingCart className="h-4 w-4 inline mr-1" />
               We'll be using a stroller
               <span className="block text-xs text-muted-foreground">
-                We'll prioritize stroller-friendly activities and routes
+                We'll prioritize stroller-friendly activities, terrain info, and elevator access
               </span>
             </Label>
           </div>
         </>
       )}
+
+      {/* Accessibility section - always show when traveling with kids */}
+      <div className="border-t pt-6 space-y-4">
+        <h4 className="font-medium flex items-center gap-2">
+          <Accessibility className="h-4 w-4" />
+          Accessibility & Mobility
+        </h4>
+        
+        <div className="flex items-center space-x-3">
+          <Checkbox
+            id="wheelchair"
+            checked={formData.needsWheelchairAccess}
+            onCheckedChange={(checked) =>
+              updateFormData({ needsWheelchairAccess: checked as boolean })
+            }
+          />
+          <Label htmlFor="wheelchair" className="font-normal cursor-pointer">
+            Wheelchair-accessible options needed
+            <span className="block text-xs text-muted-foreground">
+              We'll prioritize step-free access, elevators, and accessible venues
+            </span>
+          </Label>
+        </div>
+      </div>
     </div>
   );
 };

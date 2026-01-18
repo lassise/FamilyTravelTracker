@@ -13,8 +13,15 @@ import {
   Users,
   Sparkles,
   Train,
+  Navigation,
+  Footprints,
+  Car,
+  Bus,
+  Accessibility,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDistanceUnit } from "@/hooks/useDistanceUnit";
+import { formatDistance } from "@/lib/distanceUtils";
 
 interface ActivityBookingCardProps {
   activity: {
@@ -43,11 +50,35 @@ interface ActivityBookingCardProps {
     transport_mode: string | null;
     transport_booking_url: string | null;
     transport_station_notes: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    // New distance and accessibility fields
+    distance_from_previous: number | null;
+    distance_unit: string | null;
+    travel_time_minutes: number | null;
+    recommended_transit_mode: string | null;
+    transit_details: string | null;
+    accessibility_notes: string | null;
+    is_wheelchair_accessible: boolean | null;
+    stroller_notes: string | null;
   };
   hasKids: boolean;
+  needsWheelchairAccess?: boolean;
+  hasStroller?: boolean;
+  previousLocation?: { lat: number; lng: number; address?: string } | null;
+  lodgingLocation?: { lat: number; lng: number; address?: string } | null;
 }
 
-const ActivityBookingCard = ({ activity, hasKids }: ActivityBookingCardProps) => {
+const ActivityBookingCard = ({ 
+  activity, 
+  hasKids, 
+  needsWheelchairAccess,
+  hasStroller,
+  previousLocation,
+  lodgingLocation,
+}: ActivityBookingCardProps) => {
+  const { distanceUnit } = useDistanceUnit();
+
   const formatTime = (time: string | null) => {
     if (!time) return "";
     const [hours, minutes] = time.split(":");
@@ -106,10 +137,98 @@ const ActivityBookingCard = ({ activity, hasKids }: ActivityBookingCardProps) =>
     }
   };
 
+  const getTransitModeIcon = (mode: string | null) => {
+    switch (mode) {
+      case "walk":
+        return <Footprints className="h-3 w-3" />;
+      case "taxi":
+      case "rideshare":
+      case "car":
+        return <Car className="h-3 w-3" />;
+      case "metro":
+      case "bus":
+        return <Bus className="h-3 w-3" />;
+      case "train":
+        return <Train className="h-3 w-3" />;
+      default:
+        return <Navigation className="h-3 w-3" />;
+    }
+  };
+
+  const getTransitModeLabel = (mode: string | null) => {
+    switch (mode) {
+      case "walk": return "Walk";
+      case "taxi": return "Taxi";
+      case "rideshare": return "Rideshare";
+      case "car": return "Drive";
+      case "metro": return "Metro";
+      case "bus": return "Bus";
+      case "train": return "Train";
+      case "ferry": return "Ferry";
+      case "bike": return "Bike";
+      default: return mode || "Transit";
+    }
+  };
+
+  // Build Google Maps directions URL
+  const handleGetDirections = () => {
+    const destination = activity.latitude && activity.longitude
+      ? `${activity.latitude},${activity.longitude}`
+      : encodeURIComponent(activity.location_address || activity.location_name || activity.title);
+    
+    let origin = "";
+    if (previousLocation?.lat && previousLocation?.lng) {
+      origin = `${previousLocation.lat},${previousLocation.lng}`;
+    } else if (lodgingLocation?.lat && lodgingLocation?.lng) {
+      origin = `${lodgingLocation.lat},${lodgingLocation.lng}`;
+    } else if (previousLocation?.address) {
+      origin = encodeURIComponent(previousLocation.address);
+    } else if (lodgingLocation?.address) {
+      origin = encodeURIComponent(lodgingLocation.address);
+    }
+
+    // Use Google Maps directions URL that works on both mobile and desktop
+    const baseUrl = "https://www.google.com/maps/dir/?api=1";
+    const url = origin 
+      ? `${baseUrl}&origin=${origin}&destination=${destination}`
+      : `${baseUrl}&destination=${destination}`;
+    
+    window.open(url, "_blank");
+  };
+
   const providerLabel = getProviderLabel(activity.provider_type);
+  const showDistance = activity.distance_from_previous !== null;
+  const showTransit = activity.recommended_transit_mode || activity.travel_time_minutes;
 
   return (
     <div className="bg-muted/30 rounded-lg p-4">
+      {/* Distance and Transit Info */}
+      {(showDistance || showTransit) && (
+        <div className="flex flex-wrap items-center gap-2 mb-3 p-2 bg-blue-500/5 rounded-md text-sm">
+          {activity.recommended_transit_mode && (
+            <Badge variant="outline" className="text-xs gap-1">
+              {getTransitModeIcon(activity.recommended_transit_mode)}
+              {getTransitModeLabel(activity.recommended_transit_mode)}
+            </Badge>
+          )}
+          {activity.distance_from_previous !== null && (
+            <span className="text-muted-foreground">
+              {formatDistance(activity.distance_from_previous, distanceUnit)}
+            </span>
+          )}
+          {activity.travel_time_minutes && (
+            <span className="text-muted-foreground">
+              • {activity.travel_time_minutes} min
+            </span>
+          )}
+          {activity.transit_details && (
+            <span className="text-xs text-muted-foreground">
+              ({activity.transit_details})
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Header with time and category */}
       <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -205,9 +324,26 @@ const ActivityBookingCard = ({ activity, hasKids }: ActivityBookingCardProps) =>
         )}
       </div>
 
-      {/* Kid-friendly badges */}
-      {hasKids && (
-        <div className="flex gap-1 mt-2">
+      {/* Accessibility info */}
+      {(needsWheelchairAccess || activity.is_wheelchair_accessible !== null) && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {activity.is_wheelchair_accessible && (
+            <Badge variant="secondary" className="text-xs bg-blue-500/10 text-blue-600">
+              <Accessibility className="h-3 w-3 mr-1" />
+              Wheelchair accessible
+            </Badge>
+          )}
+          {activity.accessibility_notes && (
+            <p className="w-full text-xs text-blue-600 mt-1">
+              ♿ {activity.accessibility_notes}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Kid-friendly and stroller badges */}
+      {(hasKids || hasStroller) && (
+        <div className="flex flex-wrap gap-1 mt-2">
           {activity.is_kid_friendly && (
             <Badge variant="secondary" className="text-xs">
               <Baby className="h-3 w-3 mr-1" />
@@ -221,6 +357,13 @@ const ActivityBookingCard = ({ activity, hasKids }: ActivityBookingCardProps) =>
             </Badge>
           )}
         </div>
+      )}
+
+      {/* Stroller notes */}
+      {hasStroller && activity.stroller_notes && (
+        <p className="text-xs text-muted-foreground mt-2">
+          🚼 {activity.stroller_notes}
+        </p>
       )}
 
       {/* Transport notes */}
@@ -244,31 +387,44 @@ const ActivityBookingCard = ({ activity, hasKids }: ActivityBookingCardProps) =>
         </div>
       )}
 
-      {/* Booking button */}
-      {activity.booking_url && (
-        <Button
-          variant="default"
-          size="sm"
-          className="mt-3 w-full sm:w-auto"
-          onClick={() => window.open(activity.booking_url!, "_blank")}
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Book Now
-        </Button>
-      )}
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2 mt-4">
+        {/* Get Directions button */}
+        {(activity.location_address || activity.location_name || (activity.latitude && activity.longitude)) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGetDirections}
+          >
+            <Navigation className="h-4 w-4 mr-2" />
+            Get Directions
+          </Button>
+        )}
 
-      {/* Transport booking if available */}
-      {activity.transport_booking_url && activity.transport_mode === 'train' && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-2 ml-0 sm:ml-2 w-full sm:w-auto"
-          onClick={() => window.open(activity.transport_booking_url!, "_blank")}
-        >
-          <Train className="h-4 w-4 mr-2" />
-          Book Train
-        </Button>
-      )}
+        {/* Booking button */}
+        {activity.booking_url && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => window.open(activity.booking_url!, "_blank")}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Book Now
+          </Button>
+        )}
+
+        {/* Transport booking if available */}
+        {activity.transport_booking_url && activity.transport_mode === 'train' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(activity.transport_booking_url!, "_blank")}
+          >
+            <Train className="h-4 w-4 mr-2" />
+            Book Train
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

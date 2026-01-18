@@ -627,6 +627,7 @@ export type Database = {
       }
       itinerary_items: {
         Row: {
+          accessibility_notes: string | null
           best_time_to_visit: string | null
           booking_url: string | null
           category: string | null
@@ -634,11 +635,14 @@ export type Database = {
           created_at: string
           crowd_level: string | null
           description: string | null
+          distance_from_previous: number | null
+          distance_unit: string | null
           duration_minutes: number | null
           end_time: string | null
           id: string
           is_kid_friendly: boolean | null
           is_stroller_friendly: boolean | null
+          is_wheelchair_accessible: boolean | null
           itinerary_day_id: string
           latitude: number | null
           location_address: string | null
@@ -646,21 +650,26 @@ export type Database = {
           longitude: number | null
           provider_type: string | null
           rating: number | null
+          recommended_transit_mode: string | null
           requires_reservation: boolean | null
           reservation_info: string | null
           review_count: number | null
           seasonal_notes: string | null
           sort_order: number
           start_time: string | null
+          stroller_notes: string | null
           time_slot: string | null
           title: string
+          transit_details: string | null
           transport_booking_url: string | null
           transport_mode: string | null
           transport_station_notes: string | null
+          travel_time_minutes: number | null
           updated_at: string
           why_it_fits: string | null
         }
         Insert: {
+          accessibility_notes?: string | null
           best_time_to_visit?: string | null
           booking_url?: string | null
           category?: string | null
@@ -668,11 +677,14 @@ export type Database = {
           created_at?: string
           crowd_level?: string | null
           description?: string | null
+          distance_from_previous?: number | null
+          distance_unit?: string | null
           duration_minutes?: number | null
           end_time?: string | null
           id?: string
           is_kid_friendly?: boolean | null
           is_stroller_friendly?: boolean | null
+          is_wheelchair_accessible?: boolean | null
           itinerary_day_id: string
           latitude?: number | null
           location_address?: string | null
@@ -680,21 +692,26 @@ export type Database = {
           longitude?: number | null
           provider_type?: string | null
           rating?: number | null
+          recommended_transit_mode?: string | null
           requires_reservation?: boolean | null
           reservation_info?: string | null
           review_count?: number | null
           seasonal_notes?: string | null
           sort_order?: number
           start_time?: string | null
+          stroller_notes?: string | null
           time_slot?: string | null
           title: string
+          transit_details?: string | null
           transport_booking_url?: string | null
           transport_mode?: string | null
           transport_station_notes?: string | null
+          travel_time_minutes?: number | null
           updated_at?: string
           why_it_fits?: string | null
         }
         Update: {
+          accessibility_notes?: string | null
           best_time_to_visit?: string | null
           booking_url?: string | null
           category?: string | null
@@ -702,11 +719,14 @@ export type Database = {
           created_at?: string
           crowd_level?: string | null
           description?: string | null
+          distance_from_previous?: number | null
+          distance_unit?: string | null
           duration_minutes?: number | null
           end_time?: string | null
           id?: string
           is_kid_friendly?: boolean | null
           is_stroller_friendly?: boolean | null
+          is_wheelchair_accessible?: boolean | null
           itinerary_day_id?: string
           latitude?: number | null
           location_address?: string | null
@@ -714,17 +734,21 @@ export type Database = {
           longitude?: number | null
           provider_type?: string | null
           rating?: number | null
+          recommended_transit_mode?: string | null
           requires_reservation?: boolean | null
           reservation_info?: string | null
           review_count?: number | null
           seasonal_notes?: string | null
           sort_order?: number
           start_time?: string | null
+          stroller_notes?: string | null
           time_slot?: string | null
           title?: string
+          transit_details?: string | null
           transport_booking_url?: string | null
           transport_mode?: string | null
           transport_station_notes?: string | null
+          travel_time_minutes?: number | null
           updated_at?: string
           why_it_fits?: string | null
         }
@@ -1727,10 +1751,12 @@ export type Database = {
           end_date: string | null
           family_group_id: string | null
           has_lodging_booked: boolean | null
+          has_stroller: boolean | null
           id: string
           interests: string[] | null
           kids_ages: number[] | null
           lodging_address: string | null
+          needs_wheelchair_access: boolean | null
           notes: string | null
           pace_preference: string | null
           provider_preferences: string[] | null
@@ -1750,10 +1776,12 @@ export type Database = {
           end_date?: string | null
           family_group_id?: string | null
           has_lodging_booked?: boolean | null
+          has_stroller?: boolean | null
           id?: string
           interests?: string[] | null
           kids_ages?: number[] | null
           lodging_address?: string | null
+          needs_wheelchair_access?: boolean | null
           notes?: string | null
           pace_preference?: string | null
           provider_preferences?: string[] | null
@@ -1773,10 +1801,12 @@ export type Database = {
           end_date?: string | null
           family_group_id?: string | null
           has_lodging_booked?: boolean | null
+          has_stroller?: boolean | null
           id?: string
           interests?: string[] | null
           kids_ages?: number[] | null
           lodging_address?: string | null
+          needs_wheelchair_access?: boolean | null
           notes?: string | null
           pace_preference?: string | null
           provider_preferences?: string[] | null
