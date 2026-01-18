@@ -13,19 +13,16 @@ export function BottomNav() {
   const location = useLocation();
   
   const isActive = (href: string) => {
-    // Handle query params in the href
     const [path, query] = href.split('?');
     const currentPath = location.pathname;
     const currentSearch = location.search;
     
     if (path !== currentPath) return false;
     
-    // If href has a query param, check it matches
     if (query) {
       return currentSearch.includes(query);
     }
     
-    // For base paths without query, only active if no tab query
     return !currentSearch.includes('tab=');
   };
 
@@ -34,7 +31,10 @@ export function BottomNav() {
       className="fixed bottom-0 left-0 right-0 z-[100] md:hidden bg-background/95 backdrop-blur-lg border-t border-border"
       style={{ 
         paddingBottom: 'max(env(safe-area-inset-bottom), 8px)',
-        WebkitTransform: 'translateZ(0)', // Force GPU layer for iOS
+        WebkitTransform: 'translateZ(0)',
+        transform: 'translateZ(0)',
+        position: 'fixed',
+        willChange: 'transform',
       }}
     >
       <div className="flex items-center justify-around h-16 px-2">

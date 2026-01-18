@@ -21,6 +21,11 @@ interface FamilyMembersStepProps {
 }
 
 const ROLE_SUGGESTIONS = ["Me", "Partner", "Son", "Daughter", "Dad", "Mom", "Friend"];
+const SPOUSE_QUICK_ADD = [
+  { label: "Add Husband", role: "Husband", avatar: "👨" },
+  { label: "Add Wife", role: "Wife", avatar: "👩" },
+  { label: "Add Spouse", role: "Spouse", avatar: "🧑" },
+];
 const AVATAR_EMOJIS = ["🧑", "👨", "👩", "👦", "👧", "👴", "👵", "👶"];
 const COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F"];
 
@@ -111,8 +116,65 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
     }
   };
 
+  const handleQuickAddSpouse = async (spouseOption: typeof SPOUSE_QUICK_ADD[0]) => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "You must be logged in", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      const color = COLORS[members.length % COLORS.length];
+
+      const { data, error } = await supabase
+        .from("family_members")
+        .insert([{
+          name: spouseOption.role,
+          role: spouseOption.role,
+          avatar: spouseOption.avatar,
+          color,
+          user_id: user.id,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMembers([...members, data]);
+      toast({ title: `${spouseOption.role} added! You can edit their name anytime.` });
+    } catch (error) {
+      toast({ title: "Failed to add", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Quick add spouse buttons - show if user has added themselves */}
+      {members.length >= 1 && members.length < 2 && (
+        <div className="space-y-2">
+          <Label className="text-muted-foreground">Quick add:</Label>
+          <div className="flex flex-wrap gap-2">
+            {SPOUSE_QUICK_ADD.map((option) => (
+              <Button
+                key={option.label}
+                variant="outline"
+                size="sm"
+                onClick={() => handleQuickAddSpouse(option)}
+                disabled={loading}
+                className="gap-2"
+              >
+                <span>{option.avatar}</span>
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label htmlFor="name">Name</Label>

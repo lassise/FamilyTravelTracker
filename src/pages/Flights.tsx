@@ -77,6 +77,17 @@ const Flights = () => {
   const [returnDate, setReturnDate] = useState("");
   const [tripType, setTripType] = useState<"roundtrip" | "oneway" | "multicity">("roundtrip");
   
+  // Multi-city segments
+  interface FlightSegment {
+    origin: string;
+    destination: string;
+    date: string;
+  }
+  const [multiCitySegments, setMultiCitySegments] = useState<FlightSegment[]>([
+    { origin: "", destination: "", date: "" },
+    { origin: "", destination: "", date: "" },
+  ]);
+  
   // Passenger breakdown
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0); // Ages 2-11
@@ -513,14 +524,18 @@ const Flights = () => {
           <CardContent className="pt-6 space-y-4">
             {/* Trip Type */}
             <div className="flex flex-wrap gap-2">
-              {["roundtrip", "oneway"].map((type) => (
+              {[
+                { value: "roundtrip", label: "Round Trip" },
+                { value: "oneway", label: "One Way" },
+                { value: "multicity", label: "Multi-City" },
+              ].map((type) => (
                 <Button 
-                  key={type}
-                  variant={tripType === type ? "default" : "outline"} 
+                  key={type.value}
+                  variant={tripType === type.value ? "default" : "outline"} 
                   size="sm"
-                  onClick={() => setTripType(type as typeof tripType)}
+                  onClick={() => setTripType(type.value as typeof tripType)}
                 >
-                  {type === "roundtrip" ? "Round Trip" : "One Way"}
+                  {type.label}
                 </Button>
               ))}
             </div>
@@ -545,78 +560,160 @@ const Flights = () => {
               </div>
             )}
 
-            {/* Origin & Destination */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="relative">
-                <Label>From</Label>
+            {/* Origin & Destination - Standard for roundtrip/oneway */}
+            {tripType !== "multicity" && (
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="relative">
-                  <PlaneTakeoff className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="City or airport" 
-                    className="pl-10" 
-                    value={origin} 
-                    onChange={(e) => handleOriginSearch(e.target.value)}
-                    onFocus={() => origin.length >= 2 && setShowOriginResults(true)}
-                    onBlur={() => setTimeout(() => setShowOriginResults(false), 200)}
-                  />
-                </div>
-                {showOriginResults && originResults.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
-                    {originResults.map((a) => (
-                      <button
-                        key={a.code}
-                        className="w-full px-3 py-2 text-left hover:bg-muted text-sm"
-                        onClick={() => { setOrigin(a.code); setShowOriginResults(false); }}
-                      >
-                        <span className="font-medium">{a.code}</span> - {a.city} ({a.name})
-                      </button>
-                    ))}
+                  <Label>From</Label>
+                  <div className="relative">
+                    <PlaneTakeoff className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="City or airport" 
+                      className="pl-10" 
+                      value={origin} 
+                      onChange={(e) => handleOriginSearch(e.target.value)}
+                      onFocus={() => origin.length >= 2 && setShowOriginResults(true)}
+                      onBlur={() => setTimeout(() => setShowOriginResults(false), 200)}
+                    />
                   </div>
-                )}
-              </div>
-              <div className="relative">
-                <Label>To</Label>
+                  {showOriginResults && originResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
+                      {originResults.map((a) => (
+                        <button
+                          key={a.code}
+                          className="w-full px-3 py-2 text-left hover:bg-muted text-sm"
+                          onClick={() => { setOrigin(a.code); setShowOriginResults(false); }}
+                        >
+                          <span className="font-medium">{a.code}</span> - {a.city} ({a.name})
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="relative">
-                  <PlaneLanding className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="City or airport" 
-                    className="pl-10" 
-                    value={destination} 
-                    onChange={(e) => handleDestSearch(e.target.value)}
-                    onFocus={() => destination.length >= 2 && setShowDestResults(true)}
-                    onBlur={() => setTimeout(() => setShowDestResults(false), 200)}
-                  />
-                </div>
-                {showDestResults && destResults.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
-                    {destResults.map((a) => (
-                      <button
-                        key={a.code}
-                        className="w-full px-3 py-2 text-left hover:bg-muted text-sm"
-                        onClick={() => { setDestination(a.code); setShowDestResults(false); }}
-                      >
-                        <span className="font-medium">{a.code}</span> - {a.city} ({a.name})
-                      </button>
-                    ))}
+                  <Label>To</Label>
+                  <div className="relative">
+                    <PlaneLanding className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="City or airport" 
+                      className="pl-10" 
+                      value={destination} 
+                      onChange={(e) => handleDestSearch(e.target.value)}
+                      onFocus={() => destination.length >= 2 && setShowDestResults(true)}
+                      onBlur={() => setTimeout(() => setShowDestResults(false), 200)}
+                    />
                   </div>
-                )}
+                  {showDestResults && destResults.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-auto">
+                      {destResults.map((a) => (
+                        <button
+                          key={a.code}
+                          className="w-full px-3 py-2 text-left hover:bg-muted text-sm"
+                          onClick={() => { setDestination(a.code); setShowDestResults(false); }}
+                        >
+                          <span className="font-medium">{a.code}</span> - {a.city} ({a.name})
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Dates & Passengers */}
-            {/* Dates */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Depart</Label>
-                <Input type="date" value={departDate} onChange={(e) => setDepartDate(e.target.value)} />
+            {/* Multi-City Segments */}
+            {tripType === "multicity" && (
+              <div className="space-y-4">
+                <Label className="text-sm font-medium">Flight Segments</Label>
+                {multiCitySegments.map((segment, index) => (
+                  <div key={index} className="p-3 border rounded-lg bg-muted/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline">Segment {index + 1}</Badge>
+                      {multiCitySegments.length > 2 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setMultiCitySegments(segments => segments.filter((_, i) => i !== index));
+                          }}
+                          className="h-6 px-2 text-destructive hover:text-destructive"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">From</Label>
+                        <Input 
+                          placeholder="Airport code"
+                          value={segment.origin}
+                          onChange={(e) => {
+                            const newSegments = [...multiCitySegments];
+                            newSegments[index].origin = e.target.value.toUpperCase();
+                            setMultiCitySegments(newSegments);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">To</Label>
+                        <Input 
+                          placeholder="Airport code"
+                          value={segment.destination}
+                          onChange={(e) => {
+                            const newSegments = [...multiCitySegments];
+                            newSegments[index].destination = e.target.value.toUpperCase();
+                            setMultiCitySegments(newSegments);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Date</Label>
+                        <Input 
+                          type="date"
+                          value={segment.date}
+                          onChange={(e) => {
+                            const newSegments = [...multiCitySegments];
+                            newSegments[index].date = e.target.value;
+                            setMultiCitySegments(newSegments);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {multiCitySegments.length < 6 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const lastSegment = multiCitySegments[multiCitySegments.length - 1];
+                      setMultiCitySegments([
+                        ...multiCitySegments,
+                        { origin: lastSegment?.destination || "", destination: "", date: "" }
+                      ]);
+                    }}
+                  >
+                    + Add Another Segment
+                  </Button>
+                )}
               </div>
-              {tripType === "roundtrip" && (
+            )}
+
+            {/* Dates - only for non-multicity */}
+            {tripType !== "multicity" && (
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Return</Label>
-                  <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+                  <Label>Depart</Label>
+                  <Input type="date" value={departDate} onChange={(e) => setDepartDate(e.target.value)} />
                 </div>
-              )}
-            </div>
+                {tripType === "roundtrip" && (
+                  <div>
+                    <Label>Return</Label>
+                    <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Travelers Breakdown */}
             <div className="space-y-3">

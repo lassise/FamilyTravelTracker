@@ -260,13 +260,17 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
                     <div className="border-t p-4 space-y-4 bg-muted/20">
                       {summary.cities.length > 0 && (
                         <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Cities visited:</p>
-                          <div className="flex flex-wrap gap-1">
-                            {summary.cities.map((city) => (
-                              <Badge key={city} variant="outline" className="text-xs bg-background">
-                                {city}
-                              </Badge>
-                            ))}
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                            Cities visited ({summary.cities.length}):
+                          </p>
+                          <div className="max-h-32 overflow-y-auto pr-1">
+                            <div className="flex flex-wrap gap-1">
+                              {summary.cities.sort().map((city) => (
+                                <Badge key={city} variant="outline" className="text-xs bg-background">
+                                  {city}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       )}

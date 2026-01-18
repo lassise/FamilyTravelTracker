@@ -27,8 +27,8 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [isSoloTraveler, setIsSoloTraveler] = useState(false);
   const [userName, setUserName] = useState<string>("");
 
-  // Build steps dynamically based on solo/family mode
-  const baseSteps = [
+  // Build steps: Countries → Preferences → Family members (new order)
+  const steps = [
     {
       title: "Welcome to Your Travel Companion!",
       description: "Track your adventures around the world — solo or with family.",
@@ -52,6 +52,22 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       ),
     },
     {
+      title: "Countries You've Visited",
+      description: "Add countries you've already explored. You can add details later.",
+      icon: Globe,
+      component: (
+        <CountriesStep 
+          familyMembers={familyMembers}
+        />
+      ),
+    },
+    {
+      title: "Travel Preferences",
+      description: "Help us personalize your experience with a few quick questions.",
+      icon: Heart,
+      component: <TravelPreferencesStep />,
+    },
+    {
       title: "Who's Traveling?",
       description: "Add yourself first, then add anyone else you'd like to track travels for.",
       icon: Users,
@@ -64,30 +80,6 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       ),
     },
   ];
-
-  // Auto-select the first family member as primary - no need to ask
-  // This simplifies onboarding by assuming the first traveler added is the primary user
-
-  const remainingSteps = [
-    {
-      title: "Travel Preferences",
-      description: "Help us personalize your experience with a few quick questions.",
-      icon: Heart,
-      component: <TravelPreferencesStep />,
-    },
-    {
-      title: "Countries You've Visited",
-      description: "Add countries you've already explored. You can add details later.",
-      icon: Globe,
-      component: (
-        <CountriesStep 
-          familyMembers={familyMembers}
-        />
-      ),
-    },
-  ];
-
-  const steps = [...baseSteps, ...remainingSteps];
 
   const currentStep = steps[step];
   const progress = ((step + 1) / steps.length) * 100;

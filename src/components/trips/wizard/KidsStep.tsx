@@ -13,8 +13,20 @@ interface KidsStepProps {
   updateFormData: (updates: Partial<TripFormData>) => void;
 }
 
+// Infant age options in months
+const INFANT_MONTHS = [
+  { value: 1, label: "1 month" },
+  { value: 3, label: "3 months" },
+  { value: 6, label: "6 months" },
+  { value: 9, label: "9 months" },
+  { value: 12, label: "12 months" },
+  { value: 18, label: "18 months" },
+  { value: 24, label: "24 months" },
+];
+
 export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
   const [newAge, setNewAge] = useState("");
+  const [infantMonths, setInfantMonths] = useState<string>("");
 
   const addKidAge = () => {
     const age = parseInt(newAge);
@@ -24,10 +36,27 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
     }
   };
 
+  const addInfantByMonths = (months: number) => {
+    // Store as negative to indicate months (e.g., -6 = 6 months old)
+    // Or we can store as decimal (0.5 = 6 months)
+    // Let's store as decimal for clarity
+    const ageInYears = months / 12;
+    updateFormData({ kidsAges: [...formData.kidsAges, ageInYears] });
+    setInfantMonths("");
+  };
+
   const removeKidAge = (index: number) => {
     updateFormData({
       kidsAges: formData.kidsAges.filter((_, i) => i !== index),
     });
+  };
+
+  const formatAge = (age: number): string => {
+    if (age < 1) {
+      const months = Math.round(age * 12);
+      return `${months} mo`;
+    }
+    return `${age} ${age === 1 ? "year" : "years"}`;
   };
 
   const hasYoungKids = formData.kidsAges.some(age => age <= 4);
@@ -61,21 +90,44 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
           Add the age of each child traveling
         </p>
         
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            min="0"
-            max="18"
-            placeholder="Age"
-            value={newAge}
-            onChange={(e) => setNewAge(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addKidAge()}
-            className="w-24"
-          />
-          <Button type="button" variant="secondary" onClick={addKidAge}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
+        {/* Infant selection (in months) */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">For babies under 2:</Label>
+          <div className="flex flex-wrap gap-2">
+            {INFANT_MONTHS.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addInfantByMonths(option.value)}
+                className="text-xs"
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Older kids input */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">For kids 2 and older:</Label>
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min="2"
+              max="18"
+              placeholder="Age (2-18)"
+              value={newAge}
+              onChange={(e) => setNewAge(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addKidAge()}
+              className="w-28"
+            />
+            <Button type="button" variant="secondary" onClick={addKidAge}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          </div>
         </div>
 
         {formData.kidsAges.length > 0 && (
@@ -86,7 +138,7 @@ export const KidsStep = ({ formData, updateFormData }: KidsStepProps) => {
                 variant="secondary"
                 className="text-sm py-1 px-3 gap-1"
               >
-                {age} {age === 1 ? "year" : "years"}
+                {formatAge(age)}
                 <button
                   type="button"
                   onClick={() => removeKidAge(index)}
