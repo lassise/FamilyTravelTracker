@@ -47,6 +47,17 @@ const SEAT_OPTIONS = [
   { value: "middle", label: "Middle" },
 ];
 
+// Premium cabin seat types for business/first class
+const PREMIUM_SEAT_TYPES = [
+  { value: "lay_flat", label: "Lay-Flat Bed", description: "180° recline seats" },
+  { value: "angled_flat", label: "Angled Flat", description: "160-170° recline" },
+  { value: "pod", label: "Private Pod/Suite", description: "Enclosed suite with door" },
+  { value: "reverse_herringbone", label: "Reverse Herringbone", description: "Direct aisle access, angled" },
+  { value: "herringbone", label: "Herringbone", description: "Angled seats with aisle access" },
+  { value: "staggered", label: "Staggered", description: "Alternating window/aisle focus" },
+  { value: "standard_recliner", label: "Standard Recliner", description: "No lie-flat capability" },
+];
+
 const Flights = () => {
   const { user, loading: authLoading, needsOnboarding, profile } = useAuth();
   const { preferences, updatePreferences, loading: prefsLoading } = useFlightPreferences();
@@ -87,6 +98,9 @@ const Flights = () => {
   
   // Seat preferences - multiple selection
   const [seatPreferences, setSeatPreferences] = useState<string[]>([]);
+  
+  // Premium seat type preferences for business/first class
+  const [premiumSeatTypes, setPremiumSeatTypes] = useState<string[]>([]);
   
   // Price alert dialog
   const [priceAlertOpen, setPriceAlertOpen] = useState(false);
@@ -141,6 +155,16 @@ const Flights = () => {
     setSeatPreferences(updated);
     updatePreferences({ seat_preference: updated });
   };
+  
+  const togglePremiumSeatType = (seatType: string) => {
+    const updated = premiumSeatTypes.includes(seatType)
+      ? premiumSeatTypes.filter(s => s !== seatType)
+      : [...premiumSeatTypes, seatType];
+    setPremiumSeatTypes(updated);
+    // Could save to preferences in future - for now local state
+  };
+  
+  const isPremiumCabin = preferences.cabin_class === "business" || preferences.cabin_class === "first";
 
   const searchFlights = async () => {
     if (!origin || !destination || !departDate) {
@@ -301,6 +325,48 @@ const Flights = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Premium Seat Type Preferences - Only for Business/First Class */}
+                {isPremiumCabin && (
+                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <Label className="mb-2 block font-medium flex items-center gap-2">
+                      <Armchair className="h-4 w-4" />
+                      {preferences.cabin_class === "first" ? "First Class" : "Business Class"} Seat Type Preferences
+                    </Label>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Select the seat configurations you prefer (results will highlight matching flights)
+                    </p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {PREMIUM_SEAT_TYPES.map(seatType => (
+                        <Tooltip key={seatType.value}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={`cursor-pointer p-2.5 rounded-md border transition-all ${
+                                premiumSeatTypes.includes(seatType.value)
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background hover:bg-muted border-border'
+                              }`}
+                              onClick={() => togglePremiumSeatType(seatType.value)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">{seatType.label}</span>
+                                {premiumSeatTypes.includes(seatType.value) && (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                )}
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            <p>{seatType.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                    {premiumSeatTypes.length === 0 && (
+                      <p className="text-xs text-muted-foreground mt-2">No preference - all seat types will be shown</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Departure Times */}
                 <div>
@@ -583,19 +649,70 @@ const Flights = () => {
             </div>
 
             {/* Cabin Class */}
-            <div>
-              <Label>Cabin</Label>
-              <Select 
-                value={preferences.cabin_class} 
-                onValueChange={(v) => updatePreferences({ cabin_class: v as typeof preferences.cabin_class })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CABIN_CLASSES.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <div>
+                <Label>Cabin</Label>
+                <Select 
+                  value={preferences.cabin_class} 
+                  onValueChange={(v) => {
+                    updatePreferences({ cabin_class: v as typeof preferences.cabin_class });
+                    // Clear premium seat types if switching away from business/first
+                    if (v !== "business" && v !== "first") {
+                      setPremiumSeatTypes([]);
+                    }
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CABIN_CLASSES.map(c => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Premium Seat Type Quick Select - Shows when Business/First selected */}
+              {isPremiumCabin && (
+                <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-2">
+                  <Label className="text-sm flex items-center gap-2">
+                    <Armchair className="h-4 w-4" />
+                    Preferred Seat Types
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Select seat configurations you prefer. Flights with matching seat types will be highlighted in results.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PREMIUM_SEAT_TYPES.map(seatType => (
+                      <Tooltip key={seatType.value}>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant={premiumSeatTypes.includes(seatType.value) ? "default" : "outline"}
+                            className="cursor-pointer text-xs"
+                            onClick={() => togglePremiumSeatType(seatType.value)}
+                          >
+                            {seatType.label}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>{seatType.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                  {premiumSeatTypes.length > 0 && (
+                    <p className="text-xs text-primary">
+                      Looking for: {premiumSeatTypes.map(t => 
+                        PREMIUM_SEAT_TYPES.find(p => p.value === t)?.label
+                      ).join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Quick Filters */}
