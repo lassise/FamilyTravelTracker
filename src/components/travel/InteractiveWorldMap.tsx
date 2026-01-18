@@ -557,9 +557,23 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
   useEffect(() => {
     if (!map.current || !isMapReady) return;
 
-    map.current.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
-    map.current.setFilter('visited-countries', ['in', 'iso_3166_1_alpha_3', ...visitedCountries]);
-    map.current.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
+    // Ensure style is fully loaded before setting filters
+    const updateFilters = () => {
+      if (!map.current) return;
+      try {
+        map.current.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
+        map.current.setFilter('visited-countries', ['in', 'iso_3166_1_alpha_3', ...visitedCountries]);
+        map.current.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
+      } catch (err) {
+        console.warn('Failed to set map filters:', err);
+      }
+    };
+
+    if (map.current.isStyleLoaded()) {
+      updateFilters();
+    } else {
+      map.current.once('style.load', updateFilters);
+    }
   }, [visitedCountries, wishlistCountries, homeCountryISO, isMapReady]);
 
   // Update colors when they change - with layer existence checks and validation
@@ -579,9 +593,17 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       }
     };
 
-    updateLayerColor('home-country', mapColors.home, defaultMapColors.home);
-    updateLayerColor('visited-countries', mapColors.visited, defaultMapColors.visited);
-    updateLayerColor('wishlist-countries', mapColors.wishlist, defaultMapColors.wishlist);
+    const updateColors = () => {
+      updateLayerColor('home-country', mapColors.home, defaultMapColors.home);
+      updateLayerColor('visited-countries', mapColors.visited, defaultMapColors.visited);
+      updateLayerColor('wishlist-countries', mapColors.wishlist, defaultMapColors.wishlist);
+    };
+
+    if (map.current.isStyleLoaded()) {
+      updateColors();
+    } else {
+      map.current.once('style.load', updateColors);
+    }
   }, [mapColors, isMapReady]);
 
   if (!mapToken) {
