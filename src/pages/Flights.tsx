@@ -26,7 +26,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { scoreFlights, categorizeFlights, type ScoredFlight, type FlightResult, type PassengerBreakdown } from "@/lib/flightScoring";
-import { searchAirports, AIRLINES, type Airport } from "@/lib/airportsData";
+import { searchAirports, MAJOR_US_AIRLINES, INTERNATIONAL_AIRLINES, AIRLINES, type Airport } from "@/lib/airportsData";
 
 // Build Google Flights deep link for booking handoff
 const buildGoogleFlightsUrl = (
@@ -106,6 +106,62 @@ const PREMIUM_SEAT_TYPES = [
   { value: "staggered", label: "Staggered", description: "Alternating window/aisle focus" },
   { value: "standard_recliner", label: "Standard Recliner", description: "No lie-flat capability" },
 ];
+
+// Airline Selector Component with expandable list
+interface AirlineSelectorProps {
+  label: string;
+  selectedAirlines: string[];
+  onToggle: (airlineName: string) => void;
+  variant: 'preferred' | 'avoided';
+}
+
+const AirlineSelector = ({ label, selectedAirlines, onToggle, variant }: AirlineSelectorProps) => {
+  const [showMore, setShowMore] = useState(false);
+  
+  const displayedAirlines = showMore 
+    ? [...MAJOR_US_AIRLINES, ...INTERNATIONAL_AIRLINES]
+    : MAJOR_US_AIRLINES;
+  
+  const badgeVariant = (airlineName: string) => {
+    const isSelected = selectedAirlines.includes(airlineName);
+    if (variant === 'avoided') {
+      return isSelected ? 'destructive' : 'outline';
+    }
+    return isSelected ? 'default' : 'outline';
+  };
+  
+  return (
+    <div>
+      <Label className="mb-2 block">{label}</Label>
+      <div className="flex flex-wrap gap-2">
+        {displayedAirlines.map(airline => (
+          <Badge 
+            key={`${variant}-${airline.code}`}
+            variant={badgeVariant(airline.name) as any}
+            className="cursor-pointer"
+            onClick={() => onToggle(airline.name)}
+          >
+            {airline.name}
+          </Badge>
+        ))}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mt-2 text-muted-foreground text-xs h-7"
+        onClick={() => setShowMore(!showMore)}
+      >
+        {showMore ? 'Show less' : `More airlines (${INTERNATIONAL_AIRLINES.length}+)...`}
+        <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${showMore ? 'rotate-180' : ''}`} />
+      </Button>
+      {selectedAirlines.length > 0 && (
+        <p className="text-xs text-muted-foreground mt-1">
+          {selectedAirlines.length} selected
+        </p>
+      )}
+    </div>
+  );
+};
 
 const Flights = () => {
   const { user, loading: authLoading, needsOnboarding, profile } = useAuth();
@@ -459,39 +515,21 @@ const Flights = () => {
                   </div>
                 </div>
 
-                {/* Airlines */}
-                <div>
-                  <Label className="mb-2 block">Preferred Airlines</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {AIRLINES.slice(0, 10).map(airline => (
-                      <Badge 
-                        key={airline.code}
-                        variant={preferences.preferred_airlines.includes(airline.name) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => togglePreference("preferred_airlines", airline.name)}
-                      >
-                        {airline.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                {/* Airlines - Preferred */}
+                <AirlineSelector
+                  label="Preferred Airlines"
+                  selectedAirlines={preferences.preferred_airlines}
+                  onToggle={(name) => togglePreference("preferred_airlines", name)}
+                  variant="preferred"
+                />
 
-                {/* Avoided Airlines */}
-                <div>
-                  <Label className="mb-2 block">Avoid Airlines</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {AIRLINES.slice(0, 10).map(airline => (
-                      <Badge 
-                        key={`avoid-${airline.code}`}
-                        variant={preferences.avoided_airlines.includes(airline.name) ? "destructive" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => togglePreference("avoided_airlines", airline.name)}
-                      >
-                        {airline.name}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                {/* Airlines - Avoided */}
+                <AirlineSelector
+                  label="Avoid Airlines"
+                  selectedAirlines={preferences.avoided_airlines}
+                  onToggle={(name) => togglePreference("avoided_airlines", name)}
+                  variant="avoided"
+                />
 
                 {/* Layover Settings - Only show if nonstop not selected */}
                 {!preferences.prefer_nonstop && (
