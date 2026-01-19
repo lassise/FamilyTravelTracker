@@ -442,9 +442,15 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     map.current.scrollZoom.enable();
     map.current.dragPan.enable();
 
-    map.current.on('style.load', () => {
+    const initLayers = () => {
       if (!map.current) return;
-      
+
+      // Guard: avoid double-initializing layers/sources
+      if (map.current.getSource('countries')) {
+        setIsMapReady(true);
+        return;
+      }
+
       map.current.setFog({
         color: 'rgb(255, 255, 255)',
         'high-color': 'rgb(200, 200, 225)',
@@ -543,7 +549,16 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       });
 
       setIsMapReady(true);
-    });
+    };
+
+    // Mapbox can fire `style.load` before listeners are attached depending on timing.
+    // Listen to both `load` and `style.load`, and also attempt immediate init when possible.
+    map.current.on('load', initLayers);
+    map.current.on('style.load', initLayers);
+
+    if (map.current.isStyleLoaded()) {
+      initLayers();
+    }
 
     return () => {
       map.current?.remove();
