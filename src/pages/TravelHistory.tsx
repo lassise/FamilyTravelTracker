@@ -46,11 +46,9 @@ const TravelHistory = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [visitMemberMap, setVisitMemberMap] = useState<globalThis.Map<string, string[]>>(() => new globalThis.Map());
   
-  // Read initial tab from URL or default to 'overview'
+  // Read tab from URL or default to 'overview'
   const tabFromUrl = searchParams.get('tab') as TabKey | null;
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    tabFromUrl && tabs.some(t => t.key === tabFromUrl) ? tabFromUrl : 'overview'
-  );
+  const activeTab: TabKey = tabFromUrl && tabs.some(t => t.key === tabFromUrl) ? tabFromUrl : 'overview';
 
   // Use the dashboard filter hook
   const {
@@ -81,9 +79,8 @@ const TravelHistory = () => {
     fetchVisitMembers();
   }, []);
 
-  // Reset scroll to top when tab changes and update URL
+  // Handle tab changes by updating URL
   const handleTabChange = useCallback((tab: TabKey) => {
-    setActiveTab(tab);
     setSearchParams(tab === 'overview' ? {} : { tab });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [setSearchParams]);
