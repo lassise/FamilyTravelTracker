@@ -252,9 +252,23 @@ export const useFlightPreferences = () => {
 
     try {
       const updateData: Record<string, unknown> = { ...updates };
+      
+      // Handle JSON fields
       if (updates.home_airports) {
         updateData.home_airports = JSON.stringify(updates.home_airports);
       }
+
+      // Remove fields that aren't in the database schema
+      delete updateData.id;
+      delete updateData.alternate_airports; // Not in DB yet - stored in memory only
+      delete updateData.nonstop_priority;
+      delete updateData.departure_time_priority;
+      delete updateData.airline_priority;
+      delete updateData.layover_priority;
+      delete updateData.seat_priority;
+
+      // Only update if there are fields to update
+      if (Object.keys(updateData).length === 0) return;
 
       const { error } = await supabase
         .from("flight_preferences")

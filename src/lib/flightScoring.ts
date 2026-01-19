@@ -110,6 +110,10 @@ const WEIGHTS = {
 const AMENITY_MUST_HAVE_PENALTY = 25; // Heavy penalty for missing must-have amenity
 const AMENITY_NICE_TO_HAVE_BOOST = 10; // Boost for having nice-to-have amenity
 
+// Airline preference constants
+const AVOIDED_AIRLINE_PENALTY = 50; // Massive penalty applied to total score for avoided airlines
+const PREFERRED_AIRLINE_BOOST = 20; // Boost applied to total score for preferred airlines
+
 // Parse duration - can be ISO 8601 string "PT5H30M" or number (minutes)
 const parseDuration = (duration: string | number | undefined | null): number => {
   if (duration === null || duration === undefined) return 0;
@@ -162,19 +166,35 @@ const isAvoidedAirline = (airlineCode: string, preferences: FlightPreferences): 
          preferences.avoided_airlines.includes(airline.code);
 };
 
-// Score airline reliability
-const scoreAirlineReliability = (airlineCode: string, preferences: FlightPreferences): number => {
+// Score airline reliability - returns score and flags for preference boosts/penalties
+const scoreAirlineReliability = (airlineCode: string, preferences: FlightPreferences): {
+  score: number;
+  isAvoided: boolean;
+  isPreferred: boolean;
+} => {
   const airline = AIRLINES.find(a => airlineCode.startsWith(a.code) || airlineCode === a.name);
   let score = airline?.reliability || 70;
+  let isAvoided = false;
+  let isPreferred = false;
 
-  // Bonus for preferred airlines
+  // Check for preferred airlines
   if (airline && preferences.preferred_airlines.includes(airline.name)) {
-    score = Math.min(100, score + 15);
+    score = Math.min(100, score + 20); // Stronger boost for preferred airlines
+    isPreferred = true;
   }
 
-  // Heavy penalty for avoided airlines - make it very significant
+  // Check for avoided airlines - by name or code
   if (airline && (preferences.avoided_airlines.includes(airline.name) || preferences.avoided_airlines.includes(airline.code))) {
-    score = 0; // Zero out the score for avoided airlines
+    score = 0; // Zero out the reliability score
+    isAvoided = true;
+  }
+
+  // Check by code directly (e.g., "NK", "F9")
+  if (preferences.avoided_airlines.some(avoided => 
+    airlineCode.startsWith(avoided) || airlineCode === avoided
+  )) {
+    score = 0;
+    isAvoided = true;
   }
 
   // Bonus for preferred alliances
@@ -182,7 +202,7 @@ const scoreAirlineReliability = (airlineCode: string, preferences: FlightPrefere
     score = Math.min(100, score + 10);
   }
 
-  return score;
+  return { score, isAvoided, isPreferred };
 };
 
 // Calculate family stress score (lower is better for families)
@@ -910,7 +930,10 @@ export const scoreFlights = (
     breakdown.arrivalTime = arrivalHour >= 22 ? 50 : arrivalHour <= 6 ? 60 : 85;
 
     // Score airline reliability
-    breakdown.airlineReliability = scoreAirlineReliability(firstSegment?.airline || "", preferences);
+    const airlineResult = scoreAirlineReliability(firstSegment?.airline || "", preferences);
+    breakdown.airlineReliability = airlineResult.score;
+    const isAvoidedAirlineFlight = airlineResult.isAvoided;
+    const isPreferredAirlineFlight = airlineResult.isPreferred;
 
     // Score price (normalized)
     breakdown.price = 100 - ((flight.price - minPrice) / priceRange) * 100;
@@ -921,7 +944,7 @@ export const scoreFlights = (
     breakdown.amenities = amenityResult.score;
 
     // Calculate weighted total
-    breakdown.total = Math.round(
+    let weightedTotal = Math.round(
       (breakdown.nonstop * WEIGHTS.nonstop +
         breakdown.travelTime * WEIGHTS.travelTime +
         breakdown.layoverQuality * WEIGHTS.layoverQuality +
@@ -931,6 +954,18 @@ export const scoreFlights = (
         breakdown.price * WEIGHTS.price +
         breakdown.amenities * WEIGHTS.amenities) / 100
     );
+
+    // Apply massive penalty for avoided airlines - they should be at the bottom
+    if (isAvoidedAirlineFlight) {
+      weightedTotal = Math.max(0, weightedTotal - AVOIDED_AIRLINE_PENALTY);
+    }
+
+    // Apply boost for preferred airlines
+    if (isPreferredAirlineFlight) {
+      weightedTotal = Math.min(100, weightedTotal + PREFERRED_AIRLINE_BOOST);
+    }
+
+    breakdown.total = weightedTotal;
 
     // Assign badges
     const badges: string[] = [];
