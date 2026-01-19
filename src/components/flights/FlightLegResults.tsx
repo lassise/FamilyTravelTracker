@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FlightTransparencyPanel } from "./FlightTransparencyPanel";
 import { ConnectionRiskIndicator } from "./ConnectionRiskIndicator";
+import { PriceAlertDialog } from "./PriceAlertDialog";
 import {
   Loader2,
   AlertCircle,
@@ -34,6 +35,7 @@ import {
   Briefcase,
   Baby,
   Plane,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScoredFlight } from "@/lib/flightScoring";
@@ -56,6 +58,7 @@ interface FlightLegResultsProps {
   formatDate: (dateTime: string) => string;
   isLocked?: boolean;
   lockedMessage?: string;
+  passengers?: number;
 }
 
 // Get airline info from code
@@ -142,10 +145,12 @@ export const FlightLegResults = ({
   formatDate,
   isLocked = false,
   lockedMessage,
+  passengers = 1,
 }: FlightLegResultsProps) => {
   const [isExpanded, setIsExpanded] = useState(!isLocked);
   const [showAll, setShowAll] = useState(false);
   const [expandedFlightId, setExpandedFlightId] = useState<string | null>(null);
+  const [priceAlertFlight, setPriceAlertFlight] = useState<ScoredFlight | null>(null);
 
   const displayedFlights = showAll ? flights : flights.slice(0, 5);
 
@@ -737,9 +742,23 @@ export const FlightLegResults = ({
                         {/* Price insight advice */}
                         {flight.priceInsight && (
                           <div className="pt-2 border-t">
-                            <p className="text-xs font-medium mb-1 flex items-center gap-1">
-                              <Lightbulb className="h-3 w-3" /> Price insight
-                            </p>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-xs font-medium flex items-center gap-1">
+                                <Lightbulb className="h-3 w-3" /> Price insight
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-6 text-[10px] gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPriceAlertFlight(flight);
+                                }}
+                              >
+                                <Bell className="h-3 w-3" />
+                                Set Price Alert
+                              </Button>
+                            </div>
                             <p className="text-xs text-muted-foreground">{flight.priceInsight.advice}</p>
                           </div>
                         )}
@@ -788,6 +807,19 @@ export const FlightLegResults = ({
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Price Alert Dialog */}
+      {priceAlertFlight && (
+        <PriceAlertDialog
+          open={!!priceAlertFlight}
+          onOpenChange={(open) => !open && setPriceAlertFlight(null)}
+          origin={origin}
+          destination={destination}
+          departureDate={date}
+          currentPrice={priceAlertFlight.price}
+          passengers={passengers}
+        />
+      )}
     </Card>
   );
 };
