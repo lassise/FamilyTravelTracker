@@ -510,7 +510,7 @@ const Flights = () => {
   return <AppLayout>
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Flight Booking Assistant</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Flight Analyzer</h1>
           <p className="text-muted-foreground">Smart search optimized for your preferences</p>
         </div>
 
