@@ -20,6 +20,7 @@ import { AlternateAirportsSection } from "@/components/flights/AlternateAirports
 import { PriceAlertDialog } from "@/components/flights/PriceAlertDialog";
 import { FlightSelectionCart, type SelectedFlight } from "@/components/flights/FlightSelectionCart";
 import { FlightLegResults } from "@/components/flights/FlightLegResults";
+import { FlightProgressIndicator } from "@/components/flights/FlightProgressIndicator";
 import { buildGoogleFlightsUrl, logBookingEvent } from "@/lib/googleFlightsUrl";
 import { PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle, Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown, Bell, TrendingDown, TrendingUp, Minus, Lightbulb, ArrowLeft, ArrowRight, Plus, Trash2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -919,6 +920,15 @@ const Flights = () => {
 
             {/* Results by Leg - Tabbed View */}
             {hasResults && <div className="space-y-4">
+                {/* Step Progress Indicator */}
+                <FlightProgressIndicator
+                  tripType={tripType}
+                  confirmedLegs={confirmedLegs}
+                  activeLegTab={activeLegTab}
+                  allLegsComplete={confirmedLegs.length === getOrderedLegIds().length}
+                  multiCitySegmentCount={multiCitySegments.filter(s => s.origin && s.destination && s.date).length}
+                />
+
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">
                     {tripType === "oneway" && "Available Flights"}
