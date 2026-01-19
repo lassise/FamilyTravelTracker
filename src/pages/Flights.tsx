@@ -225,6 +225,7 @@ const Flights = () => {
 
   // Selection cart
   const [selectedFlights, setSelectedFlights] = useState<SelectedFlight[]>([]);
+  const [confirmedLegs, setConfirmedLegs] = useState<string[]>([]);
 
   // Flight search hook
   const {
@@ -272,6 +273,7 @@ const Flights = () => {
   // Clear selections when trip type changes
   useEffect(() => {
     setSelectedFlights([]);
+    setConfirmedLegs([]);
     clearResults();
   }, [tripType, clearResults]);
 
@@ -316,6 +318,7 @@ const Flights = () => {
         return;
       }
       setSelectedFlights([]);
+      setConfirmedLegs([]);
       searchMultiCity(validSegments);
     } else if (tripType === "roundtrip") {
       if (!origin || !destination || !departDate || !returnDate) {
@@ -323,6 +326,7 @@ const Flights = () => {
         return;
       }
       setSelectedFlights([]);
+      setConfirmedLegs([]);
       searchRoundTrip(origin, destination, departDate, returnDate);
     } else {
       if (!origin || !destination || !departDate) {
@@ -330,6 +334,7 @@ const Flights = () => {
         return;
       }
       setSelectedFlights([]);
+      setConfirmedLegs([]);
       searchOneWay(origin, destination, departDate);
     }
   };
@@ -376,10 +381,43 @@ const Flights = () => {
   // Remove selection
   const handleRemoveSelection = (legId: string) => {
     setSelectedFlights(prev => prev.filter(s => s.legId !== legId));
+    setConfirmedLegs(prev => prev.filter(id => id !== legId));
+  };
+
+  // Handle confirming a leg selection
+  const handleConfirmLeg = (legId: string) => {
+    setConfirmedLegs(prev => {
+      if (prev.includes(legId)) return prev;
+      return [...prev, legId];
+    });
+    
+    // Scroll to next leg
+    const legOrder = tripType === "roundtrip" 
+      ? ["outbound", "return"]
+      : tripType === "multicity"
+        ? multiCitySegments.filter(s => s.origin && s.destination && s.date).map((_, i) => `segment-${i + 1}`)
+        : ["outbound"];
+    
+    const currentIndex = legOrder.indexOf(legId);
+    if (currentIndex < legOrder.length - 1) {
+      const nextLegId = legOrder[currentIndex + 1];
+      setTimeout(() => {
+        const element = document.getElementById(`leg-${nextLegId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  };
+
+  // Handle going back to change a leg
+  const handleGoBackToLeg = (legId: string) => {
+    setConfirmedLegs(prev => prev.filter(id => id !== legId));
   };
 
   // Focus on a leg for changing selection
   const handleChangeSelection = (legId: string) => {
+    setConfirmedLegs(prev => prev.filter(id => id !== legId));
     const element = document.getElementById(`leg-${legId}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -495,6 +533,29 @@ const Flights = () => {
         label: `Flight ${idx + 1}`
       };
     }
+  };
+
+  // Get ordered leg IDs
+  const getOrderedLegIds = () => {
+    if (tripType === "roundtrip") {
+      return ["outbound", "return"];
+    } else if (tripType === "multicity") {
+      return multiCitySegments
+        .filter(s => s.origin && s.destination && s.date)
+        .map((_, i) => `segment-${i + 1}`);
+    }
+    return ["outbound"];
+  };
+
+  // Get next leg label for confirm button
+  const getNextLegLabel = (currentLegId: string) => {
+    const legOrder = getOrderedLegIds();
+    const currentIndex = legOrder.indexOf(currentLegId);
+    if (currentIndex < legOrder.length - 1) {
+      const nextLegId = legOrder[currentIndex + 1];
+      return getLegInfo(nextLegId).label;
+    }
+    return null;
   };
 
   if (authLoading || prefsLoading) {
@@ -867,9 +928,24 @@ const Flights = () => {
                 {Object.entries(legResults).map(([legId, result]) => {
                   const legInfo = getLegInfo(legId);
                   const selectedForLeg = selectedFlights.find(s => s.legId === legId);
+                  const isConfirmed = confirmedLegs.includes(legId);
+                  const nextLegLabel = getNextLegLabel(legId);
                   
-                  // For sequential round-trip: lock return until outbound is selected
-                  const isLocked = tripType === "roundtrip" && legId === "return" && !outboundSelected;
+                  // For sequential round-trip/multi-city: lock legs until previous is confirmed
+                  const legOrder = getOrderedLegIds();
+                  const currentIndex = legOrder.indexOf(legId);
+                  let isLocked = false;
+                  let lockedMessage = "";
+                  
+                  if (currentIndex > 0) {
+                    const previousLegId = legOrder[currentIndex - 1];
+                    const previousConfirmed = confirmedLegs.includes(previousLegId);
+                    if (!previousConfirmed) {
+                      isLocked = true;
+                      const prevLegInfo = getLegInfo(previousLegId);
+                      lockedMessage = `Confirm your ${prevLegInfo.label} flight first to see ${legInfo.label} options`;
+                    }
+                  }
 
                   return <div key={legId} id={`leg-${legId}`}>
                       <FlightLegResults
@@ -883,13 +959,18 @@ const Flights = () => {
                         error={result.error}
                         selectedFlightId={selectedForLeg?.flight.id || null}
                         onSelectFlight={(flight) => handleSelectFlight(legId, legInfo.label, flight, legInfo.origin, legInfo.destination, legInfo.date)}
+                        onConfirmSelection={() => handleConfirmLeg(legId)}
                         onRetry={() => retryLeg(legId, legInfo.origin, legInfo.destination, legInfo.date)}
                         isAvoidedAirline={isAvoidedAirline}
                         formatTime={formatTime}
                         formatDate={formatDate}
                         isLocked={isLocked}
-                        lockedMessage="Select your outbound flight first to see return options"
+                        lockedMessage={lockedMessage}
                         passengers={passengers}
+                        isConfirmed={isConfirmed}
+                        canGoBack={currentIndex > 0}
+                        onGoBack={() => handleGoBackToLeg(legId)}
+                        nextLegLabel={nextLegLabel || undefined}
                       />
                     </div>;
                 })}

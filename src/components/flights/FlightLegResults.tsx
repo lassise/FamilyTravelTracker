@@ -52,6 +52,7 @@ interface FlightLegResultsProps {
   error: string | null;
   selectedFlightId: string | null;
   onSelectFlight: (flight: ScoredFlight) => void;
+  onConfirmSelection: () => void;
   onRetry: () => void;
   isAvoidedAirline: (code: string) => boolean;
   formatTime: (dateTime: string) => string;
@@ -59,6 +60,10 @@ interface FlightLegResultsProps {
   isLocked?: boolean;
   lockedMessage?: string;
   passengers?: number;
+  isConfirmed?: boolean;
+  canGoBack?: boolean;
+  onGoBack?: () => void;
+  nextLegLabel?: string;
 }
 
 // Get airline info from code
@@ -139,6 +144,7 @@ export const FlightLegResults = ({
   error,
   selectedFlightId,
   onSelectFlight,
+  onConfirmSelection,
   onRetry,
   isAvoidedAirline,
   formatTime,
@@ -146,8 +152,12 @@ export const FlightLegResults = ({
   isLocked = false,
   lockedMessage,
   passengers = 1,
+  isConfirmed = false,
+  canGoBack = false,
+  onGoBack,
+  nextLegLabel,
 }: FlightLegResultsProps) => {
-  const [isExpanded, setIsExpanded] = useState(!isLocked);
+  const [isExpanded, setIsExpanded] = useState(!isLocked && !isConfirmed);
   const [showAll, setShowAll] = useState(false);
   const [expandedFlightId, setExpandedFlightId] = useState<string | null>(null);
   const [priceAlertFlight, setPriceAlertFlight] = useState<ScoredFlight | null>(null);
@@ -252,8 +262,88 @@ export const FlightLegResults = ({
     );
   }
 
+  // Find the selected flight details for confirmed state
+  const selectedFlight = flights.find(f => f.id === selectedFlightId);
+  const selectedFirstSeg = selectedFlight?.itineraries[0]?.segments[0];
+  const selectedLastSeg = selectedFlight?.itineraries[0]?.segments[selectedFlight?.itineraries[0]?.segments.length - 1];
+  const selectedStops = (selectedFlight?.itineraries[0]?.segments.length || 1) - 1;
+  const selectedDuration = selectedFlight?.itineraries.reduce(
+    (sum, it) => sum + it.segments.reduce((s, seg) => s + (typeof seg.duration === "number" ? seg.duration : 0), 0),
+    0
+  ) || 0;
+
+  // Confirmed state - show summary with ability to change
+  if (isConfirmed && selectedFlight) {
+    return (
+      <Card className="border-primary bg-primary/5">
+        <CardHeader className="py-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-primary" />
+              {legLabel}: {origin} → {destination}
+              <Badge variant="default" className="text-xs bg-primary">
+                Confirmed
+              </Badge>
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex items-center justify-between gap-4 p-3 bg-background rounded-lg border">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="outline" className="text-xs font-medium">
+                  {getAirlineInfo(selectedFirstSeg?.airline || "")?.name || selectedFirstSeg?.airline}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{selectedFirstSeg?.flightNumber}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-center">
+                  <p className="font-semibold">{formatTime(selectedFirstSeg?.departureTime || "")}</p>
+                  <p className="text-xs text-muted-foreground">{selectedFirstSeg?.departureAirport}</p>
+                </div>
+                <div className="flex-1 flex flex-col items-center px-2">
+                  <span className="text-xs text-muted-foreground">
+                    {Math.floor(selectedDuration / 60)}h {selectedDuration % 60}m
+                  </span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  <span className={cn(
+                    "text-xs",
+                    selectedStops === 0 ? "text-emerald-600 font-medium" : "text-muted-foreground"
+                  )}>
+                    {selectedStops === 0 ? "Nonstop" : `${selectedStops} stop${selectedStops > 1 ? 's' : ''}`}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold">{formatTime(selectedLastSeg?.arrivalTime || "")}</p>
+                  <p className="text-xs text-muted-foreground">{selectedLastSeg?.arrivalAirport}</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-bold text-primary">${selectedFlight.price}</p>
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-3 gap-2" 
+            onClick={() => {
+              if (onGoBack) onGoBack();
+            }}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Change {legLabel} Flight
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className={cn(selectedFlightId ? "border-primary" : "")}>
+    <Card className={cn(
+      selectedFlightId ? "border-primary" : "",
+      isConfirmed && "border-primary bg-primary/5"
+    )}>
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleTrigger asChild>
           <CardHeader className="py-3 cursor-pointer hover:bg-muted/50">
@@ -270,9 +360,9 @@ export const FlightLegResults = ({
                 </Badge>
               </span>
               <div className="flex items-center gap-2">
-                {selectedFlightId && (
-                  <Badge variant="default" className="text-xs">
-                    Selected
+                {selectedFlightId && !isConfirmed && (
+                  <Badge variant="outline" className="text-xs border-primary text-primary">
+                    Click to confirm
                   </Badge>
                 )}
                 {isExpanded ? (
@@ -287,6 +377,34 @@ export const FlightLegResults = ({
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-4">
+            {/* Confirm selection button - sticky at top when flight is selected */}
+            {selectedFlightId && !isConfirmed && (
+              <div className="sticky top-0 z-10 bg-background border-b pb-3 -mx-6 px-6 pt-3">
+                <div className="flex items-center justify-between gap-3 p-3 bg-primary/10 rounded-lg border border-primary/30">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Flight selected</span>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConfirmSelection();
+                    }}
+                  >
+                    Confirm {legLabel}
+                    {nextLegLabel && (
+                      <>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className="text-xs opacity-80">Next: {nextLegLabel}</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Quick category badges */}
             <div className="flex flex-wrap gap-2">
               {bestOverall && (
