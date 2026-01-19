@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Globe, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStateVisits } from '@/hooks/useStateVisits';
-import { countriesWithStates, countryNameToCode, getStatesForCountry } from '@/lib/statesData';
+import { getSubdivisionsForCountry, iso3ToIso2All, iso2ToIso3All, countryHasSubdivisions } from '@/lib/allSubdivisionsData';
 import { getAllCountries, getEffectiveFlagCode } from '@/lib/countriesData';
 import CountryFlag from '@/components/common/CountryFlag';
 import { useHomeCountry } from '@/hooks/useHomeCountry';
@@ -64,17 +64,9 @@ const iso3ToCountryName: Record<string, string> = Object.fromEntries(
   Object.entries(countryToISO3).map(([name, iso3]) => [iso3, name])
 );
 
-// ISO3 to ISO2 mapping for state lookups
-const iso3ToIso2: Record<string, string> = {
-  'USA': 'US', 'CAN': 'CA', 'AUS': 'AU', 'BRA': 'BR', 'MEX': 'MX',
-  'IND': 'IN', 'DEU': 'DE', 'GBR': 'GB', 'FRA': 'FR', 'ITA': 'IT',
-  'ESP': 'ES', 'JPN': 'JP', 'CHN': 'CN',
-};
-
-// ISO2 to ISO3 mapping (inverse of iso3ToIso2)
-const iso2ToIso3: Record<string, string> = Object.fromEntries(
-  Object.entries(iso3ToIso2).map(([iso3, iso2]) => [iso2, iso3])
-);
+// Use comprehensive ISO3 to ISO2 mapping from library
+const iso3ToIso2 = iso3ToIso2All;
+const iso2ToIso3 = iso2ToIso3All;
 
 interface InteractiveWorldMapProps {
   countries: Country[];
@@ -189,14 +181,16 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
   // Use resolved home country ISO3 for map coloring
   const homeCountryISO = resolvedHome.iso3;
 
-  // Countries that support state-level tracking (visited OR home country)
+  // Countries that support state-level tracking (all countries with subdivisions)
   const countriesWithStateTracking = useMemo(
     () =>
       countries.filter((c) => {
-        const code = countryNameToCode[c.name];
+        const allCountriesList = getAllCountries();
+        const match = allCountriesList.find(ac => ac.name === c.name);
+        const code = match?.code;
         const isHome = resolvedHome.isHomeCountry(c.name);
         const isVisited = c.visitedBy.length > 0;
-        return (isVisited || isHome) && code && countriesWithStates.includes(code);
+        return (isVisited || isHome) && code && countryHasSubdivisions(code);
       }),
     [countries, resolvedHome]
   );
@@ -252,7 +246,14 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     async (iso3?: string) => {
       if (!iso3) return;
       const iso2 = iso3ToIso2[iso3];
-      if (!iso2 || !countriesWithStates.includes(iso2)) return;
+      if (!iso2) return;
+      
+      // Check if this country has subdivisions
+      if (!countryHasSubdivisions(iso2)) {
+        // Country has no subdivisions - could show a message or skip
+        console.log(`Country ${iso2} has no subdivisions to track`);
+        return;
+      }
 
       const canonical = getAllCountries().find((c) => c.code === iso2);
       const countryName = canonical?.name ?? resolvedHome.name;
@@ -310,51 +311,11 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     [countries, resolvedHome.name]
   );
 
-  // Handle country click from map
+  // Handle country click from map - always go directly to state selection
   const handleCountryClick = useCallback(async (iso3: string) => {
-    const countryName = iso3ToCountryName[iso3];
-    const allCountries = getAllCountries();
-    const iso2 = iso3ToIso2[iso3];
-    
-    let clickedInfo: typeof clickedCountryInfo = null;
-    
-    if (!countryName) {
-      // Try to get name from Mapbox data via countries-list
-      const match = iso2 ? allCountries.find(c => c.code === iso2) : null;
-      if (!match) return;
-      
-      clickedInfo = {
-        iso3,
-        name: match.name,
-        flag: match.flag,
-        continent: match.continent,
-      };
-    } else {
-      const match = allCountries.find(c => c.name === countryName);
-      
-      clickedInfo = {
-        iso3,
-        name: countryName,
-        flag: match?.flag ?? '🏳️',
-        continent: match?.continent ?? 'Unknown',
-      };
-    }
-
-    // Check if this country is visited
-    const isVisited = visitedCountries.includes(iso3);
-    const isHome = resolvedHome.isHomeCountry(clickedInfo.name);
-    
-    // For visited countries or home country - navigate directly to states/cities
-    if (isVisited || isHome) {
-      // Open state tracking dialog directly
-      await openStateTrackingDialogForIso3(iso3);
-      return;
-    }
-    
-    // For unvisited countries - show the quick action dialog
-    setClickedCountryInfo(clickedInfo);
-    setQuickActionOpen(true);
-  }, [visitedCountries, resolvedHome, openStateTrackingDialogForIso3]);
+    // Always try to open the state tracking dialog immediately
+    await openStateTrackingDialogForIso3(iso3);
+  }, [openStateTrackingDialogForIso3]);
 
   // Check if clicked country is the home country
   const isClickedCountryHomeCountry = useMemo(() => {
@@ -675,8 +636,10 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
           <div className="flex flex-wrap gap-2">
             {countriesWithStateTracking.length > 0 ? (
               countriesWithStateTracking.map(country => {
-                const code = countryNameToCode[country.name];
-                const states = getStatesForCountry(code);
+                const allCountriesList = getAllCountries();
+                const match = allCountriesList.find(ac => ac.name === country.name);
+                const code = match?.code || '';
+                const states = getSubdivisionsForCountry(code);
                 const stateCount = getStateVisitCount(code);
                 const totalStates = states ? Object.keys(states).length : 0;
                 const isUSA = country.name === 'United States';
@@ -709,7 +672,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
                         ({stateCount}/{totalStates})
                       </span>
                     ) : (
-                      <span className="ml-1 opacity-70">({totalStates} states)</span>
+                      <span className="ml-1 opacity-70">({totalStates} regions)</span>
                     )}
                   </Badge>
                 );

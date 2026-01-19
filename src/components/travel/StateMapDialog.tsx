@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { MapPin, CheckCircle2, XCircle, Search } from 'lucide-react';
 import { useStateVisits } from '@/hooks/useStateVisits';
 import { useFamilyData, Country } from '@/hooks/useFamilyData';
-import { getStatesForCountry, countryNameToCode, getRegionLabel } from '@/lib/statesData';
+import { getSubdivisionsForCountry, getSubdivisionLabel } from '@/lib/allSubdivisionsData';
+import { getAllCountries } from '@/lib/countriesData';
 import StateGridSelector from './StateGridSelector';
 import CountryFlag from '@/components/common/CountryFlag';
 import { getEffectiveFlagCode } from '@/lib/countriesData';
@@ -24,12 +25,20 @@ const StateMapDialog = ({ open, onOpenChange, country }: StateMapDialogProps) =>
   const [searchQuery, setSearchQuery] = useState('');
 
   const { familyMembers } = useFamilyData();
-  const countryCode = country ? countryNameToCode[country.name] : null;
+  
+  // Get country code from countries-list
+  const countryCode = useMemo(() => {
+    if (!country) return null;
+    const allCountries = getAllCountries();
+    const match = allCountries.find(c => c.name === country.name);
+    return match?.code || null;
+  }, [country]);
+  
   const { stateVisits, toggleStateVisit, refetch } = useStateVisits(countryCode || undefined);
 
   const states = useMemo(() => {
     if (!countryCode) return null;
-    return getStatesForCountry(countryCode);
+    return getSubdivisionsForCountry(countryCode);
   }, [countryCode]);
 
   const filteredStates = useMemo(() => {
@@ -153,7 +162,7 @@ const StateMapDialog = ({ open, onOpenChange, country }: StateMapDialogProps) =>
   const totalCount = stateEntries.length;
   const progressPercent = Math.round((visitedCount / totalCount) * 100);
 
-  const regionLabel = getRegionLabel(countryCode);
+  const regionLabel = getSubdivisionLabel(countryCode);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
