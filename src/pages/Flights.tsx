@@ -511,7 +511,7 @@ const Flights = () => {
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground mb-2">Flight Analyzer</h1>
-          <p className="text-muted-foreground">Smart search optimized for your preferences</p>
+          <p className="text-muted-foreground">Analyzes available flights and tells you which ones to pick <span className="text-xs font-medium text-amber-600 dark:text-amber-400">*CANNOT DO DIRECT BOOKING*</span></p>
         </div>
 
         {/* Main content with cart sidebar on desktop */}
