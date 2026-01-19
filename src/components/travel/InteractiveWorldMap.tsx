@@ -163,10 +163,19 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
   }, []);
 
   // Memoize country lists to prevent unnecessary recalculations
+  // Use the flag field which stores the ISO2 code to get ISO3
   const visitedCountries = useMemo(() => 
     countries
       .filter(c => c.visitedBy.length > 0)
-      .map(c => countryToISO3[c.name])
+      .map(c => {
+        // First try to use the flag field (stores ISO2 code)
+        const iso2FromFlag = c.flag?.toUpperCase();
+        if (iso2FromFlag && iso2ToIso3[iso2FromFlag]) {
+          return iso2ToIso3[iso2FromFlag];
+        }
+        // Fallback to name-based lookup
+        return countryToISO3[c.name];
+      })
       .filter(Boolean),
     [countries]
   );
@@ -199,7 +208,15 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     () =>
       countries
         .filter((c) => wishlist.includes(c.id))
-        .map((c) => countryToISO3[c.name])
+        .map((c) => {
+          // First try to use the flag field (stores ISO2 code)
+          const iso2FromFlag = c.flag?.toUpperCase();
+          if (iso2FromFlag && iso2ToIso3[iso2FromFlag]) {
+            return iso2ToIso3[iso2FromFlag];
+          }
+          // Fallback to name-based lookup
+          return countryToISO3[c.name];
+        })
         .filter(Boolean),
     [countries, wishlist]
   );
@@ -311,11 +328,31 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     [countries, resolvedHome.name]
   );
 
-  // Handle country click from map - always go directly to state selection
+  // Handle country click from map
   const handleCountryClick = useCallback(async (iso3: string) => {
-    // Always try to open the state tracking dialog immediately
-    await openStateTrackingDialogForIso3(iso3);
-  }, [openStateTrackingDialogForIso3]);
+    // Check if this country is visited
+    const isVisited = visitedCountries.includes(iso3);
+    
+    if (isVisited) {
+      // Visited countries go directly to state selection
+      await openStateTrackingDialogForIso3(iso3);
+    } else {
+      // Unvisited countries show the quick action dialog (wishlist or cancel)
+      const iso2 = iso3ToIso2[iso3];
+      const allCountriesList = getAllCountries();
+      // Try to find by ISO2 code first, then by name
+      const match = allCountriesList.find(c => c.code === iso2);
+      const countryName = match?.name || iso3ToCountryName[iso3] || iso3;
+      
+      setClickedCountryInfo({
+        iso3,
+        name: countryName,
+        flag: match?.flag || '🏳️',
+        continent: match?.continent || 'Unknown',
+      });
+      setQuickActionOpen(true);
+    }
+  }, [openStateTrackingDialogForIso3, visitedCountries]);
 
   // Check if clicked country is the home country
   const isClickedCountryHomeCountry = useMemo(() => {
