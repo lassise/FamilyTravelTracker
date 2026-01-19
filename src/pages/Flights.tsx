@@ -137,21 +137,32 @@ const AirlineSelector = ({
     }
     return isSelected ? 'default' : 'outline';
   };
-  return <div>
+  return (
+    <div>
       <Label className="mb-2 block">{label}</Label>
       <div className="flex flex-wrap gap-2">
-        {displayedAirlines.map(airline => <Badge key={`${variant}-${airline.code}`} variant={badgeVariant(airline.name) as any} className="cursor-pointer" onClick={() => onToggle(airline.name)}>
+        {displayedAirlines.map(airline => (
+          <Badge 
+            key={`${variant}-${airline.code}`} 
+            variant={badgeVariant(airline.name) as any} 
+            className="cursor-pointer" 
+            onClick={() => onToggle(airline.name)}
+          >
             {airline.name}
-          </Badge>)}
+          </Badge>
+        ))}
       </div>
       <Button variant="ghost" size="sm" className="mt-2 text-muted-foreground text-xs h-7" onClick={() => setShowMore(!showMore)}>
         {showMore ? 'Show less' : `More airlines (${INTERNATIONAL_AIRLINES.length}+)...`}
         <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${showMore ? 'rotate-180' : ''}`} />
       </Button>
-      {selectedAirlines.length > 0 && <p className="text-xs text-muted-foreground mt-1">
+      {selectedAirlines.length > 0 && (
+        <p className="text-xs text-muted-foreground mt-1">
           {selectedAirlines.length} selected
-        </p>}
-    </div>;
+        </p>
+      )}
+    </div>
+  );
 };
 
 const Flights = () => {
@@ -221,10 +232,21 @@ const Flights = () => {
     isSearching,
     searchOneWay,
     searchRoundTrip,
+    searchReturnLeg,
     searchMultiCity,
     retryLeg,
     clearResults,
+    isReturnPending,
   } = useFlightSearch(preferences, passengerBreakdown, cabinClass, stopsFilter);
+
+  // For sequential round-trip: trigger return search when outbound is selected
+  const outboundSelected = selectedFlights.find(s => s.legId === "outbound");
+  
+  useEffect(() => {
+    if (tripType === "roundtrip" && outboundSelected && isReturnPending) {
+      searchReturnLeg();
+    }
+  }, [tripType, outboundSelected, isReturnPending, searchReturnLeg]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -845,6 +867,9 @@ const Flights = () => {
                 {Object.entries(legResults).map(([legId, result]) => {
                   const legInfo = getLegInfo(legId);
                   const selectedForLeg = selectedFlights.find(s => s.legId === legId);
+                  
+                  // For sequential round-trip: lock return until outbound is selected
+                  const isLocked = tripType === "roundtrip" && legId === "return" && !outboundSelected;
 
                   return <div key={legId} id={`leg-${legId}`}>
                       <FlightLegResults
@@ -862,6 +887,8 @@ const Flights = () => {
                         isAvoidedAirline={isAvoidedAirline}
                         formatTime={formatTime}
                         formatDate={formatDate}
+                        isLocked={isLocked}
+                        lockedMessage="Select your outbound flight first to see return options"
                       />
                     </div>;
                 })}

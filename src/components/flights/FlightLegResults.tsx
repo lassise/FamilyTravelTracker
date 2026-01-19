@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { FlightTransparencyPanel } from "./FlightTransparencyPanel";
+import { ConnectionRiskIndicator } from "./ConnectionRiskIndicator";
 import {
   Loader2,
   AlertCircle,
@@ -12,16 +16,28 @@ import {
   Zap,
   DollarSign,
   PlaneTakeoff,
-  PlaneLanding,
   Clock,
   AlertTriangle,
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Wifi,
+  Power,
+  Tv,
+  ThumbsUp,
+  ThumbsDown,
+  TrendingDown,
+  TrendingUp,
+  Minus,
+  Lightbulb,
+  Info,
+  Briefcase,
+  Baby,
+  Plane,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScoredFlight } from "@/lib/flightScoring";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AIRLINES } from "@/lib/airportsData";
 
 interface FlightLegResultsProps {
   legId: string;
@@ -38,7 +54,76 @@ interface FlightLegResultsProps {
   isAvoidedAirline: (code: string) => boolean;
   formatTime: (dateTime: string) => string;
   formatDate: (dateTime: string) => string;
+  isLocked?: boolean;
+  lockedMessage?: string;
 }
+
+// Get airline info from code
+const getAirlineInfo = (code: string) => {
+  return AIRLINES.find(a => code?.startsWith(a.code) || code === a.name);
+};
+
+// Extract amenities from flight extensions
+const extractAmenities = (flight: ScoredFlight) => {
+  const amenities = {
+    hasWifi: false,
+    hasSeatbackScreen: false,
+    hasPower: false,
+    hasUsbPorts: false,
+    legroom: null as string | null,
+    aircraft: null as string | null,
+    meal: false,
+  };
+
+  for (const it of flight.itineraries) {
+    for (const seg of it.segments) {
+      const ext = (seg.extensions || []).map((e: string) => e?.toLowerCase() || '');
+      
+      if (ext.some(e => e.includes('wi-fi') || e.includes('wifi'))) amenities.hasWifi = true;
+      if (ext.some(e => e.includes('personal device') || e.includes('seatback') || e.includes('on-demand') || e.includes('entertainment'))) amenities.hasSeatbackScreen = true;
+      if (ext.some(e => e.includes('power outlet') || e.includes('in-seat power'))) amenities.hasPower = true;
+      if (ext.some(e => e.includes('usb'))) amenities.hasUsbPorts = true;
+      if (ext.some(e => e.includes('meal') || e.includes('food'))) amenities.meal = true;
+      
+      if (seg.legroom) amenities.legroom = seg.legroom;
+      if (seg.airplane || seg.aircraft) amenities.aircraft = seg.airplane || seg.aircraft;
+    }
+  }
+
+  return amenities;
+};
+
+// Detect if basic economy
+const isBasicEconomy = (flight: ScoredFlight): boolean => {
+  for (const it of flight.itineraries) {
+    for (const seg of it.segments) {
+      const ext = (seg.extensions || []).map((e: string) => e?.toLowerCase() || '');
+      if (ext.some(e => e.includes('basic') || e.includes('main cabin') && e.includes('basic'))) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+// Get fare inclusions estimate
+const getFareInclusions = (flight: ScoredFlight, airlineCode: string) => {
+  const isBasic = isBasicEconomy(flight);
+  const isULCC = ['NK', 'F9', 'WN'].includes(airlineCode);
+  const isPremium = flight.itineraries[0]?.segments[0]?.cabin === 'business' || flight.itineraries[0]?.segments[0]?.cabin === 'first';
+
+  return {
+    carryOn: isULCC ? 'fee' as const : true,
+    checkedBag: isPremium ? true : 'fee' as const,
+    seatSelection: isBasic || isULCC ? 'fee' as const : isPremium ? true : 'limited' as const,
+    mealIncluded: isPremium,
+    wifi: 'fee' as const,
+    power: !isULCC,
+    entertainment: !isULCC,
+    changeable: isPremium ? true : 'fee' as const,
+    refundable: isPremium,
+  };
+};
 
 export const FlightLegResults = ({
   legId,
@@ -55,9 +140,12 @@ export const FlightLegResults = ({
   isAvoidedAirline,
   formatTime,
   formatDate,
+  isLocked = false,
+  lockedMessage,
 }: FlightLegResultsProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(!isLocked);
   const [showAll, setShowAll] = useState(false);
+  const [expandedFlightId, setExpandedFlightId] = useState<string | null>(null);
 
   const displayedFlights = showAll ? flights : flights.slice(0, 5);
 
@@ -94,7 +182,7 @@ export const FlightLegResults = ({
         </CardHeader>
         <CardContent className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-24 w-full" />
+            <Skeleton key={i} className="h-32 w-full" />
           ))}
         </CardContent>
       </Card>
@@ -140,6 +228,25 @@ export const FlightLegResults = ({
     );
   }
 
+  // Locked state for sequential selection
+  if (isLocked) {
+    return (
+      <Card className="opacity-60">
+        <CardHeader className="py-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            {legLabel}: {origin} → {destination}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground text-center py-4">
+            {lockedMessage || "Select your outbound flight first to see return options"}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className={cn(selectedFlightId ? "border-primary" : "")}>
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
@@ -174,22 +281,22 @@ export const FlightLegResults = ({
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <CardContent className="pt-0 space-y-3">
+          <CardContent className="pt-0 space-y-4">
             {/* Quick category badges */}
             <div className="flex flex-wrap gap-2">
               {bestOverall && (
-                <Badge variant="outline" className="text-xs gap-1">
-                  <Star className="h-3 w-3 text-primary" /> Best: ${bestOverall.price}
+                <Badge variant="outline" className="text-xs gap-1 bg-primary/10 text-primary border-primary/30">
+                  <Star className="h-3 w-3" /> Best Match: ${bestOverall.price}
                 </Badge>
               )}
               {cheapest && cheapest.id !== bestOverall?.id && (
-                <Badge variant="outline" className="text-xs gap-1">
-                  <DollarSign className="h-3 w-3 text-green-500" /> Cheapest: ${cheapest.price}
+                <Badge variant="outline" className="text-xs gap-1 bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-900/20 dark:text-emerald-400">
+                  <DollarSign className="h-3 w-3" /> Cheapest: ${cheapest.price}
                 </Badge>
               )}
               {fastest && fastest.id !== bestOverall?.id && (
-                <Badge variant="outline" className="text-xs gap-1">
-                  <Zap className="h-3 w-3 text-yellow-500" /> Fastest
+                <Badge variant="outline" className="text-xs gap-1 bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400">
+                  <Zap className="h-3 w-3" /> Fastest
                 </Badge>
               )}
             </div>
@@ -212,84 +319,453 @@ export const FlightLegResults = ({
               const isSelected = flight.id === selectedFlightId;
               const flightAirline = firstSeg?.airline || "";
               const isAvoided = isAvoidedAirline(flightAirline);
+              const airlineInfo = getAirlineInfo(flightAirline);
+              const amenities = extractAmenities(flight);
+              const isFlightExpanded = expandedFlightId === flight.id;
+              const isBasic = isBasicEconomy(flight);
+
+              // Calculate layover info for connection risk
+              let layoverMinutes = 0;
+              let hasTerminalChange = false;
+              if (stops > 0 && flight.itineraries[0]?.segments.length > 1) {
+                const seg1 = flight.itineraries[0].segments[0];
+                const seg2 = flight.itineraries[0].segments[1];
+                const arrival = new Date(seg1.arrivalTime);
+                const departure = new Date(seg2.departureTime);
+                layoverMinutes = (departure.getTime() - arrival.getTime()) / (1000 * 60);
+              }
+
+              const positiveMatches = flight.preferenceMatches.filter(m => m.type === 'positive');
+              const negativeMatches = flight.preferenceMatches.filter(m => m.type === 'negative');
 
               return (
                 <div
                   key={flight.id}
                   className={cn(
-                    "p-3 rounded-lg border cursor-pointer transition-all hover:border-primary/50",
-                    isSelected && "border-primary bg-primary/5",
-                    isAvoided && "border-red-500/50 bg-red-50/30 dark:bg-red-950/10"
+                    "rounded-lg border transition-all",
+                    isSelected && "border-primary bg-primary/5 ring-2 ring-primary/20",
+                    isAvoided && "border-red-500/50 bg-red-50/30 dark:bg-red-950/10",
+                    !isSelected && !isAvoided && "hover:border-primary/50"
                   )}
-                  onClick={() => onSelectFlight(flight)}
                 >
                   {/* Avoided warning */}
                   {isAvoided && (
-                    <div className="flex items-center gap-1 mb-2 text-xs text-red-600 dark:text-red-400">
+                    <div className="flex items-center gap-1 px-3 pt-2 text-xs text-red-600 dark:text-red-400">
                       <AlertTriangle className="h-3 w-3" />
-                      <span>Avoided airline</span>
+                      <span>This airline is on your avoid list</span>
                     </div>
                   )}
 
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      {/* Airline and badges */}
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs">
-                          {firstSeg?.airline} {firstSeg?.flightNumber}
-                        </Badge>
-                        {idx === 0 && !isAvoided && (
-                          <Badge className="text-[10px] bg-primary">Best Match</Badge>
-                        )}
-                        {flight.id === cheapest?.id && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Cheapest
-                          </Badge>
-                        )}
-                        {flight.id === fastest?.id && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Fastest
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Times */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium">{formatTime(firstSeg?.departureTime || "")}</span>
-                        <div className="flex flex-col items-center">
-                          <span className="text-[10px] text-muted-foreground">
-                            {Math.floor(duration / 60)}h {duration % 60}m
-                          </span>
-                          <div className="w-12 h-px bg-border relative">
-                            {stops > 0 && (
-                              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                            )}
+                  <div 
+                    className="p-3 cursor-pointer"
+                    onClick={() => onSelectFlight(flight)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        {/* Airline and badges row */}
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-xs font-medium">
+                              {airlineInfo?.name || flightAirline}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {firstSeg?.flightNumber}
+                            </span>
                           </div>
-                          <span className="text-[10px] text-muted-foreground">
-                            {stops === 0 ? "Nonstop" : `${stops} stop`}
-                          </span>
+                          
+                          {/* Ranking badges */}
+                          {idx === 0 && !isAvoided && (
+                            <Badge className="text-[10px] bg-primary gap-1">
+                              <Star className="h-2.5 w-2.5" /> Best Match
+                            </Badge>
+                          )}
+                          {flight.id === cheapest?.id && idx !== 0 && (
+                            <Badge variant="secondary" className="text-[10px] gap-1">
+                              <DollarSign className="h-2.5 w-2.5" /> Cheapest
+                            </Badge>
+                          )}
+                          {flight.id === fastest?.id && idx !== 0 && (
+                            <Badge variant="secondary" className="text-[10px] gap-1">
+                              <Zap className="h-2.5 w-2.5" /> Fastest
+                            </Badge>
+                          )}
+                          {isBasic && (
+                            <Badge variant="outline" className="text-[10px] bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400">
+                              Basic Economy
+                            </Badge>
+                          )}
                         </div>
-                        <span className="font-medium">{formatTime(lastSeg?.arrivalTime || "")}</span>
+
+                        {/* Times and route */}
+                        <div className="flex items-center gap-3">
+                          <div className="text-center">
+                            <p className="text-lg font-semibold">{formatTime(firstSeg?.departureTime || "")}</p>
+                            <p className="text-xs text-muted-foreground">{firstSeg?.departureAirport}</p>
+                          </div>
+                          
+                          <div className="flex-1 flex flex-col items-center px-2">
+                            <span className="text-xs text-muted-foreground">
+                              {Math.floor(duration / 60)}h {duration % 60}m
+                            </span>
+                            <div className="w-full h-px bg-border relative my-1">
+                              {stops > 0 && (
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-1">
+                                  {Array.from({ length: stops }).map((_, i) => (
+                                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <span className={cn(
+                              "text-xs",
+                              stops === 0 ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"
+                            )}>
+                              {stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? 's' : ''}`}
+                            </span>
+                          </div>
+                          
+                          <div className="text-center">
+                            <p className="text-lg font-semibold">{formatTime(lastSeg?.arrivalTime || "")}</p>
+                            <p className="text-xs text-muted-foreground">{lastSeg?.arrivalAirport}</p>
+                          </div>
+                        </div>
+
+                        {/* Connection risk for stops */}
+                        {stops > 0 && layoverMinutes > 0 && (
+                          <div className="mt-2">
+                            <ConnectionRiskIndicator 
+                              layoverMinutes={layoverMinutes}
+                              hasTerminalChange={hasTerminalChange}
+                              className="text-[10px]"
+                            />
+                          </div>
+                        )}
+
+                        {/* Amenities quick view */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          {amenities.hasWifi && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                  <Wifi className="h-3 w-3" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>WiFi available</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {amenities.hasSeatbackScreen && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                  <Tv className="h-3 w-3" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Seatback entertainment</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {(amenities.hasPower || amenities.hasUsbPorts) && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                                  <Power className="h-3 w-3" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Power outlets / USB</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {amenities.legroom && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {amenities.legroom} legroom
+                            </span>
+                          )}
+                          {amenities.aircraft && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <Plane className="h-2.5 w-2.5" />
+                                  {amenities.aircraft}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>Aircraft type</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                        <span>{firstSeg?.departureAirport}</span>
-                        <ArrowRight className="h-3 w-3" />
-                        <span>{lastSeg?.arrivalAirport}</span>
+                      {/* Price and score */}
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xl font-bold text-primary">${flight.price}</p>
+                        {flight.pricePerTicket && flight.passengers && flight.passengers > 1 && (
+                          <p className="text-[10px] text-muted-foreground">
+                            ${Math.round(flight.pricePerTicket)}/person
+                          </p>
+                        )}
+                        
+                        {/* Score indicator */}
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <span className="text-xs text-muted-foreground">Score:</span>
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-[10px] px-1.5",
+                              flight.score >= 80 && "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400",
+                              flight.score >= 60 && flight.score < 80 && "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400",
+                              flight.score < 60 && "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400"
+                            )}
+                          >
+                            {flight.score}
+                          </Badge>
+                        </div>
+
+                        {/* Price insight */}
+                        {flight.priceInsight && (
+                          <div className={cn(
+                            "flex items-center justify-end gap-1 mt-1 text-[10px]",
+                            flight.priceInsight.level === 'low' && "text-emerald-600",
+                            flight.priceInsight.level === 'medium' && "text-amber-600",
+                            flight.priceInsight.level === 'high' && "text-red-600"
+                          )}>
+                            {flight.priceInsight.level === 'low' && <TrendingDown className="h-3 w-3" />}
+                            {flight.priceInsight.level === 'medium' && <Minus className="h-3 w-3" />}
+                            {flight.priceInsight.level === 'high' && <TrendingUp className="h-3 w-3" />}
+                            {flight.priceInsight.label}
+                          </div>
+                        )}
+
+                        {isSelected && (
+                          <Badge variant="default" className="mt-2 text-[10px]">
+                            <Check className="h-3 w-3 mr-1" /> Selected
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
-                    {/* Price and select */}
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-primary">${flight.price}</p>
-                      <p className="text-xs text-muted-foreground">Score: {flight.score}</p>
-                      {isSelected && (
-                        <Badge variant="default" className="mt-1 text-[10px]">
-                          <Check className="h-3 w-3 mr-1" /> Selected
+                    {/* Explanation */}
+                    {flight.explanation && (
+                      <p className="text-xs text-muted-foreground mt-2 bg-muted/50 rounded px-2 py-1">
+                        {flight.explanation}
+                      </p>
+                    )}
+
+                    {/* Preference matches - quick view */}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {positiveMatches.slice(0, 3).map((match, i) => (
+                        <Tooltip key={`pos-${i}`}>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-[10px] gap-0.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400">
+                              <ThumbsUp className="h-2.5 w-2.5" />
+                              {match.label}
+                            </Badge>
+                          </TooltipTrigger>
+                          {match.detail && <TooltipContent>{match.detail}</TooltipContent>}
+                        </Tooltip>
+                      ))}
+                      {negativeMatches.slice(0, 2).map((match, i) => (
+                        <Tooltip key={`neg-${i}`}>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-[10px] gap-0.5 bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400">
+                              <ThumbsDown className="h-2.5 w-2.5" />
+                              {match.label}
+                            </Badge>
+                          </TooltipTrigger>
+                          {match.detail && <TooltipContent>{match.detail}</TooltipContent>}
+                        </Tooltip>
+                      ))}
+                      {(positiveMatches.length > 3 || negativeMatches.length > 2) && (
+                        <Badge 
+                          variant="outline" 
+                          className="text-[10px] cursor-pointer hover:bg-muted"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedFlightId(isFlightExpanded ? null : flight.id);
+                          }}
+                        >
+                          +{positiveMatches.length - 3 + negativeMatches.length - 2} more
                         </Badge>
                       )}
                     </div>
                   </div>
+
+                  {/* Expanded details */}
+                  <Collapsible open={isFlightExpanded}>
+                    <CollapsibleTrigger asChild>
+                      <button 
+                        className="w-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 border-t hover:bg-muted/50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedFlightId(isFlightExpanded ? null : flight.id);
+                        }}
+                      >
+                        <Info className="h-3 w-3" />
+                        {isFlightExpanded ? "Hide details" : "Show full analysis & what's included"}
+                        {isFlightExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </button>
+                    </CollapsibleTrigger>
+                    
+                    <CollapsibleContent>
+                      <div className="px-3 pb-3 space-y-3 border-t bg-muted/30">
+                        {/* Match explanation */}
+                        {flight.matchExplanation && (
+                          <div className="pt-3 space-y-2">
+                            {flight.matchExplanation.whyNotPerfect.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1 mb-1">
+                                  <AlertTriangle className="h-3 w-3" /> Why it's not perfect
+                                </p>
+                                <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
+                                  {flight.matchExplanation.whyNotPerfect.map((reason, i) => (
+                                    <li key={i}>• {reason}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {flight.matchExplanation.whyBestChoice.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-emerald-600 flex items-center gap-1 mb-1">
+                                  <Lightbulb className="h-3 w-3" /> Why it's still a good choice
+                                </p>
+                                <ul className="text-xs text-muted-foreground space-y-0.5 ml-4">
+                                  {flight.matchExplanation.whyBestChoice.map((reason, i) => (
+                                    <li key={i}>• {reason}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* All preference matches */}
+                        <div className="pt-2">
+                          <p className="text-xs font-medium mb-2">All preference matches</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[10px] text-emerald-600 font-medium mb-1 flex items-center gap-1">
+                                <ThumbsUp className="h-2.5 w-2.5" /> Matches your preferences
+                              </p>
+                              {positiveMatches.length > 0 ? (
+                                <ul className="text-xs text-muted-foreground space-y-0.5">
+                                  {positiveMatches.map((m, i) => (
+                                    <li key={i} className="flex items-start gap-1">
+                                      <Check className="h-3 w-3 text-emerald-500 mt-0.5 shrink-0" />
+                                      <span>{m.label}{m.detail ? `: ${m.detail}` : ''}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">None</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-red-600 font-medium mb-1 flex items-center gap-1">
+                                <ThumbsDown className="h-2.5 w-2.5" /> Doesn't match
+                              </p>
+                              {negativeMatches.length > 0 ? (
+                                <ul className="text-xs text-muted-foreground space-y-0.5">
+                                  {negativeMatches.map((m, i) => (
+                                    <li key={i} className="flex items-start gap-1">
+                                      <AlertTriangle className="h-3 w-3 text-red-500 mt-0.5 shrink-0" />
+                                      <span>{m.label}{m.detail ? `: ${m.detail}` : ''}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">None</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Hidden costs */}
+                        {flight.hiddenCosts.length > 0 && (
+                          <div className="pt-2 border-t">
+                            <p className="text-xs font-medium mb-1 flex items-center gap-1 text-amber-600">
+                              <Briefcase className="h-3 w-3" /> Potential additional costs
+                            </p>
+                            <ul className="text-xs text-muted-foreground space-y-0.5">
+                              {flight.hiddenCosts.map((cost, i) => (
+                                <li key={i}>
+                                  • {cost.description}
+                                  {cost.estimatedCost > 0 && (
+                                    <span className="text-amber-600 ml-1">~${cost.estimatedCost}</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Delay risk */}
+                        <div className="pt-2 border-t">
+                          <p className="text-xs font-medium mb-1">Delay risk assessment</p>
+                          <Badge 
+                            variant="outline"
+                            className={cn(
+                              "text-[10px]",
+                              flight.delayRisk === 'low' && "bg-emerald-50 text-emerald-700 border-emerald-300",
+                              flight.delayRisk === 'medium' && "bg-amber-50 text-amber-700 border-amber-300",
+                              flight.delayRisk === 'high' && "bg-red-50 text-red-700 border-red-300"
+                            )}
+                          >
+                            {flight.delayRisk === 'low' && '✓ Low risk'}
+                            {flight.delayRisk === 'medium' && '⚠ Medium risk'}
+                            {flight.delayRisk === 'high' && '⚠ High risk'}
+                          </Badge>
+                        </div>
+
+                        {/* Family stress score */}
+                        {flight.familyStressScore !== undefined && (
+                          <div className="pt-2 border-t">
+                            <p className="text-xs font-medium mb-1 flex items-center gap-1">
+                              <Baby className="h-3 w-3" /> Family friendliness
+                            </p>
+                            <Badge 
+                              variant="outline"
+                              className={cn(
+                                "text-[10px]",
+                                flight.familyStressScore < 30 && "bg-emerald-50 text-emerald-700 border-emerald-300",
+                                flight.familyStressScore >= 30 && flight.familyStressScore < 60 && "bg-amber-50 text-amber-700 border-amber-300",
+                                flight.familyStressScore >= 60 && "bg-red-50 text-red-700 border-red-300"
+                              )}
+                            >
+                              {flight.familyStressScore < 30 && '✓ Great for families'}
+                              {flight.familyStressScore >= 30 && flight.familyStressScore < 60 && '⚠ Manageable with kids'}
+                              {flight.familyStressScore >= 60 && '⚠ May be stressful with kids'}
+                            </Badge>
+                          </div>
+                        )}
+
+                        {/* Price insight advice */}
+                        {flight.priceInsight && (
+                          <div className="pt-2 border-t">
+                            <p className="text-xs font-medium mb-1 flex items-center gap-1">
+                              <Lightbulb className="h-3 w-3" /> Price insight
+                            </p>
+                            <p className="text-xs text-muted-foreground">{flight.priceInsight.advice}</p>
+                          </div>
+                        )}
+
+                        {/* Transparency panel */}
+                        <div className="pt-2 border-t">
+                          <FlightTransparencyPanel
+                            cabinClass={firstSeg?.cabin || 'economy'}
+                            isBasicEconomy={isBasic}
+                            fareFamily={isBasic ? 'Basic Economy' : undefined}
+                            inclusions={getFareInclusions(flight, flightAirline)}
+                            restrictions={isBasic ? [
+                              'Last to board - overhead bin space not guaranteed',
+                              'No changes or refunds',
+                              'Seat assigned at check-in',
+                            ] : []}
+                            estimatedBagFees={
+                              ['NK', 'F9'].includes(flightAirline) 
+                                ? { carryOn: 45, firstBag: 35, secondBag: 45 }
+                                : { firstBag: 35, secondBag: 45 }
+                            }
+                          />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               );
             })}

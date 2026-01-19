@@ -42,6 +42,14 @@ export const useFlightSearch = (
   const [isSearching, setIsSearching] = useState(false);
   const cacheRef = useRef<Record<string, CacheEntry>>({});
 
+  // Store round-trip params for sequential search
+  const [roundTripParams, setRoundTripParams] = useState<{
+    origin: string;
+    destination: string;
+    departDate: string;
+    returnDate: string;
+  } | null>(null);
+
   const passengers =
     passengerBreakdown.adults +
     passengerBreakdown.children +
@@ -117,6 +125,7 @@ export const useFlightSearch = (
       }));
 
       setIsSearching(true);
+      setRoundTripParams(null);
 
       try {
         const flights = await searchLeg({ legId, origin, destination, date });
@@ -144,75 +153,101 @@ export const useFlightSearch = (
     [searchLeg]
   );
 
-  // Search round-trip (parallel outbound + return)
+  // Search round-trip - Sequential: outbound first, return on-demand
   const searchRoundTrip = useCallback(
     async (origin: string, destination: string, departDate: string, returnDate: string) => {
       const outboundId = "outbound";
       const returnId = "return";
 
+      // Store params for later return search
+      setRoundTripParams({ origin, destination, departDate, returnDate });
+
+      // Initialize outbound as loading, return as pending (not searched yet)
       setLegResults({
         [outboundId]: { legId: outboundId, flights: [], isLoading: true, error: null },
-        [returnId]: { legId: returnId, flights: [], isLoading: true, error: null },
+        [returnId]: { legId: returnId, flights: [], isLoading: false, error: null },
       });
 
       setIsSearching(true);
 
-      // Search both legs in parallel
-      const [outboundResult, returnResult] = await Promise.allSettled([
-        searchLeg({ legId: outboundId, origin, destination, date: departDate }),
-        searchLeg({ legId: returnId, origin: destination, destination: origin, date: returnDate }),
-      ]);
-
-      // Process outbound
-      if (outboundResult.status === "fulfilled") {
+      // Search outbound only
+      try {
+        const outboundFlights = await searchLeg({ 
+          legId: outboundId, 
+          origin, 
+          destination, 
+          date: departDate 
+        });
+        
         setLegResults((prev) => ({
           ...prev,
-          [outboundId]: { legId: outboundId, flights: outboundResult.value, isLoading: false, error: null },
+          [outboundId]: { legId: outboundId, flights: outboundFlights, isLoading: false, error: null },
         }));
-      } else {
+
+        if (outboundFlights.length === 0) {
+          toast.info("No outbound flights found");
+        } else {
+          toast.success(`Found ${outboundFlights.length} outbound options. Select one to see return flights.`);
+        }
+      } catch (err: any) {
+        const errorMsg = err.message || "Failed to search outbound flights";
         setLegResults((prev) => ({
           ...prev,
-          [outboundId]: {
-            legId: outboundId,
-            flights: [],
-            isLoading: false,
-            error: outboundResult.reason?.message || "Failed to search outbound flights",
-          },
+          [outboundId]: { legId: outboundId, flights: [], isLoading: false, error: errorMsg },
         }));
-      }
-
-      // Process return
-      if (returnResult.status === "fulfilled") {
-        setLegResults((prev) => ({
-          ...prev,
-          [returnId]: { legId: returnId, flights: returnResult.value, isLoading: false, error: null },
-        }));
-      } else {
-        setLegResults((prev) => ({
-          ...prev,
-          [returnId]: {
-            legId: returnId,
-            flights: [],
-            isLoading: false,
-            error: returnResult.reason?.message || "Failed to search return flights",
-          },
-        }));
-      }
-
-      setIsSearching(false);
-
-      // Toast summary
-      const outboundCount =
-        outboundResult.status === "fulfilled" ? outboundResult.value.length : 0;
-      const returnCount = returnResult.status === "fulfilled" ? returnResult.value.length : 0;
-
-      if (outboundCount > 0 || returnCount > 0) {
-        toast.success(`Found ${outboundCount} outbound and ${returnCount} return options`);
-      } else {
-        toast.info("No flights found for this route");
+        toast.error("Failed to search outbound flights");
+      } finally {
+        setIsSearching(false);
       }
     },
     [searchLeg]
+  );
+
+  // Search return leg (called when outbound is selected)
+  const searchReturnLeg = useCallback(
+    async () => {
+      if (!roundTripParams) return;
+
+      const { origin, destination, returnDate } = roundTripParams;
+      const returnId = "return";
+
+      setLegResults((prev) => ({
+        ...prev,
+        [returnId]: { legId: returnId, flights: [], isLoading: true, error: null },
+      }));
+
+      setIsSearching(true);
+
+      try {
+        const returnFlights = await searchLeg({ 
+          legId: returnId, 
+          origin: destination, 
+          destination: origin, 
+          date: returnDate 
+        });
+        
+        setLegResults((prev) => ({
+          ...prev,
+          [returnId]: { legId: returnId, flights: returnFlights, isLoading: false, error: null },
+        }));
+
+        if (returnFlights.length === 0) {
+          toast.info("No return flights found");
+        } else {
+          toast.success(`Found ${returnFlights.length} return options`);
+        }
+      } catch (err: any) {
+        const errorMsg = err.message || "Failed to search return flights";
+        setLegResults((prev) => ({
+          ...prev,
+          [returnId]: { legId: returnId, flights: [], isLoading: false, error: errorMsg },
+        }));
+        toast.error("Failed to search return flights");
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [searchLeg, roundTripParams]
   );
 
   // Search multi-city (parallel with concurrency limit)
@@ -227,6 +262,7 @@ export const useFlightSearch = (
       setLegResults(initialResults);
 
       setIsSearching(true);
+      setRoundTripParams(null);
 
       // Use Promise.allSettled for parallel search with safe error handling
       // Limit concurrency to 3 to avoid edge function timeouts
@@ -308,15 +344,25 @@ export const useFlightSearch = (
   // Clear all results
   const clearResults = useCallback(() => {
     setLegResults({});
+    setRoundTripParams(null);
   }, []);
+
+  // Check if return search is pending (for sequential round-trip)
+  const isReturnPending = roundTripParams !== null && 
+    legResults["return"]?.flights.length === 0 && 
+    !legResults["return"]?.isLoading && 
+    !legResults["return"]?.error;
 
   return {
     legResults,
     isSearching,
     searchOneWay,
     searchRoundTrip,
+    searchReturnLeg,
     searchMultiCity,
     retryLeg,
     clearResults,
+    isReturnPending,
+    roundTripParams,
   };
 };
