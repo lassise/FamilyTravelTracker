@@ -1899,6 +1899,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_anonymous_rate_limit: {
+        Args: {
+          lookup_key: string
+          max_requests?: number
+          window_seconds?: number
+        }
+        Returns: boolean
+      }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       get_public_profile: {
         Args: { profile_user_id: string }
