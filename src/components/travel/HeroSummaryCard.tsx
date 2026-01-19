@@ -1,11 +1,12 @@
-import { useMemo, memo, ReactNode } from "react";
+import { useMemo, memo, ReactNode, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Globe2, Users, Plane, Calendar } from "lucide-react";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
 import { useStateVisits } from "@/hooks/useStateVisits";
 import CountryFlag from "@/components/common/CountryFlag";
-
+import ContinentBreakdownDialog from "./ContinentBreakdownDialog";
 interface HeroSummaryCardProps {
   countries: Country[];
   familyMembers: FamilyMember[];
@@ -23,6 +24,8 @@ const HeroSummaryCard = memo(({
   filterComponent,
   earliestYear
 }: HeroSummaryCardProps) => {
+  const navigate = useNavigate();
+  const [showContinentDialog, setShowContinentDialog] = useState(false);
   const resolvedHome = useHomeCountry(homeCountry);
   const { getStateVisitCount } = useStateVisits();
   
@@ -38,6 +41,16 @@ const HeroSummaryCard = memo(({
     return getStateVisitCount(resolvedHome.iso2);
   }, [resolvedHome, getStateVisitCount]);
 
+  // Handle stat card clicks
+  const handleStatClick = (label: string) => {
+    if (label === "Countries") {
+      navigate("/travel-history?tab=countries");
+    } else if (label === "Continents") {
+      setShowContinentDialog(true);
+    }
+  };
+
+  const isClickable = (label: string) => label === "Countries" || label === "Continents";
   const stats = useMemo(() => {
     const baseStats: Array<{
       icon: typeof Globe2 | null;
@@ -123,10 +136,16 @@ const HeroSummaryCard = memo(({
         <div className="grid grid-cols-4 gap-4">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
+            const clickable = isClickable(stat.label);
             return (
               <div
                 key={index}
-                className="flex flex-col items-center text-center p-3 rounded-xl bg-background/60 backdrop-blur-sm"
+                onClick={() => handleStatClick(stat.label)}
+                className={`flex flex-col items-center text-center p-3 rounded-xl bg-background/60 backdrop-blur-sm transition-all ${
+                  clickable 
+                    ? "cursor-pointer hover:bg-background/80 hover:scale-105 active:scale-95" 
+                    : ""
+                }`}
               >
                 <div className={`p-2 rounded-full ${stat.bgColor} mb-2`}>
                   {stat.flagCode ? (
@@ -160,6 +179,13 @@ const HeroSummaryCard = memo(({
           </div>
         </div>
       </CardContent>
+
+      <ContinentBreakdownDialog
+        open={showContinentDialog}
+        onOpenChange={setShowContinentDialog}
+        countries={countries}
+        homeCountryName={resolvedHome.name}
+      />
     </Card>
   );
 });
