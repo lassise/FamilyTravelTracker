@@ -889,6 +889,7 @@ const Flights = () => {
                         formatDate={formatDate}
                         isLocked={isLocked}
                         lockedMessage="Select your outbound flight first to see return options"
+                        passengers={passengers}
                       />
                     </div>;
                 })}

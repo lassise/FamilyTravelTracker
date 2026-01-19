@@ -613,17 +613,52 @@ const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPrefe
 };
 
 // Calculate price insight based on price distribution
-const calculatePriceInsight = (price: number, allPrices: number[]): PriceInsight => {
+// Helper to format date nicely
+const formatDateShort = (date: Date): string => {
+  const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Get next Tuesday from a given date
+const getNextTuesday = (from: Date): Date => {
+  const result = new Date(from);
+  const day = result.getDay();
+  const daysUntilTuesday = (2 - day + 7) % 7 || 7; // If already Tuesday, get next week's
+  result.setDate(result.getDate() + daysUntilTuesday);
+  return result;
+};
+
+// Check if route is likely international based on airport codes
+const isLikelyInternational = (departureAirport: string, arrivalAirport: string): boolean => {
+  // US airport codes generally are 3 letters starting with specific patterns
+  const usPatterns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'W'];
+  const isOriginUS = usPatterns.some(p => departureAirport.startsWith(p)) && departureAirport.length === 3;
+  const isDestUS = usPatterns.some(p => arrivalAirport.startsWith(p)) && arrivalAirport.length === 3;
+  // Simple heuristic - if both look like US codes, assume domestic
+  return !(isOriginUS && isDestUS);
+};
+
+const calculatePriceInsight = (
+  price: number, 
+  allPrices: number[], 
+  departureDate?: string,
+  departureAirport?: string,
+  arrivalAirport?: string
+): PriceInsight => {
+  const today = new Date();
+  const depDate = departureDate ? new Date(departureDate) : null;
+  const daysUntilDeparture = depDate ? Math.ceil((depDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const isInternational = departureAirport && arrivalAirport ? isLikelyInternational(departureAirport, arrivalAirport) : false;
+  
   if (allPrices.length < 2) {
     return {
       level: "medium",
       label: "Average price",
-      advice: "Prices vary. Check back for potential drops.",
+      advice: "Prices vary. Set a price alert to get notified when prices drop.",
     };
   }
   
   const sorted = [...allPrices].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
   const min = sorted[0];
   const max = sorted[sorted.length - 1];
   const range = max - min;
@@ -632,22 +667,95 @@ const calculatePriceInsight = (price: number, allPrices: number[]): PriceInsight
   const percentile = range > 0 ? ((price - min) / range) * 100 : 50;
   
   if (percentile <= 25) {
+    let advice = "This is a good deal – book soon before prices rise.";
+    if (daysUntilDeparture !== null) {
+      if (daysUntilDeparture <= 7) {
+        advice = "Great price for last-minute travel! Book now – prices rarely drop this close to departure.";
+      } else if (daysUntilDeparture <= 21) {
+        advice = "Excellent price for your travel date. Book soon – prices typically climb in the final 3 weeks.";
+      }
+    }
     return {
       level: "low",
       label: "Great price",
-      advice: "This is a good deal. Book soon – prices can rise as departure approaches.",
+      advice,
     };
   } else if (percentile <= 60) {
+    let advice = "Average pricing.";
+    
+    if (daysUntilDeparture !== null && depDate) {
+      if (isInternational) {
+        // International: best 2-3 months out
+        const idealBookingStart = new Date(depDate);
+        idealBookingStart.setDate(idealBookingStart.getDate() - 90); // 3 months
+        const idealBookingEnd = new Date(depDate);
+        idealBookingEnd.setDate(idealBookingEnd.getDate() - 60); // 2 months
+        
+        if (daysUntilDeparture > 90) {
+          advice = `Fair price. The sweet spot for international flights is typically ${formatDateShort(idealBookingStart)} to ${formatDateShort(idealBookingEnd)} (2-3 months before departure).`;
+        } else if (daysUntilDeparture >= 60) {
+          advice = "You're in the ideal booking window for international flights. Consider setting a price alert if you want to wait for a better deal.";
+        } else {
+          advice = "Prices often rise closer to departure for international flights. This is a reasonable price to lock in.";
+        }
+      } else {
+        // Domestic: best 3-6 weeks out
+        const idealBookingStart = new Date(depDate);
+        idealBookingStart.setDate(idealBookingStart.getDate() - 42); // 6 weeks
+        const idealBookingEnd = new Date(depDate);
+        idealBookingEnd.setDate(idealBookingEnd.getDate() - 21); // 3 weeks
+        
+        if (daysUntilDeparture > 42) {
+          advice = `Fair price. The sweet spot for domestic flights is typically ${formatDateShort(idealBookingStart)} to ${formatDateShort(idealBookingEnd)} (3-6 weeks before departure).`;
+        } else if (daysUntilDeparture >= 21) {
+          advice = "You're in the ideal booking window for domestic flights. Consider setting a price alert if you want to wait for a better deal.";
+        } else {
+          advice = "Prices typically rise in the final 3 weeks. This is a reasonable price to lock in.";
+        }
+      }
+    } else {
+      advice = "Average pricing. Best to book 3-6 weeks before domestic or 2-3 months before international flights.";
+    }
+    
     return {
       level: "medium", 
       label: "Fair price",
-      advice: "Average pricing. Best to book 3-6 weeks before domestic or 2-3 months before international flights.",
+      advice,
     };
   } else {
+    // High price - suggest checking back
+    let advice = "Consider waiting if your dates are flexible.";
+    
+    if (depDate && daysUntilDeparture !== null) {
+      const nextTuesday = getNextTuesday(today);
+      const tuesdayAfter = new Date(nextTuesday);
+      tuesdayAfter.setDate(tuesdayAfter.getDate() + 7);
+      
+      if (daysUntilDeparture <= 14) {
+        advice = `Prices are high this close to departure. If flexible, check again on ${formatDateShort(nextTuesday)} – airlines often release deals on Tuesdays.`;
+      } else if (daysUntilDeparture <= 30) {
+        advice = `Higher than average. Check back on ${formatDateShort(nextTuesday)} or ${formatDateShort(tuesdayAfter)} – prices often drop on Tuesdays. Set a price alert to get notified.`;
+      } else {
+        // Calculate ideal booking window
+        const idealStart = new Date(depDate);
+        idealStart.setDate(idealStart.getDate() - (isInternational ? 90 : 42));
+        const idealEnd = new Date(depDate);
+        idealEnd.setDate(idealEnd.getDate() - (isInternational ? 60 : 21));
+        
+        if (today < idealStart) {
+          advice = `Prices are high now. The best time to book is ${formatDateShort(idealStart)} to ${formatDateShort(idealEnd)}. Set a price alert to track drops.`;
+        } else {
+          advice = `Higher than average. Check back on ${formatDateShort(nextTuesday)} – airlines often release deals on Tuesdays. Set a price alert to get notified.`;
+        }
+      }
+    } else {
+      advice = "Consider waiting if your dates are flexible. Prices often drop on Tuesdays or during sales. Set a price alert to track this route.";
+    }
+    
     return {
       level: "high",
       label: "Higher price",
-      advice: "Consider waiting if your dates are flexible. Prices often drop on Tuesdays or during sales.",
+      advice,
     };
   }
 };
@@ -957,7 +1065,7 @@ export const scoreFlights = (
       : undefined;
 
     const pricePerTicket = totalPassengers > 0 ? flight.price / totalPassengers : flight.price;
-    const priceInsight = calculatePriceInsight(flight.price, prices);
+    const priceInsight = calculatePriceInsight(flight.price, prices, departureDateStr, departureAirport, arrivalAirport);
 
     const scoredFlight: ScoredFlight = {
       ...flight,
