@@ -15,12 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlternateAirportsSection } from "@/components/flights/AlternateAirportsSection";
 import { PriceAlertDialog } from "@/components/flights/PriceAlertDialog";
 import { FlightSelectionCart, type SelectedFlight } from "@/components/flights/FlightSelectionCart";
 import { FlightLegResults } from "@/components/flights/FlightLegResults";
 import { buildGoogleFlightsUrl, logBookingEvent } from "@/lib/googleFlightsUrl";
-import { PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle, Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown, Bell, TrendingDown, TrendingUp, Minus, Lightbulb, ArrowLeft, ArrowRight, Plus, Trash2 } from "lucide-react";
+import { PlaneTakeoff, PlaneLanding, Users, Filter, Clock, DollarSign, Loader2, AlertCircle, Star, Zap, Heart, Baby, ChevronDown, AlertTriangle, Info, Armchair, CheckCircle2, XCircle, ExternalLink, ArrowUpDown, Bell, TrendingDown, TrendingUp, Minus, Lightbulb, ArrowLeft, ArrowRight, Plus, Trash2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { scoreFlights, categorizeFlights, type ScoredFlight, type FlightResult, type PassengerBreakdown } from "@/lib/flightScoring";
@@ -226,6 +227,9 @@ const Flights = () => {
   // Selection cart
   const [selectedFlights, setSelectedFlights] = useState<SelectedFlight[]>([]);
   const [confirmedLegs, setConfirmedLegs] = useState<string[]>([]);
+  
+  // Active leg tab for separated views
+  const [activeLegTab, setActiveLegTab] = useState<string>("outbound");
 
   // Flight search hook
   const {
@@ -274,6 +278,7 @@ const Flights = () => {
   useEffect(() => {
     setSelectedFlights([]);
     setConfirmedLegs([]);
+    setActiveLegTab(tripType === "multicity" ? "segment-1" : "outbound");
     clearResults();
   }, [tripType, clearResults]);
 
@@ -319,6 +324,7 @@ const Flights = () => {
       }
       setSelectedFlights([]);
       setConfirmedLegs([]);
+      setActiveLegTab("segment-1");
       searchMultiCity(validSegments);
     } else if (tripType === "roundtrip") {
       if (!origin || !destination || !departDate || !returnDate) {
@@ -327,6 +333,7 @@ const Flights = () => {
       }
       setSelectedFlights([]);
       setConfirmedLegs([]);
+      setActiveLegTab("outbound");
       searchRoundTrip(origin, destination, departDate, returnDate);
     } else {
       if (!origin || !destination || !departDate) {
@@ -335,6 +342,7 @@ const Flights = () => {
       }
       setSelectedFlights([]);
       setConfirmedLegs([]);
+      setActiveLegTab("outbound");
       searchOneWay(origin, destination, departDate);
     }
   };
@@ -391,7 +399,7 @@ const Flights = () => {
       return [...prev, legId];
     });
     
-    // Scroll to next leg
+    // Switch to next leg tab
     const legOrder = tripType === "roundtrip" 
       ? ["outbound", "return"]
       : tripType === "multicity"
@@ -402,26 +410,24 @@ const Flights = () => {
     if (currentIndex < legOrder.length - 1) {
       const nextLegId = legOrder[currentIndex + 1];
       setTimeout(() => {
-        const element = document.getElementById(`leg-${nextLegId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        setActiveLegTab(nextLegId);
+        toast.success(`${getLegInfo(legId).label} flight confirmed! Now select your ${getLegInfo(nextLegId).label} flight.`);
       }, 100);
+    } else {
+      toast.success(`All flights selected! Continue to Google Flights to book.`);
     }
   };
 
   // Handle going back to change a leg
   const handleGoBackToLeg = (legId: string) => {
     setConfirmedLegs(prev => prev.filter(id => id !== legId));
+    setActiveLegTab(legId);
   };
 
   // Focus on a leg for changing selection
   const handleChangeSelection = (legId: string) => {
     setConfirmedLegs(prev => prev.filter(id => id !== legId));
-    const element = document.getElementById(`leg-${legId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    setActiveLegTab(legId);
   };
 
   // Check if selection is complete
@@ -911,7 +917,7 @@ const Flights = () => {
               </CardContent>
             </Card>
 
-            {/* Results by Leg */}
+            {/* Results by Leg - Tabbed View */}
             {hasResults && <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">
@@ -925,29 +931,106 @@ const Flights = () => {
                   </Button>
                 </div>
 
-                {Object.entries(legResults).map(([legId, result]) => {
+                {/* Leg Navigation Tabs */}
+                {(tripType === "roundtrip" || tripType === "multicity") && (
+                  <Tabs value={activeLegTab} onValueChange={setActiveLegTab} className="w-full">
+                    <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${getOrderedLegIds().length}, 1fr)` }}>
+                      {getOrderedLegIds().map((legId, index) => {
+                        const legInfo = getLegInfo(legId);
+                        const isConfirmed = confirmedLegs.includes(legId);
+                        const selectedForLeg = selectedFlights.find(s => s.legId === legId);
+                        const previousLegId = index > 0 ? getOrderedLegIds()[index - 1] : null;
+                        const previousConfirmed = previousLegId ? confirmedLegs.includes(previousLegId) : true;
+                        const isLocked = !previousConfirmed && index > 0;
+                        
+                        return (
+                          <TabsTrigger 
+                            key={legId} 
+                            value={legId}
+                            disabled={isLocked}
+                            className="relative flex flex-col gap-0.5 py-2"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              {index === 0 ? (
+                                <PlaneTakeoff className="h-3.5 w-3.5" />
+                              ) : (
+                                <PlaneLanding className="h-3.5 w-3.5" />
+                              )}
+                              <span className="font-medium">{legInfo.label}</span>
+                              {isConfirmed && (
+                                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">
+                              {legInfo.origin} → {legInfo.destination}
+                            </span>
+                            {selectedForLeg && !isConfirmed && (
+                              <Badge variant="secondary" className="absolute -top-1 -right-1 text-[9px] px-1 py-0">
+                                Selected
+                              </Badge>
+                            )}
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+
+                    {/* Tab Content - Each leg on separate tab */}
+                    {getOrderedLegIds().map((legId, index) => {
+                      const result = legResults[legId];
+                      if (!result) return null;
+                      
+                      const legInfo = getLegInfo(legId);
+                      const selectedForLeg = selectedFlights.find(s => s.legId === legId);
+                      const isConfirmed = confirmedLegs.includes(legId);
+                      const nextLegLabel = getNextLegLabel(legId);
+                      const previousLegId = index > 0 ? getOrderedLegIds()[index - 1] : null;
+                      const previousConfirmed = previousLegId ? confirmedLegs.includes(previousLegId) : true;
+                      const isLocked = !previousConfirmed && index > 0;
+                      const prevLegInfo = previousLegId ? getLegInfo(previousLegId) : null;
+                      const lockedMessage = isLocked && prevLegInfo 
+                        ? `Confirm your ${prevLegInfo.label} flight first to see ${legInfo.label} options` 
+                        : "";
+
+                      return (
+                        <TabsContent key={legId} value={legId} className="mt-4">
+                          <FlightLegResults
+                            legId={legId}
+                            legLabel={legInfo.label}
+                            origin={legInfo.origin}
+                            destination={legInfo.destination}
+                            date={legInfo.date}
+                            flights={result.flights}
+                            isLoading={result.isLoading}
+                            error={result.error}
+                            selectedFlightId={selectedForLeg?.flight.id || null}
+                            onSelectFlight={(flight) => handleSelectFlight(legId, legInfo.label, flight, legInfo.origin, legInfo.destination, legInfo.date)}
+                            onConfirmSelection={() => handleConfirmLeg(legId)}
+                            onRetry={() => retryLeg(legId, legInfo.origin, legInfo.destination, legInfo.date)}
+                            isAvoidedAirline={isAvoidedAirline}
+                            formatTime={formatTime}
+                            formatDate={formatDate}
+                            isLocked={isLocked}
+                            lockedMessage={lockedMessage}
+                            passengers={passengers}
+                            isConfirmed={isConfirmed}
+                            canGoBack={index > 0}
+                            onGoBack={() => handleGoBackToLeg(legId)}
+                            nextLegLabel={nextLegLabel || undefined}
+                          />
+                        </TabsContent>
+                      );
+                    })}
+                  </Tabs>
+                )}
+
+                {/* One-way: No tabs needed, just show results */}
+                {tripType === "oneway" && Object.entries(legResults).map(([legId, result]) => {
                   const legInfo = getLegInfo(legId);
                   const selectedForLeg = selectedFlights.find(s => s.legId === legId);
                   const isConfirmed = confirmedLegs.includes(legId);
-                  const nextLegLabel = getNextLegLabel(legId);
                   
-                  // For sequential round-trip/multi-city: lock legs until previous is confirmed
-                  const legOrder = getOrderedLegIds();
-                  const currentIndex = legOrder.indexOf(legId);
-                  let isLocked = false;
-                  let lockedMessage = "";
-                  
-                  if (currentIndex > 0) {
-                    const previousLegId = legOrder[currentIndex - 1];
-                    const previousConfirmed = confirmedLegs.includes(previousLegId);
-                    if (!previousConfirmed) {
-                      isLocked = true;
-                      const prevLegInfo = getLegInfo(previousLegId);
-                      lockedMessage = `Confirm your ${prevLegInfo.label} flight first to see ${legInfo.label} options`;
-                    }
-                  }
-
-                  return <div key={legId} id={`leg-${legId}`}>
+                  return (
+                    <div key={legId} id={`leg-${legId}`}>
                       <FlightLegResults
                         legId={legId}
                         legLabel={legInfo.label}
@@ -964,15 +1047,15 @@ const Flights = () => {
                         isAvoidedAirline={isAvoidedAirline}
                         formatTime={formatTime}
                         formatDate={formatDate}
-                        isLocked={isLocked}
-                        lockedMessage={lockedMessage}
+                        isLocked={false}
+                        lockedMessage=""
                         passengers={passengers}
                         isConfirmed={isConfirmed}
-                        canGoBack={currentIndex > 0}
-                        onGoBack={() => handleGoBackToLeg(legId)}
-                        nextLegLabel={nextLegLabel || undefined}
+                        canGoBack={false}
+                        nextLegLabel={undefined}
                       />
-                    </div>;
+                    </div>
+                  );
                 })}
               </div>}
           </div>
