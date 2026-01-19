@@ -61,7 +61,7 @@ const CABIN_CLASSES = [{
 }];
 
 const STOPS_OPTIONS = [{
-  value: "",
+  value: "any",
   label: "Any stops"
 }, {
   value: "nonstop",
@@ -218,7 +218,7 @@ const Flights = () => {
   const [showPreferences, setShowPreferences] = useState(false);
   const [seatPreferences, setSeatPreferences] = useState<string[]>([]);
   const [premiumSeatTypes, setPremiumSeatTypes] = useState<string[]>([]);
-  const [stopsFilter, setStopsFilter] = useState<string>("");
+  const [stopsFilter, setStopsFilter] = useState<string>("any");
   const [compareAllCabins, setCompareAllCabins] = useState(false);
   const [cabinClass, setCabinClass] = useState<string>("economy");
   const [priceAlertOpen, setPriceAlertOpen] = useState(false);
