@@ -135,7 +135,6 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                       const storedFlag = (country.flag || '').trim().toUpperCase();
                       const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
                       const effectiveCode = (regionCode || (storedFlagIsCode ? storedFlag : '')).toUpperCase();
-                      const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(effectiveCode);
 
                       return (
                         <DropdownMenuItem
@@ -144,11 +143,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                           className="cursor-pointer"
                         >
                           <span className="mr-2 inline-flex items-center">
-                            {isSubdivision ? (
-                              <CountryFlag countryCode={effectiveCode} countryName={country.name} size="sm" />
-                            ) : (
-                              <span>{country.flag}</span>
-                            )}
+                            <CountryFlag countryCode={effectiveCode} countryName={country.name} size="sm" />
                           </span>
                           {country.name}
                         </DropdownMenuItem>
@@ -183,25 +178,20 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                 const storedFlag = (country.flag || '').trim().toUpperCase();
                 const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
                 const effectiveCode = (regionCode || (storedFlagIsCode ? storedFlag : '')).toUpperCase();
-                const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(effectiveCode);
 
                 return (
                   <div
                     key={country.id}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border border-border/50 group hover:border-primary/50 transition-colors"
+                    className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border border-border/50 group hover:border-primary/50 transition-colors min-w-0"
                   >
-                    <span className="text-xl inline-flex items-center">
-                      {isSubdivision ? (
-                        <CountryFlag countryCode={effectiveCode} countryName={country.name} size="md" />
-                      ) : (
-                        <span>{country.flag}</span>
-                      )}
+                    <span className="flex-shrink-0 inline-flex items-center">
+                      <CountryFlag countryCode={effectiveCode} countryName={country.name} size="md" />
                     </span>
-                    <span className="text-sm truncate flex-1">{country.name}</span>
+                    <span className="text-sm truncate flex-1 min-w-0">{country.name}</span>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-6 w-6 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => handleRemoveFromWishlist(country.id)}
                     >
                       <X className="h-3 w-3" />

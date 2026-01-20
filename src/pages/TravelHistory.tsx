@@ -82,8 +82,32 @@ const TravelHistory = () => {
   // Handle tab changes by updating URL
   const handleTabChange = useCallback((tab: TabKey) => {
     setSearchParams(tab === 'overview' ? {} : { tab });
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    // For countries tab, scroll to the countries section after a short delay
+    if (tab === 'countries') {
+      setTimeout(() => {
+        const countriesSection = document.getElementById('countries-explored');
+        if (countriesSection) {
+          countriesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+      }, 50);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
   }, [setSearchParams]);
+
+  // On initial load with countries tab, scroll to section
+  useEffect(() => {
+    if (activeTab === 'countries' && !loading) {
+      setTimeout(() => {
+        const countriesSection = document.getElementById('countries-explored');
+        if (countriesSection) {
+          countriesSection.scrollIntoView({ behavior: 'instant', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [activeTab, loading]);
 
   useEffect(() => {
     if (!authLoading && !user) {
