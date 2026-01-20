@@ -14,31 +14,34 @@ serve(async (req) => {
   try {
     // Require authentication
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Verify JWT
+    // Create Supabase client and verify JWT using getClaims
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
+    const token = authHeader.replace('Bearer ', '');
+    const { data, error: authError } = await supabaseClient.auth.getClaims(token);
+    
+    if (authError || !data?.claims) {
+      console.error('Auth error:', authError);
       return new Response(
         JSON.stringify({ error: 'Invalid authentication token' }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const token = Deno.env.get("MAPBOX_PUBLIC_TOKEN");
+    const token_mapbox = Deno.env.get("MAPBOX_PUBLIC_TOKEN");
     
-    if (!token) {
+    if (!token_mapbox) {
       return new Response(
         JSON.stringify({ error: "Mapbox token not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -46,10 +49,11 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ token }),
+      JSON.stringify({ token: token_mapbox }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
+    console.error('Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: message }),
