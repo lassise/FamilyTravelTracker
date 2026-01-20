@@ -21,17 +21,18 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client and verify JWT using getClaims
-    const supabaseClient = createClient(
+    const token = authHeader.replace('Bearer ', '');
+
+    // Create Supabase admin client to verify the token
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data, error: authError } = await supabaseClient.auth.getClaims(token);
+    // Verify the JWT by getting the user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
-    if (authError || !data?.claims) {
+    if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(
         JSON.stringify({ error: 'Invalid authentication token' }),
@@ -39,9 +40,9 @@ serve(async (req) => {
       );
     }
 
-    const token_mapbox = Deno.env.get("MAPBOX_PUBLIC_TOKEN");
+    const mapboxToken = Deno.env.get("MAPBOX_PUBLIC_TOKEN");
     
-    if (!token_mapbox) {
+    if (!mapboxToken) {
       return new Response(
         JSON.stringify({ error: "Mapbox token not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -49,7 +50,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ token: token_mapbox }),
+      JSON.stringify({ token: mapboxToken }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
