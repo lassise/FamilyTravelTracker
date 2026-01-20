@@ -317,7 +317,7 @@ const CountryQuickActionDialog = ({
                 </Button>
 
                 {/* Visited with Details */}
-                <Button onClick={handleAddVisitedWithDetails} disabled={loading !== null} className="w-full justify-start gap-2 bg-accent text-primary-foreground" variant="outline">
+                <Button onClick={handleAddVisitedWithDetails} disabled={loading !== null} className="w-full justify-start gap-2 bg-green-600 hover:bg-green-700 text-white border-0" variant="outline">
                   {loading === 'visited-details' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                   Add to Visited (Add Details)
                 </Button>

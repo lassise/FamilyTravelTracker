@@ -15,7 +15,7 @@ import StateMapDialog from './StateMapDialog';
 import CountryQuickActionDialog from './CountryQuickActionDialog';
 import MapColorSettings, { MapColors, defaultMapColors } from './MapColorSettings';
 import CountryVisitDetailsDialog from '@/components/CountryVisitDetailsDialog';
-
+import { toast } from 'sonner';
 // Country to ISO 3166-1 alpha-3 mapping for Mapbox
 const countryToISO3: Record<string, string> = {
   'Afghanistan': 'AFG', 'Albania': 'ALB', 'Algeria': 'DZA', 'Argentina': 'ARG',
@@ -122,6 +122,8 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [stateDialogOpen, setStateDialogOpen] = useState(false);
   const [mapColors, setMapColors] = useState<MapColors>(loadMapColors);
+  const layersInitializedRef = useRef(false);
+  const initRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Quick action dialog state
   const [quickActionOpen, setQuickActionOpen] = useState(false);
@@ -263,18 +265,25 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     async (iso3?: string) => {
       if (!iso3) return;
       const iso2 = iso3ToIso2[iso3];
-      if (!iso2) return;
+      if (!iso2) {
+        toast.error('Could not identify this country');
+        return;
+      }
       
       // Check if this country has subdivisions
       if (!countryHasSubdivisions(iso2)) {
-        // Country has no subdivisions - could show a message or skip
-        console.log(`Country ${iso2} has no subdivisions to track`);
+        // Country has no subdivisions - show a toast and don't open dialog
+        const countryName = iso3ToCountryName[iso3] || iso3;
+        toast.info(`${countryName} doesn't have region tracking available`);
         return;
       }
 
       const canonical = getAllCountries().find((c) => c.code === iso2);
       const countryName = canonical?.name ?? resolvedHome.name;
-      if (!countryName) return;
+      if (!countryName) {
+        toast.error('Could not identify this country');
+        return;
+      }
 
       const inMemory = countries.find((c) => c.name === countryName);
       if (inMemory) {
@@ -323,6 +332,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
         setStateDialogOpen(true);
       } catch (err) {
         console.error('Failed to open state tracking dialog:', err);
+        toast.error('Failed to open region tracker');
       }
     },
     [countries, resolvedHome.name]
@@ -418,9 +428,20 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
     colorsRef.current = mapColors;
   }, [mapColors]);
 
-  // Initialize map once - do NOT include mapColors in dependencies
+  // Initialize map once - with improved reliability
   useEffect(() => {
     if (!mapContainer.current || !mapToken || map.current) return;
+
+    // Ensure container has non-zero dimensions before initializing
+    const containerRect = mapContainer.current.getBoundingClientRect();
+    if (containerRect.width === 0 || containerRect.height === 0) {
+      // Retry after a short delay if container not ready
+      initRetryTimeoutRef.current = setTimeout(() => {
+        // Force a re-check by triggering the effect again
+        setIsMapReady(prev => prev); // This won't change anything but will help with timing
+      }, 100);
+      return;
+    }
 
     mapboxgl.accessToken = mapToken;
 
@@ -432,6 +453,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       center: initialCenter,
       pitch: 15,
       dragRotate: true,
+      failIfMajorPerformanceCaveat: false, // Don't fail on low-end devices
     });
 
     map.current.addControl(
@@ -446,10 +468,12 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
       if (!map.current) return;
 
       // Guard: avoid double-initializing layers/sources
-      if (map.current.getSource('countries')) {
+      if (layersInitializedRef.current || map.current.getSource('countries')) {
         setIsMapReady(true);
         return;
       }
+
+      layersInitializedRef.current = true;
 
       map.current.setFog({
         color: 'rgb(255, 255, 255)',
@@ -548,24 +572,101 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch }: In
         }
       });
 
+      // Resize the map after initialization to ensure proper rendering
+      setTimeout(() => {
+        map.current?.resize();
+      }, 100);
+
       setIsMapReady(true);
     };
 
+    // Handle style loading errors and retry
+    let styleLoadTimeout: NodeJS.Timeout | null = null;
+    
+    const handleStyleError = () => {
+      console.warn('Mapbox style failed to load, attempting reload...');
+      if (map.current) {
+        map.current.setStyle('mapbox://styles/mapbox/light-v11');
+      }
+    };
+
+    // Set a timeout to detect if style never loads
+    styleLoadTimeout = setTimeout(() => {
+      if (!layersInitializedRef.current && map.current) {
+        console.warn('Mapbox style load timeout, forcing rehydration...');
+        try {
+          map.current.setStyle('mapbox://styles/mapbox/light-v11');
+        } catch (err) {
+          console.error('Failed to reload Mapbox style:', err);
+        }
+      }
+    }, 8000); // 8 second timeout
+
+    map.current.on('error', (e) => {
+      console.error('Mapbox error:', e.error);
+      // Only handle style-related errors
+      if (e.error?.message?.includes('style')) {
+        handleStyleError();
+      }
+    });
+
     // Mapbox can fire `style.load` before listeners are attached depending on timing.
     // Listen to both `load` and `style.load`, and also attempt immediate init when possible.
-    map.current.on('load', initLayers);
-    map.current.on('style.load', initLayers);
+    map.current.on('load', () => {
+      if (styleLoadTimeout) clearTimeout(styleLoadTimeout);
+      initLayers();
+    });
+    
+    map.current.on('style.load', () => {
+      if (styleLoadTimeout) clearTimeout(styleLoadTimeout);
+      initLayers();
+    });
 
     if (map.current.isStyleLoaded()) {
+      if (styleLoadTimeout) clearTimeout(styleLoadTimeout);
       initLayers();
     }
 
     return () => {
+      if (styleLoadTimeout) clearTimeout(styleLoadTimeout);
+      if (initRetryTimeoutRef.current) clearTimeout(initRetryTimeoutRef.current);
+      layersInitializedRef.current = false;
       map.current?.remove();
       map.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapToken, initialCenter, homeCountryISO, handleCountryClick]);
+
+  // Handle window resize and visibility changes
+  useEffect(() => {
+    if (!map.current || !isMapReady) return;
+
+    const handleResize = () => {
+      // Debounce resize calls
+      setTimeout(() => {
+        map.current?.resize();
+      }, 100);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && map.current) {
+        setTimeout(() => {
+          map.current?.resize();
+        }, 100);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also call resize on initial ready state
+    handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isMapReady]);
 
   // Update filters when countries change (without re-creating map)
   useEffect(() => {
