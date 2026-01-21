@@ -101,6 +101,10 @@ const CountryTracker = ({ countries, familyMembers, onUpdate }: CountryTrackerPr
   };
 
   const getCountryCode = (countryName: string): string => {
+    // Scotland should always use its own flag, not the GB Union Jack
+    if (countryName?.toLowerCase().includes("scotland")) {
+      return "GB-SCT";
+    }
     const found = allCountriesData.find((c) => c.name === countryName);
     return found?.code || "";
   };

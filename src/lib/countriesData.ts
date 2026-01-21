@@ -37,7 +37,7 @@ export const getAllCountries = (): CountryOption[] => {
 
 // Country aliases for common alternative names
 const countryAliases: Record<string, string[]> = {
-  'GB': ['uk', 'britain', 'great britain'],
+  'GB': ['uk', 'britain', 'great britain', 'united kingdom'],
   'GB-SCT': ['scotland'],
   'GB-WLS': ['wales'],
   'GB-ENG': ['england'],

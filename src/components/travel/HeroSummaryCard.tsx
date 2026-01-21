@@ -1,7 +1,8 @@
 import { useMemo, memo, ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Globe2, Users, Plane, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Globe2, Users, Plane, Calendar, Share2 } from "lucide-react";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
 import { useStateVisits } from "@/hooks/useStateVisits";
@@ -28,6 +29,7 @@ const HeroSummaryCard = memo(({
   const [showContinentDialog, setShowContinentDialog] = useState(false);
   const resolvedHome = useHomeCountry(homeCountry);
   const { getStateVisitCount } = useStateVisits();
+  const [shareLoading, setShareLoading] = useState(false);
   
   // Exclude home country from visited countries count
   const visitedCountries = useMemo(() => 
@@ -115,6 +117,27 @@ const HeroSummaryCard = memo(({
     [visitedCountries.length]
   );
 
+  const handleShareDashboard = async () => {
+    setShareLoading(true);
+    try {
+      const url = `${window.location.origin}/travel-history?tab=overview`;
+      if (navigator.share) {
+        await navigator.share({
+          title: "Our family travel dashboard",
+          text: "See our travel stats and analytics on Family Travel Tracker.",
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      // ignore cancel/errors
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
   return (
     <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5 border-primary/20 overflow-hidden">
       <CardContent className="p-6">
@@ -130,7 +153,28 @@ const HeroSummaryCard = memo(({
               }
             </p>
           </div>
-          {filterComponent}
+          <div className="flex items-center gap-2">
+            {filterComponent}
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:inline-flex"
+              onClick={handleShareDashboard}
+              disabled={shareLoading}
+            >
+              <Share2 className="h-4 w-4 mr-1" />
+              Share dashboard
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="sm:hidden"
+              onClick={handleShareDashboard}
+              disabled={shareLoading}
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4">
