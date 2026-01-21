@@ -1950,12 +1950,21 @@ export type Database = {
       get_share_profile_by_token: {
         Args: { token: string }
         Returns: {
+          allow_downloads: boolean
           custom_headline: string
           id: string
           is_public: boolean
+          show_achievements: boolean
+          show_cities: boolean
+          show_countries: boolean
+          show_family_members: boolean
+          show_heatmap: boolean
           show_map: boolean
           show_photos: boolean
           show_stats: boolean
+          show_streaks: boolean
+          show_timeline: boolean
+          show_travel_dna: boolean
           show_wishlist: boolean
           user_id: string
         }[]
