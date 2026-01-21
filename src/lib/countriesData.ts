@@ -37,11 +37,12 @@ export const getAllCountries = (): CountryOption[] => {
 
 // Country aliases for common alternative names
 const countryAliases: Record<string, string[]> = {
-  'GB': ['uk', 'britain', 'great britain', 'united kingdom'],
+  // UK nations first so they take precedence over the generic GB/UK mapping
   'GB-SCT': ['scotland'],
   'GB-WLS': ['wales'],
   'GB-ENG': ['england'],
   'GB-NIR': ['northern ireland'],
+  'GB': ['uk', 'britain', 'great britain', 'united kingdom'],
   'US': ['usa', 'america', 'united states of america'],
   'AE': ['uae', 'emirates', 'dubai', 'abu dhabi'],
   'KR': ['south korea', 'korea'],
@@ -49,14 +50,44 @@ const countryAliases: Record<string, string[]> = {
   'NL': ['holland'],
 };
 
+// Normalize a free-form location string for robust matching
+const normalizeLocationString = (value: string): string => {
+  return value
+    .toLowerCase()
+    .replace(/[,]/g, ' ')      // remove commas
+    .replace(/\s+/g, ' ')      // collapse whitespace
+    .trim();
+};
+
 // Get code for special regions (returns subdivision code for UK nations)
 export const getRegionCode = (name: string): string => {
-  const lowerName = name.toLowerCase().trim();
+  if (!name) return '';
+  const normalized = normalizeLocationString(name);
+
+  // Explicit handling: if "scotland" appears anywhere, prefer the Scotland flag
+  if (normalized.includes('scotland')) {
+    return 'GB-SCT';
+  }
+  if (normalized.includes('wales')) {
+    return 'GB-WLS';
+  }
+  if (normalized.includes('england')) {
+    return 'GB-ENG';
+  }
+  if (normalized.includes('northern ireland')) {
+    return 'GB-NIR';
+  }
+
+  // Generic alias matching (for UK, US, etc.)
   for (const [code, aliases] of Object.entries(countryAliases)) {
-    if (aliases.includes(lowerName)) {
-      return code;
+    for (const alias of aliases) {
+      const normalizedAlias = normalizeLocationString(alias);
+      if (normalized === normalizedAlias || normalized.includes(normalizedAlias)) {
+        return code;
+      }
     }
   }
+
   return '';
 };
 
