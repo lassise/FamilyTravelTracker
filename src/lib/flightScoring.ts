@@ -1087,7 +1087,7 @@ export const scoreFlights = (
       preferenceMatches.push({ type: "negative", label: `${airline.name}`, detail: "Airline you avoid" });
     }
     // Also check by code directly in case airline wasn't found in lookup
-    const airlineCode = firstSegment?.airline || "";
+    // (airlineCode already declared above, reusing it)
     if (airlineCode && preferences.avoided_airlines.some(avoided => {
       const normalizedAvoided = (avoided || "").trim().toUpperCase();
       const normalizedCode = airlineCode.trim().toUpperCase();
