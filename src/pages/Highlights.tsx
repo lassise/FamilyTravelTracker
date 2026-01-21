@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Globe, MapPin, Camera, Plane, Trophy, Flame, Calendar, Building2, Users, Download } from "lucide-react";
+import { Loader2, Globe, MapPin, Camera, Plane, Trophy, Flame, Calendar, Building2, Users, Download, Share2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +78,11 @@ const Highlights = () => {
   const [cities, setCities] = useState<CityVisit[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [visitedCountryIds, setVisitedCountryIds] = useState<Set<string>>(new Set());
+
+  const shareUrl = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return window.location.href;
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -252,7 +257,47 @@ const Highlights = () => {
           {shareProfile?.custom_headline && (
             <p className="text-xl text-muted-foreground">{shareProfile.custom_headline}</p>
           )}
-          
+
+          {/* Social sharing */}
+          <div className="mt-6 flex flex-wrap justify-center gap-3 text-sm">
+            <span className="text-muted-foreground flex items-center gap-2">
+              <Share2 className="h-4 w-4" />
+              Share this travel map:
+            </span>
+            <a
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-full bg-[#1877F2]/10 text-[#1877F2] hover:bg-[#1877F2]/20 text-xs font-medium"
+            >
+              Facebook
+            </a>
+            <a
+              href={`https://x.com/intent/post?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent("Check out this family travel map!")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-full bg-black/10 text-black hover:bg-black/20 text-xs font-medium"
+            >
+              X
+            </a>
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-full bg-[#0A66C2]/10 text-[#0A66C2] hover:bg-[#0A66C2]/20 text-xs font-medium"
+            >
+              LinkedIn
+            </a>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent("Check out this family travel map: " + shareUrl)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-3 py-1.5 rounded-full bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 text-xs font-medium"
+            >
+              WhatsApp
+            </a>
+          </div>
+
           {shareProfile?.allow_downloads && (
             <Button 
               variant="outline" 
@@ -533,8 +578,22 @@ const Highlights = () => {
           </section>
         )}
 
-        {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-border text-center">
+        {/* CTA + Footer */}
+        <footer className="mt-16 pt-8 border-t border-border text-center space-y-4">
+          <div>
+            <p className="text-base font-medium text-foreground mb-2">
+              Want to track your own travel? Use Family Travel Tracker For Free.
+            </p>
+            <Button
+              asChild
+              size="sm"
+              className="mt-1"
+            >
+              <a href="/auth">
+                Start for free
+              </a>
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">
             Powered by <span className="text-primary font-medium">TravelTracker</span>
           </p>

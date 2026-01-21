@@ -24,14 +24,15 @@ import CountryComparison from "@/components/travel/CountryComparison";
 import EnhancedBucketList from "@/components/travel/EnhancedBucketList";
 import TravelMilestones from "@/components/travel/TravelMilestones";
 import DashboardMemberFilter from "@/components/travel/DashboardMemberFilter";
-
-import { Loader2, BarChart3, Globe2, Trophy, Map as MapIcon, Camera, Users, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, BarChart3, Globe2, Trophy, Map as MapIcon, Camera, Users, MapPin, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type TabKey = 'overview' | 'countries' | 'memories';
 
+// For the main Travel Tracker experience, we only surface Countries + Memories as tabs.
+// The internal "overview" tab remains available for other flows that deep-link to it.
 const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
-  { key: 'overview', label: 'Overview', icon: Globe2 },
   { key: 'countries', label: 'Countries', icon: MapIcon },
   { key: 'memories', label: 'Memories', icon: Camera },
 ];
@@ -45,10 +46,12 @@ const TravelHistory = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [visitMemberMap, setVisitMemberMap] = useState<globalThis.Map<string, string[]>>(() => new globalThis.Map());
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareLoading, setShareLoading] = useState(false);
   
-  // Read tab from URL or default to 'overview'
+  // Read tab from URL or default to 'countries' for the Travel Tracker tab
   const tabFromUrl = searchParams.get('tab') as TabKey | null;
-  const activeTab: TabKey = tabFromUrl && tabs.some(t => t.key === tabFromUrl) ? tabFromUrl : 'overview';
+  const activeTab: TabKey = tabFromUrl && tabs.some(t => t.key === tabFromUrl) ? tabFromUrl : 'countries';
 
   // Use the dashboard filter hook
   const {
@@ -164,6 +167,59 @@ const TravelHistory = () => {
     ? getStateVisitCount(resolvedHome.iso2) 
     : 0;
 
+  // Load share profile to build a reusable highlights link for sharing visited countries
+  useEffect(() => {
+    const loadShareProfile = async () => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from("share_profiles")
+          .select("share_token,is_public")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!error && data && data.is_public && data.share_token) {
+          setShareLink(`${window.location.origin}/highlights/${data.share_token}`);
+        }
+      } catch {
+        // Fail silently; Share button will route to Profile instead.
+      }
+    };
+    loadShareProfile();
+  }, [user]);
+
+  const handleShareTravel = async () => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+
+    // No public share profile yet – send user to Profile to enable sharing.
+    if (!shareLink) {
+      navigate("/profile");
+      return;
+    }
+
+    setShareLoading(true);
+    try {
+      // Prefer native share sheet when available
+      if (navigator.share) {
+        await navigator.share({
+          title: "My family travel map",
+          text: "Check out the countries we've visited with Family Travel Tracker.",
+          url: shareLink,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareLink);
+        window.open(shareLink, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      // Swallow errors – user might have cancelled share dialog
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="min-h-screen">
@@ -179,23 +235,47 @@ const TravelHistory = () => {
               </div>
               
               <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <Globe2 className="h-4 w-4 text-primary" />
-                  <span className="font-semibold text-foreground">{visitedCountriesCount}</span>
-                  <span className="text-muted-foreground hidden sm:inline">countries</span>
-                </div>
-                {resolvedHome.hasStateTracking && (
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 text-accent" />
-                    <span className="font-semibold text-foreground">{statesVisitedCount}/50</span>
-                    <span className="text-muted-foreground hidden sm:inline">states</span>
+                    <Globe2 className="h-4 w-4 text-primary" />
+                    <span className="font-semibold text-foreground">{visitedCountriesCount}</span>
+                    <span className="text-muted-foreground hidden sm:inline">countries</span>
                   </div>
-                )}
-                <div className="flex items-center gap-1.5">
-                  <MapIcon className="h-4 w-4 text-secondary" />
-                  <span className="font-semibold text-foreground">{filteredContinents}</span>
-                  <span className="text-muted-foreground hidden sm:inline">continents</span>
+                  {resolvedHome.hasStateTracking && (
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 text-accent" />
+                      <span className="font-semibold text-foreground">{statesVisitedCount}/50</span>
+                      <span className="text-muted-foreground hidden sm:inline">states</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <MapIcon className="h-4 w-4 text-secondary" />
+                    <span className="font-semibold text-foreground">{filteredContinents}</span>
+                    <span className="text-muted-foreground hidden sm:inline">continents</span>
+                  </div>
                 </div>
+
+                {/* Share button → shares the public highlights link for countries visited */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-2 hidden sm:inline-flex"
+                  onClick={handleShareTravel}
+                  disabled={shareLoading}
+                >
+                  <Share2 className="h-4 w-4 mr-1" />
+                  {shareLink ? "Share" : "Set up sharing"}
+                </Button>
+                {/* Compact icon-only share button for mobile */}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="sm:hidden ml-2"
+                  onClick={handleShareTravel}
+                  disabled={shareLoading}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
             
