@@ -42,8 +42,16 @@ export const CountryFlag = ({
   const isValidCode = /^[A-Z]{2}$/.test(normalizedCode) || isSubdivisionCode;
   const codeLower = normalizedCode.toLowerCase().replace('-', '-');
   
-  // FlagCDN URL - use w80 for retina quality, CSS will handle display size
-  const flagUrl = `https://flagcdn.com/w80/${codeLower}.png`;
+  // Scotland-specific override: use Flagpedia Saltire image (blue with white X)
+  // Flagpedia provides the correct Scotland flag that matches the official Saltire design
+  let flagUrl: string;
+  if (normalizedCode === 'GB-SCT') {
+    // Use Flagpedia for Scotland - w80 matches the flagcdn.com sizing for consistency
+    flagUrl = 'https://flagpedia.net/data/flags/w80/gb-sct.webp';
+  } else {
+    // FlagCDN URL - use w80 for retina quality, CSS will handle display size
+    flagUrl = `https://flagcdn.com/w80/${codeLower}.png`;
+  }
   
   // Get initials for fallback
   const initials = isValidCode 
