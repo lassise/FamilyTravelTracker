@@ -1024,41 +1024,71 @@ export type Database = {
       }
       share_profiles: {
         Row: {
+          allow_downloads: boolean
           created_at: string
           custom_headline: string | null
           id: string
           is_public: boolean | null
           share_token: string
+          show_achievements: boolean
+          show_cities: boolean
+          show_countries: boolean
+          show_family_members: boolean
+          show_heatmap: boolean
           show_map: boolean | null
           show_photos: boolean | null
           show_stats: boolean | null
+          show_streaks: boolean
+          show_timeline: boolean
+          show_travel_dna: boolean
           show_wishlist: boolean | null
+          theme_color: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          allow_downloads?: boolean
           created_at?: string
           custom_headline?: string | null
           id?: string
           is_public?: boolean | null
           share_token?: string
+          show_achievements?: boolean
+          show_cities?: boolean
+          show_countries?: boolean
+          show_family_members?: boolean
+          show_heatmap?: boolean
           show_map?: boolean | null
           show_photos?: boolean | null
           show_stats?: boolean | null
+          show_streaks?: boolean
+          show_timeline?: boolean
+          show_travel_dna?: boolean
           show_wishlist?: boolean | null
+          theme_color?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          allow_downloads?: boolean
           created_at?: string
           custom_headline?: string | null
           id?: string
           is_public?: boolean | null
           share_token?: string
+          show_achievements?: boolean
+          show_cities?: boolean
+          show_countries?: boolean
+          show_family_members?: boolean
+          show_heatmap?: boolean
           show_map?: boolean | null
           show_photos?: boolean | null
           show_stats?: boolean | null
+          show_streaks?: boolean
+          show_timeline?: boolean
+          show_travel_dna?: boolean
           show_wishlist?: boolean | null
+          theme_color?: string | null
           updated_at?: string
           user_id?: string
         }

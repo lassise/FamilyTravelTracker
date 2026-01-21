@@ -162,7 +162,22 @@ export const FlightLegResults = ({
   const [expandedFlightId, setExpandedFlightId] = useState<string | null>(null);
   const [priceAlertFlight, setPriceAlertFlight] = useState<ScoredFlight | null>(null);
 
-  const displayedFlights = showAll ? flights : flights.slice(0, 5);
+  // Sort flights to put avoided airlines at the bottom
+  const sortedFlights = [...flights].sort((a, b) => {
+    const aAirline = a.itineraries[0]?.segments[0]?.airline || "";
+    const bAirline = b.itineraries[0]?.segments[0]?.airline || "";
+    const aAvoided = isAvoidedAirline(aAirline) || a.isAvoidedAirline;
+    const bAvoided = isAvoidedAirline(bAirline) || b.isAvoidedAirline;
+    
+    // Avoided airlines go to the bottom
+    if (aAvoided && !bAvoided) return 1;
+    if (!aAvoided && bAvoided) return -1;
+    
+    // Within same category, maintain score order
+    return b.score - a.score;
+  });
+  
+  const displayedFlights = showAll ? sortedFlights : sortedFlights.slice(0, 5);
 
   // Quick categories
   const bestOverall = flights[0];
@@ -467,20 +482,20 @@ export const FlightLegResults = ({
                   className={cn(
                     "rounded-lg border transition-all",
                     isSelected && "border-primary bg-primary/5 ring-2 ring-primary/20",
-                    isAvoided && "border-red-500/50 bg-red-50/30 dark:bg-red-950/10",
-                    !isSelected && !isAvoided && "hover:border-primary/50"
+                    (isAvoided || flight.isAvoidedAirline) && !isSelected && "border-muted bg-muted/30 opacity-60",
+                    !isSelected && !isAvoided && !flight.isAvoidedAirline && "hover:border-primary/50"
                   )}
                 >
-                  {/* Avoided warning with penalty indicator */}
+                  {/* Avoided warning with penalty indicator - subtle styling since card is greyed */}
                   {(isAvoided || flight.isAvoidedAirline) && (
-                    <div className="flex items-center justify-between gap-2 px-3 pt-2 bg-red-100/50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-                      <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-muted/50 border-b border-muted">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <AlertTriangle className="h-3.5 w-3.5" />
-                        <span className="font-medium">This airline is on your avoid list</span>
+                        <span className="font-medium">Avoided airline</span>
                       </div>
-                      <Badge variant="destructive" className="text-[10px] gap-1">
+                      <Badge variant="secondary" className="text-[10px] gap-1 bg-muted text-muted-foreground">
                         <TrendingDown className="h-2.5 w-2.5" />
-                        -{flight.scorePenalty || 50} pts penalty
+                        -{flight.scorePenalty || 50} pts
                       </Badge>
                     </div>
                   )}

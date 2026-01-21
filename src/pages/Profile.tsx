@@ -6,17 +6,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useFamilyData } from "@/hooks/useFamilyData";
-import { Loader2, User, Share2, Copy, ExternalLink, Globe, Camera, MapPin, Users } from "lucide-react";
+import { Loader2, User, Globe, Users } from "lucide-react";
 import TravelPreferencesSection from "@/components/profile/TravelPreferencesSection";
 import TravelRecommendations from "@/components/travel/TravelRecommendations";
 import QuickAIPlanner from "@/components/travel/QuickAIPlanner";
 import FamilyMember from "@/components/FamilyMember";
 import FamilyMemberDialog from "@/components/FamilyMemberDialog";
 import DistanceUnitSetting from "@/components/settings/DistanceUnitSetting";
+import TravelShareSettings from "@/components/sharing/TravelShareSettings";
 
 const Profile = () => {
   const { user, profile, loading: authLoading, updateProfile } = useAuth();
@@ -26,17 +26,6 @@ const Profile = () => {
   
   const [fullName, setFullName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [shareProfile, setShareProfile] = useState<{
-    id: string;
-    share_token: string;
-    is_public: boolean;
-    show_photos: boolean;
-    show_stats: boolean;
-    show_map: boolean;
-    show_wishlist: boolean;
-    custom_headline: string | null;
-  } | null>(null);
-  const [loadingShare, setLoadingShare] = useState(true);
 
   const visitedCountries = countries.filter(c => c.visitedBy.length > 0).length;
 
@@ -52,25 +41,6 @@ const Profile = () => {
     }
   }, [profile]);
 
-  useEffect(() => {
-    const fetchShareProfile = async () => {
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from("share_profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      
-      if (data) {
-        setShareProfile(data);
-      }
-      setLoadingShare(false);
-    };
-
-    fetchShareProfile();
-  }, [user]);
-
   const handleSaveProfile = async () => {
     setSaving(true);
     const { error } = await updateProfile({ full_name: fullName });
@@ -81,62 +51,6 @@ const Profile = () => {
       toast({ title: "Profile updated!" });
     }
     setSaving(false);
-  };
-
-  const handleCreateShareProfile = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from("share_profiles")
-      .insert({ user_id: user.id, is_public: false })
-      .select()
-      .single();
-    
-    if (error) {
-      toast({ title: "Error creating share profile", variant: "destructive" });
-    } else {
-      setShareProfile(data);
-      toast({ title: "Share profile created!" });
-    }
-  };
-
-  const handleTogglePublic = async (isPublic: boolean) => {
-    if (!shareProfile) return;
-    
-    const { error } = await supabase
-      .from("share_profiles")
-      .update({ is_public: isPublic })
-      .eq("id", shareProfile.id);
-    
-    if (!error) {
-      setShareProfile({ ...shareProfile, is_public: isPublic });
-      toast({ title: isPublic ? "Profile is now public!" : "Profile is now private" });
-    }
-  };
-
-  const handleToggleSetting = async (field: string, value: boolean) => {
-    if (!shareProfile) return;
-    
-    const { error } = await supabase
-      .from("share_profiles")
-      .update({ [field]: value })
-      .eq("id", shareProfile.id);
-    
-    if (!error) {
-      setShareProfile({ ...shareProfile, [field]: value });
-    }
-  };
-
-  const copyShareLink = () => {
-    if (!shareProfile) return;
-    const link = `${window.location.origin}/highlights/${shareProfile.share_token}`;
-    navigator.clipboard.writeText(link);
-    toast({ title: "Link copied to clipboard!" });
-  };
-
-  const openShareLink = () => {
-    if (!shareProfile) return;
-    window.open(`/highlights/${shareProfile.share_token}`, "_blank");
   };
 
   if (authLoading) {
@@ -261,102 +175,7 @@ const Profile = () => {
             <QuickAIPlanner />
 
             {/* Share Profile Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Share2 className="h-5 w-5 text-primary" />
-                  Share Your Travels
-                </CardTitle>
-                <CardDescription>
-                  Create a shareable highlights page to show off your adventures
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loadingShare ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : !shareProfile ? (
-                  <Button onClick={handleCreateShareProfile} className="w-full">
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Create Shareable Profile
-                  </Button>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Make Profile Public</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Allow others to view your highlights page
-                        </p>
-                      </div>
-                      <Switch
-                        checked={shareProfile.is_public}
-                        onCheckedChange={handleTogglePublic}
-                      />
-                    </div>
-
-                    {shareProfile.is_public && (
-                      <>
-                        <div className="border-t pt-4 space-y-3">
-                          <Label className="text-sm font-medium">What to show:</Label>
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">Interactive Map</span>
-                            </div>
-                            <Switch
-                              checked={shareProfile.show_map}
-                              onCheckedChange={(v) => handleToggleSetting("show_map", v)}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Globe className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">Travel Statistics</span>
-                            </div>
-                            <Switch
-                              checked={shareProfile.show_stats}
-                              onCheckedChange={(v) => handleToggleSetting("show_stats", v)}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Camera className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">Photo Gallery</span>
-                            </div>
-                            <Switch
-                              checked={shareProfile.show_photos}
-                              onCheckedChange={(v) => handleToggleSetting("show_photos", v)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="border-t pt-4 space-y-2">
-                          <Label>Your Share Link</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={`${window.location.origin}/highlights/${shareProfile.share_token}`}
-                              readOnly
-                              className="text-xs"
-                            />
-                            <Button size="icon" variant="outline" onClick={copyShareLink}>
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="outline" onClick={openShareLink}>
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            <TravelShareSettings />
           </div>
         </div>
       </div>
