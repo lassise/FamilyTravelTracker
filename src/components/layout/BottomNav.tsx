@@ -1,12 +1,12 @@
-import { Globe, PlaneTakeoff, Sparkles, Map } from "lucide-react";
+import { Map, Sparkles, PlaneTakeoff, Wand2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/family", label: "Overview", icon: Globe },
   { href: "/family?tab=countries", label: "Countries", icon: Map },
   { href: "/family?tab=memories", label: "Memories", icon: Sparkles },
   { href: "/flights", label: "Flights", icon: PlaneTakeoff },
+  { href: "/trips/new", label: "AI Planner", icon: Wand2 },
 ];
 
 export function BottomNav() {
