@@ -36,10 +36,13 @@ import {
   Baby,
   Plane,
   Bell,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScoredFlight } from "@/lib/flightScoring";
 import { AIRLINES } from "@/lib/airportsData";
+import { toast } from "sonner";
 
 interface FlightLegResultsProps {
   legId: string;
@@ -64,6 +67,9 @@ interface FlightLegResultsProps {
   canGoBack?: boolean;
   onGoBack?: () => void;
   nextLegLabel?: string;
+  tripType?: "oneway" | "roundtrip" | "multicity";
+  onContinueToGoogle?: () => void;
+  onCopyChecklist?: () => void;
 }
 
 // Get airline info from code
@@ -156,6 +162,9 @@ export const FlightLegResults = ({
   canGoBack = false,
   onGoBack,
   nextLegLabel,
+  tripType,
+  onContinueToGoogle,
+  onCopyChecklist,
 }: FlightLegResultsProps) => {
   const [isExpanded, setIsExpanded] = useState(!isLocked && !isConfirmed);
   const [showAll, setShowAll] = useState(false);
@@ -362,6 +371,70 @@ export const FlightLegResults = ({
             <RefreshCw className="h-3 w-3" />
             Change {legLabel} Flight
           </Button>
+          
+          {/* One-way flight: Show checklist and Google Flights buttons directly */}
+          {tripType === "oneway" && selectedFlight && (
+            <div className="mt-4 space-y-3">
+              {/* Match This Flight Checklist */}
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full text-xs gap-2">
+                    <Info className="h-3 w-3" />
+                    Match This Flight Checklist
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="p-3 bg-muted rounded-md text-xs space-y-2">
+                    <p className="text-muted-foreground">
+                      Use this checklist to find the exact same flights on Google Flights:
+                    </p>
+                    <div className="font-mono text-[10px] whitespace-pre-wrap bg-background p-2 rounded border max-h-40 overflow-auto">
+                      {`${legLabel}:
+• Airline: ${selectedFirstSeg?.airline || ""} ${selectedFirstSeg?.flightNumber || ""}
+• Departs: ${formatTime(selectedFirstSeg?.departureTime || "")} from ${selectedFirstSeg?.departureAirport || ""}
+• Arrives: ${formatTime(selectedLastSeg?.arrivalTime || "")} at ${selectedLastSeg?.arrivalAirport || destination}
+• Stops: ${selectedStops === 0 ? "Nonstop" : `${selectedStops} stop${selectedStops > 1 ? "s" : ""}`}
+• Duration: ${Math.floor(selectedDuration / 60)}h ${selectedDuration % 60}m
+• Price: $${selectedFlight.price}`}
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={() => {
+                        const checklist = `${legLabel}:
+• Airline: ${selectedFirstSeg?.airline || ""} ${selectedFirstSeg?.flightNumber || ""}
+• Departs: ${formatTime(selectedFirstSeg?.departureTime || "")} from ${selectedFirstSeg?.departureAirport || ""}
+• Arrives: ${formatTime(selectedLastSeg?.arrivalTime || "")} at ${selectedLastSeg?.arrivalAirport || destination}
+• Stops: ${selectedStops === 0 ? "Nonstop" : `${selectedStops} stop${selectedStops > 1 ? "s" : ""}`}
+• Duration: ${Math.floor(selectedDuration / 60)}h ${selectedDuration % 60}m
+• Price: $${selectedFlight.price}`;
+                        navigator.clipboard.writeText(checklist);
+                        toast.success("Checklist copied to clipboard");
+                        if (onCopyChecklist) onCopyChecklist();
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copy Checklist
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+              
+              {/* Continue to Google Flights */}
+              {onContinueToGoogle && (
+                <Button
+                  className="w-full gap-2"
+                  size="lg"
+                  onClick={onContinueToGoogle}
+                >
+                  Continue to Google Flights
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     );

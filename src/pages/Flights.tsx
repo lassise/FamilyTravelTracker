@@ -1108,6 +1108,9 @@ const Flights = () => {
                         isConfirmed={isConfirmed}
                         canGoBack={false}
                         nextLegLabel={undefined}
+                        tripType={tripType}
+                        onContinueToGoogle={() => handleContinueToGoogle()}
+                        onCopyChecklist={() => toast.success("Checklist copied to clipboard")}
                       />
                     </div>
                   );
@@ -1115,8 +1118,8 @@ const Flights = () => {
               </div>}
           </div>
 
-          {/* Right column - Selection Cart (desktop) */}
-          {hasResults && !isMobile && <div className="w-80 flex-shrink-0">
+          {/* Right column - Selection Cart (desktop) - Only show for roundtrip and multicity */}
+          {hasResults && !isMobile && tripType !== "oneway" && <div className="w-80 flex-shrink-0">
               <FlightSelectionCart
                 tripType={tripType}
                 selections={selectedFlights}
@@ -1132,8 +1135,8 @@ const Flights = () => {
             </div>}
         </div>
 
-        {/* Mobile Selection Cart */}
-        {hasResults && isMobile && <FlightSelectionCart
+        {/* Mobile Selection Cart - Only show for roundtrip and multicity */}
+        {hasResults && isMobile && tripType !== "oneway" && <FlightSelectionCart
             tripType={tripType}
             selections={selectedFlights}
             onRemoveSelection={handleRemoveSelection}

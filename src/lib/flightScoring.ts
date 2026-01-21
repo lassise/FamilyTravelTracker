@@ -539,6 +539,16 @@ const generateExplanation = (
     reasons.push("reliable airline");
   }
 
+  // Add preferred airline to reasons
+  if (flight.isPreferredAirline) {
+    const airline = AIRLINES.find(a => {
+      const firstSegment = flight.itineraries[0]?.segments[0];
+      const airlineCode = firstSegment?.airline || "";
+      return airlineCode.startsWith(a.code) || airlineCode === a.name;
+    });
+    reasons.push(`preferred airline (${airline?.name || "your preferred airline"})`);
+  }
+
   if (flight.breakdown.departureTime > 80) {
     reasons.push("preferred departure time");
   }
