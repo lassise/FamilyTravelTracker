@@ -40,10 +40,7 @@ const DashboardMemberFilter = memo(({
       </SelectTrigger>
       <SelectContent className="bg-background border-border z-50">
         <SelectItem value="all" className="text-sm">
-          <div className="flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>All Members</span>
-          </div>
+          <span>All Members</span>
         </SelectItem>
         {familyMembers.map((member) => (
           <SelectItem key={member.id} value={member.id} className="text-sm">
