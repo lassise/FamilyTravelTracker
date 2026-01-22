@@ -77,10 +77,6 @@ interface InteractiveWorldMapProps {
   selectedMemberId?: string | null;
   readOnly?: boolean;
   stateVisitsOverride?: StateVisit[];
-  // Pre-computed ISO3 codes for deterministic public rendering
-  visitedISO3Override?: string[];
-  wishlistISO3Override?: string[];
-  homeISO3Override?: string;
 }
 
 // Validate that a color is a valid HSL/RGB/hex string
@@ -130,9 +126,6 @@ const InteractiveWorldMap = ({
   selectedMemberId,
   readOnly,
   stateVisitsOverride,
-  visitedISO3Override,
-  wishlistISO3Override,
-  homeISO3Override,
 }: InteractiveWorldMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -193,20 +186,21 @@ const InteractiveWorldMap = ({
 
   // Memoize country lists to prevent unnecessary recalculations
   // Use the flag field which stores the ISO2 code to get ISO3
-  // Use override ISO3 codes if provided (for deterministic public view), else compute from countries
-  const visitedCountries = useMemo(() => {
-    if (visitedISO3Override) return visitedISO3Override;
-    return countries
+  const visitedCountries = useMemo(() => 
+    countries
       .filter(c => c.visitedBy.length > 0)
       .map(c => {
+        // First try to use the flag field (stores ISO2 code)
         const iso2FromFlag = c.flag?.toUpperCase();
         if (iso2FromFlag && iso2ToIso3[iso2FromFlag]) {
           return iso2ToIso3[iso2FromFlag];
         }
+        // Fallback to name-based lookup
         return countryToISO3[c.name];
       })
-      .filter(Boolean);
-  }, [countries, visitedISO3Override]);
+      .filter(Boolean),
+    [countries]
+  );
 
   // Create a map of country names to their IDs for quick lookup
   const countryNameToId = useMemo(() => {
@@ -215,8 +209,8 @@ const InteractiveWorldMap = ({
     return map;
   }, [countries]);
 
-  // Use override home ISO3 if provided, else use resolved
-  const homeCountryISO = homeISO3Override || resolvedHome.iso3;
+  // Use resolved home country ISO3 for map coloring
+  const homeCountryISO = resolvedHome.iso3;
 
   // Precompute full country list once to avoid repeated lookups
   const allCountriesList = useMemo(() => getAllCountries(), []);
@@ -234,20 +228,22 @@ const InteractiveWorldMap = ({
     [countries, resolvedHome, allCountriesList]
   );
 
-  // Use override wishlist ISO3 codes if provided, else compute
-  const wishlistCountries = useMemo(() => {
-    if (wishlistISO3Override) return wishlistISO3Override;
-    return countries
-      .filter((c) => wishlist.includes(c.id))
-      .map((c) => {
-        const iso2FromFlag = c.flag?.toUpperCase();
-        if (iso2FromFlag && iso2ToIso3[iso2FromFlag]) {
-          return iso2ToIso3[iso2FromFlag];
-        }
-        return countryToISO3[c.name];
-      })
-      .filter(Boolean);
-  }, [countries, wishlist, wishlistISO3Override]);
+  const wishlistCountries = useMemo(
+    () =>
+      countries
+        .filter((c) => wishlist.includes(c.id))
+        .map((c) => {
+          // First try to use the flag field (stores ISO2 code)
+          const iso2FromFlag = c.flag?.toUpperCase();
+          if (iso2FromFlag && iso2ToIso3[iso2FromFlag]) {
+            return iso2ToIso3[iso2FromFlag];
+          }
+          // Fallback to name-based lookup
+          return countryToISO3[c.name];
+        })
+        .filter(Boolean),
+    [countries, wishlist]
+  );
 
   // Country center coordinates for initial map view
   const countryCoordinates: Record<string, [number, number]> = {
