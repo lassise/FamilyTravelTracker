@@ -1022,6 +1022,42 @@ export type Database = {
           },
         ]
       }
+      share_links: {
+        Row: {
+          created_at: string
+          id: string
+          include_countries: boolean
+          include_memories: boolean
+          include_stats: boolean
+          is_active: boolean
+          last_accessed_at: string | null
+          owner_user_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          include_countries?: boolean
+          include_memories?: boolean
+          include_stats?: boolean
+          is_active?: boolean
+          last_accessed_at?: string | null
+          owner_user_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          include_countries?: boolean
+          include_memories?: boolean
+          include_stats?: boolean
+          is_active?: boolean
+          last_accessed_at?: string | null
+          owner_user_id?: string
+          token?: string
+        }
+        Relationships: []
+      }
       share_profiles: {
         Row: {
           allow_downloads: boolean
@@ -1187,6 +1223,7 @@ export type Database = {
           country_id: string | null
           created_at: string
           id: string
+          is_shareable: boolean
           photo_url: string
           taken_at: string | null
           trip_id: string | null
@@ -1197,6 +1234,7 @@ export type Database = {
           country_id?: string | null
           created_at?: string
           id?: string
+          is_shareable?: boolean
           photo_url: string
           taken_at?: string | null
           trip_id?: string | null
@@ -1207,6 +1245,7 @@ export type Database = {
           country_id?: string | null
           created_at?: string
           id?: string
+          is_shareable?: boolean
           photo_url?: string
           taken_at?: string | null
           trip_id?: string | null
@@ -1993,6 +2032,11 @@ export type Database = {
           show_wishlist: boolean
           user_id: string
         }[]
+      }
+      get_shared_dashboard: { Args: { token: string }; Returns: Json }
+      get_shared_dashboard_data: {
+        Args: { p_share_token: string }
+        Returns: Json
       }
       has_group_role: {
         Args: {
