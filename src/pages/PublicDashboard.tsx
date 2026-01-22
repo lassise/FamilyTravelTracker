@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Globe, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,31 +9,22 @@ import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
 import TravelMilestones from "@/components/travel/TravelMilestones";
 import PublicPhotoGallery from "@/components/travel/PublicPhotoGallery";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
-import { useDashboardFilter } from "@/hooks/useDashboardFilter";
 
-interface ShareProfile {
-  id: string;
-  user_id: string;
-  is_public: boolean;
+interface ShareSettings {
   show_stats: boolean;
   show_map: boolean;
-  show_wishlist: boolean;
-  show_photos: boolean;
   show_countries: boolean;
-  show_cities: boolean;
-  show_achievements: boolean;
-  show_streaks: boolean;
+  show_photos: boolean;
   show_timeline: boolean;
   show_family_members: boolean;
-  show_travel_dna: boolean;
-  show_heatmap: boolean;
-  allow_downloads: boolean;
-  custom_headline: string | null;
+  show_achievements: boolean;
+  show_wishlist: boolean;
 }
 
-interface UserProfile {
-  full_name: string | null;
-  home_country: string | null;
+interface OwnerProfile {
+  fullName: string | null;
+  avatarUrl: string | null;
+  homeCountry: string | null;
 }
 
 interface Country {
@@ -53,278 +44,151 @@ interface FamilyMember {
   countriesVisited: number;
 }
 
+interface VisitDetail {
+  id: string;
+  country_id: string;
+  visit_date: string | null;
+  approximate_year: number | null;
+  approximate_month: number | null;
+  is_approximate: boolean | null;
+  trip_name: string | null;
+  highlight: string | null;
+}
+
+interface VisitFamilyMember {
+  visit_id: string;
+  family_member_id: string;
+}
+
+interface StateVisit {
+  id: string;
+  state_code: string;
+  state_name: string;
+  country_code: string;
+  country_id: string | null;
+  family_member_id: string | null;
+  created_at: string | null;
+}
+
+interface Photo {
+  id: string;
+  photo_url: string;
+  caption: string | null;
+  country_id: string | null;
+  taken_at: string | null;
+}
+
+interface Stats {
+  visitedCountriesCount: number;
+  visitedContinentsCount: number;
+  visitedStatesCount: number;
+  earliestYear: number | null;
+}
+
+interface DashboardData {
+  shareSettings: ShareSettings;
+  owner: OwnerProfile;
+  countries: Country[];
+  familyMembers: FamilyMember[];
+  visitDetails: VisitDetail[];
+  visitFamilyMembers: VisitFamilyMember[];
+  stateVisits: StateVisit[];
+  photos: Photo[];
+  stats: Stats;
+}
+
+interface DashboardState {
+  loading: boolean;
+  error: string | null;
+  data: DashboardData | null;
+  debug: Record<string, unknown> | null;
+}
+
 const PublicDashboard = () => {
   const { token } = useParams<{ token: string }>();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [shareProfile, setShareProfile] = useState<ShareProfile | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [visitDetails, setVisitDetails] = useState<any[]>([]);
-  const [visitMemberMap, setVisitMemberMap] = useState<globalThis.Map<string, string[]>>(() => new globalThis.Map());
-  const [photos, setPhotos] = useState<any[]>([]);
-  
-  const resolvedHome = useHomeCountry(userProfile?.home_country || null);
-  const [stateVisits, setStateVisits] = useState<any[]>([]);
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const debugMode = searchParams.get("debug") === "1";
 
-  // Dashboard filter state
-  const {
-    getFilteredCountries,
-    getFilteredContinents,
-    getFilteredEarliestYear,
-  } = useDashboardFilter(familyMembers);
+  const [state, setState] = useState<DashboardState>({
+    loading: true,
+    error: null,
+    data: null,
+    debug: null,
+  });
 
-  // Helper function to get state visit count
-  const getStateVisitCount = useCallback((countryCode: string) => {
-    if (!resolvedHome.iso2 || !resolvedHome.hasStateTracking) return 0;
-    const uniqueStates = new Set(
-      stateVisits
-        .filter(sv => sv.country_code === countryCode)
-        .map(sv => sv.state_code)
-    );
-    return uniqueStates.size;
-  }, [stateVisits, resolvedHome]);
+  const resolvedHome = useHomeCountry(state.data?.owner?.homeCountry || null);
+
+  // Build visitMemberMap from visitFamilyMembers
+  const visitMemberMap = useMemo(() => {
+    const map = new globalThis.Map<string, string[]>();
+    if (!state.data?.visitFamilyMembers) return map;
+    state.data.visitFamilyMembers.forEach((vfm) => {
+      if (vfm.visit_id && vfm.family_member_id) {
+        const existing = map.get(vfm.visit_id) || [];
+        if (!existing.includes(vfm.family_member_id)) {
+          existing.push(vfm.family_member_id);
+          map.set(vfm.visit_id, existing);
+        }
+      }
+    });
+    return map;
+  }, [state.data?.visitFamilyMembers]);
+
+  // Compute total continents from visited countries
+  const totalContinents = useMemo(() => {
+    if (!state.data?.countries) return 0;
+    const visitedCountries = state.data.countries.filter((c) => c.visitedBy.length > 0);
+    const continents = new Set(visitedCountries.map((c) => c.continent));
+    return continents.size;
+  }, [state.data?.countries]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    async function loadPublicDashboard() {
       if (!token) {
-        setError("Invalid dashboard link");
-        setLoading(false);
+        setState({ loading: false, error: "No token provided", data: null, debug: null });
         return;
       }
 
-      // Fetch share profile using secure function
-      const { data: shareDataArr, error: shareError } = await supabase
-        .rpc('get_dashboard_share_profile_by_token', { token });
-
-      if (shareError || !shareDataArr || shareDataArr.length === 0) {
-        console.error("PublicDashboard: share profile lookup failed", {
-          token,
-          shareError,
-          shareDataArr,
-        });
-        setError("Dashboard not found or is private");
-        setLoading(false);
-        return;
-      }
-
-      const shareData = shareDataArr[0] as ShareProfile;
-      setShareProfile(shareData);
-
-      // Fetch user profile
-      const { data: profileDataArr } = await supabase
-        .rpc('get_public_profile', { profile_user_id: shareData.user_id });
-
-      if (profileDataArr && profileDataArr.length > 0) {
-        setUserProfile(profileDataArr[0] as UserProfile);
-      }
-
-      // Fetch family members only when allowed (privacy + still allow correct visited counts when hidden)
-      const { data: membersData } = shareData.show_family_members
-        ? await supabase
-            .from("family_members")
-            .select("*")
-            .eq("user_id", shareData.user_id)
-            .order("created_at", { ascending: true })
-        : ({ data: [] } as any);
-
-      // We'll set family members after we calculate countriesVisited below
-
-      // Fetch countries
-      const { data: countriesData } = await supabase
-        .from("countries")
-        .select("*")
-        .eq("user_id", shareData.user_id);
-
-      // Fetch visit details (for earliest year calculation)
-      const { data: visitDetailsData } = await supabase
-        .from("country_visit_details")
-        .select("*")
-        .eq("user_id", shareData.user_id)
-        .order("visit_date", { ascending: false });
-
-      if (visitDetailsData) {
-        setVisitDetails(visitDetailsData);
-      }
-
-      // Fetch visit-member mappings (supports earliest-year filters and member-specific rendering)
-      let visitMembersData: any[] = [];
-      {
-        const { data: vmd } = await supabase
-          .from("visit_family_members")
-          .select("visit_id, family_member_id")
-          .eq("user_id", shareData.user_id);
-
-        if (vmd) {
-          visitMembersData = vmd;
-          const map = new globalThis.Map<string, string[]>();
-          vmd.forEach((item: any) => {
-            if (item.visit_id && item.family_member_id) {
-              const existing = map.get(item.visit_id) || [];
-              if (!existing.includes(item.family_member_id)) {
-                existing.push(item.family_member_id);
-                map.set(item.visit_id, existing);
-              }
-            }
-          });
-          setVisitMemberMap(map);
-        }
-      }
-
-      // Fetch visits to determine which countries are visited
-      const { data: visitsData } = await supabase
-        .from("country_visits")
-        .select("country_id, family_member_id")
-        .eq("user_id", shareData.user_id);
-
-      // Build visitedBy map: country_id -> Set of member names OR a generic marker when members are hidden.
-      const visitedByMap = new Map<string, Set<string>>();
-      const markCountryVisited = (countryId: string, memberName?: string) => {
-        if (!visitedByMap.has(countryId)) visitedByMap.set(countryId, new Set());
-        visitedByMap.get(countryId)!.add(memberName || "Visited");
-      };
-
-      if (visitsData) {
-        visitsData.forEach((visit: any) => {
-          if (!visit.country_id) return;
-          if (shareData.show_family_members && visit.family_member_id && membersData && membersData.length > 0) {
-            const member = membersData.find((m: any) => m.id === visit.family_member_id);
-            markCountryVisited(visit.country_id, member?.name);
-          } else {
-            markCountryVisited(visit.country_id);
-          }
-        });
-      }
-
-      // Also check visit_family_members for detailed visits
-      if (visitMembersData && visitDetailsData) {
-        const visitToCountry = new Map<string, string>();
-        visitDetailsData.forEach((vd: any) => {
-          if (vd.id && vd.country_id) {
-            visitToCountry.set(vd.id, vd.country_id);
-          }
+      try {
+        // Call Edge Function - ONLY data source for this page
+        const { data, error } = await supabase.functions.invoke("get-public-dashboard", {
+          body: { token },
         });
 
-        visitMembersData.forEach((vm: any) => {
-          const countryId = visitToCountry.get(vm.visit_id);
-          if (!countryId) return;
-          if (shareData.show_family_members && vm.family_member_id && membersData && membersData.length > 0) {
-            const member = membersData.find((m: any) => m.id === vm.family_member_id);
-            markCountryVisited(countryId, member?.name);
-          } else {
-            markCountryVisited(countryId);
-          }
+        if (error) throw error;
+
+        if (!data.ok) {
+          setState({
+            loading: false,
+            error: data.error || "Share link not available",
+            data: null,
+            debug: data.debug,
+          });
+          return;
+        }
+
+        // Success - render owner's data
+        setState({
+          loading: false,
+          error: null,
+          data: data.data,
+          debug: data.debug,
+        });
+      } catch (err) {
+        console.error("PublicDashboard: Edge Function error", err);
+        setState({
+          loading: false,
+          error: err instanceof Error ? err.message : "Failed to load dashboard",
+          data: null,
+          debug: null,
         });
       }
+    }
 
-      if (countriesData) {
-        // Transform countries to include visitedBy array
-        const transformedCountries: Country[] = countriesData.map((c: any) => ({
-          ...c,
-          visitedBy: Array.from(visitedByMap.get(c.id) || []),
-        }));
-        setCountries(transformedCountries);
-      }
-
-      // Calculate countriesVisited per family member and set familyMembers
-      if (shareData.show_family_members && membersData) {
-        // Count unique countries visited per member
-        const memberCountryCount = new Map<string, Set<string>>();
-        membersData.forEach((m: any) => memberCountryCount.set(m.id, new Set<string>()));
-        
-        // Count from country_visits
-        if (visitsData) {
-          visitsData.forEach((visit: any) => {
-            if (visit.family_member_id && visit.country_id) {
-              memberCountryCount.get(visit.family_member_id)?.add(visit.country_id);
-            }
-          });
-        }
-        
-        // Count from visit_family_members
-        if (visitMembersData && visitDetailsData) {
-          const visitToCountry = new Map<string, string>();
-          visitDetailsData.forEach((vd: any) => {
-            if (vd.id && vd.country_id) {
-              visitToCountry.set(vd.id, vd.country_id);
-            }
-          });
-          visitMembersData.forEach((vm: any) => {
-            const countryId = visitToCountry.get(vm.visit_id);
-            if (countryId && vm.family_member_id) {
-              memberCountryCount.get(vm.family_member_id)?.add(countryId);
-            }
-          });
-        }
-        
-        const transformedMembers: FamilyMember[] = membersData.map((m: any) => ({
-          ...m,
-          countriesVisited: memberCountryCount.get(m.id)?.size || 0,
-        }));
-        setFamilyMembers(transformedMembers);
-      } else {
-        setFamilyMembers([]);
-      }
-
-      // Fetch state visits if home country supports it
-      if (shareData.show_stats) {
-        const { data: statesData } = await supabase
-          .from("state_visits")
-          .select("*")
-          .eq("user_id", shareData.user_id);
-
-        if (statesData) {
-          setStateVisits(statesData);
-        }
-      }
-
-      // Fetch photos if enabled (for memories/timeline)
-      if (shareData.show_photos || shareData.show_timeline) {
-        const { data: photosData } = await supabase
-          .from("travel_photos")
-          .select("*")
-          .eq("user_id", shareData.user_id)
-          .order("taken_at", { ascending: false });
-
-        if (photosData) {
-          setPhotos(photosData);
-        }
-      }
-
-      setLoading(false);
-    };
-
-    fetchData();
+    loadPublicDashboard();
   }, [token]);
 
-  // Apply member filter to countries
-  const filteredCountries = useMemo(() => 
-    getFilteredCountries(countries),
-    [countries, getFilteredCountries]
-  );
-
-  // Calculate filtered continents
-  const filteredContinents = useMemo(() => 
-    getFilteredContinents(countries),
-    [countries, getFilteredContinents]
-  );
-
-  // Calculate filtered earliest year
-  const filteredEarliestYear = useMemo(() => 
-    getFilteredEarliestYear(visitDetails, visitMemberMap),
-    [visitDetails, visitMemberMap, getFilteredEarliestYear]
-  );
-
-  // Calculate total continents
-  const totalContinents = useMemo(() => {
-    const visitedCountries = filteredCountries.filter(c => c.visitedBy.length > 0);
-    const continents = new Set(visitedCountries.map(c => c.continent));
-    return continents.size;
-  }, [filteredCountries]);
-
-  if (loading) {
+  if (state.loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -332,14 +196,14 @@ const PublicDashboard = () => {
     );
   }
 
-  if (error) {
+  if (state.error || !state.data) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
             <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">Oops!</h2>
-            <p className="text-muted-foreground mb-6">Profile not found or is private</p>
+            <p className="text-muted-foreground mb-6">{state.error || "Profile not found or is private"}</p>
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 Want to track your family's adventures?
@@ -350,11 +214,19 @@ const PublicDashboard = () => {
                 </Button>
               </Link>
             </div>
+            {debugMode && state.debug && (
+              <pre className="mt-6 text-left text-xs bg-muted p-4 rounded overflow-auto max-h-64">
+                {JSON.stringify(state.debug, null, 2)}
+              </pre>
+            )}
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  const { data, debug } = state;
+  const { shareSettings, owner, countries, familyMembers, visitDetails, stateVisits, photos, stats } = data;
 
   return (
     <div className="min-h-screen bg-background">
@@ -384,7 +256,7 @@ const PublicDashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
-            {userProfile?.full_name || "Traveler"}'s Travel Dashboard
+            {owner.fullName || "Traveler"}'s Travel Dashboard
           </h1>
           <p className="text-muted-foreground">
             Explore their family's adventures and travel statistics.
@@ -392,16 +264,16 @@ const PublicDashboard = () => {
         </div>
 
         {/* Hero Summary - Countries Visited Overview */}
-        {shareProfile?.show_stats && (
+        {shareSettings.show_stats && (
           <div className="mb-8">
-            <HeroSummaryCard 
-              countries={filteredCountries} 
-              familyMembers={familyMembers} 
+            <HeroSummaryCard
+              countries={countries}
+              familyMembers={familyMembers}
               totalContinents={totalContinents}
-              homeCountry={userProfile?.home_country || null}
-              earliestYear={filteredEarliestYear}
+              homeCountry={owner.homeCountry || null}
+              earliestYear={stats.earliestYear}
               visitMemberMap={visitMemberMap}
-              selectedMemberId={selectedMemberId}
+              selectedMemberId={null}
               filterComponent={
                 familyMembers.length > 1 ? (
                   <div className="text-sm text-muted-foreground">
@@ -414,14 +286,14 @@ const PublicDashboard = () => {
         )}
 
         {/* Interactive World Map */}
-        {shareProfile?.show_map && (
+        {shareSettings.show_map && (
           <div className="mb-8">
-            <InteractiveWorldMap 
-              countries={countries} 
-              wishlist={[]} 
-              homeCountry={userProfile?.home_country || null}
+            <InteractiveWorldMap
+              countries={countries}
+              wishlist={[]}
+              homeCountry={owner.homeCountry || null}
               onRefetch={() => {}}
-              selectedMemberId={selectedMemberId}
+              selectedMemberId={null}
               readOnly
               stateVisitsOverride={stateVisits}
             />
@@ -429,32 +301,64 @@ const PublicDashboard = () => {
         )}
 
         {/* Travel Milestones */}
-        {shareProfile?.show_achievements && (
+        {shareSettings.show_achievements && (
           <div className="mb-8">
-            <TravelMilestones 
-              countries={countries} 
-              familyMembers={familyMembers} 
-              totalContinents={totalContinents} 
+            <TravelMilestones
+              countries={countries}
+              familyMembers={familyMembers}
+              totalContinents={totalContinents}
             />
           </div>
         )}
 
         {/* Memories Section - Timeline and Photos */}
-        {(shareProfile?.show_timeline || shareProfile?.show_photos) && (
+        {(shareSettings.show_timeline || shareSettings.show_photos) && (
           <div className="mb-8 space-y-6">
             <h2 className="text-2xl font-semibold">Memories</h2>
-            
-            {/* Travel Timeline - Note: TravelTimeline uses useVisitDetails hook which requires auth
-                For public dashboard, we show a simplified version or message */}
-            {shareProfile?.show_timeline && visitDetails.length > 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Timeline view available when signed in</p>
-              </div>
+
+            {/* Public Timeline (read-only) */}
+            {shareSettings.show_timeline && visitDetails.length > 0 && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    {visitDetails.slice(0, 25).map((v) => {
+                      const country = countries.find((c) => c.id === v.country_id);
+                      const title = country?.name || "Unknown";
+                      const dateLabel = v.visit_date
+                        ? new Date(v.visit_date).toLocaleDateString(undefined, { year: "numeric", month: "short" })
+                        : v.approximate_year
+                          ? `${v.approximate_month ? `${v.approximate_month}/` : ""}${v.approximate_year}`
+                          : "";
+
+                      return (
+                        <div key={v.id} className="flex items-start justify-between gap-4 border-b last:border-b-0 pb-3 last:pb-0">
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{title}</p>
+                            {v.trip_name && (
+                              <p className="text-sm text-muted-foreground truncate">{v.trip_name}</p>
+                            )}
+                            {v.highlight && (
+                              <p className="text-sm text-muted-foreground mt-1">{v.highlight}</p>
+                            )}
+                          </div>
+                          {dateLabel && (
+                            <div className="text-sm text-muted-foreground whitespace-nowrap">{dateLabel}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {visitDetails.length > 25 && (
+                      <p className="text-xs text-muted-foreground">Showing the latest 25 visits.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Photo Gallery */}
-            {shareProfile?.show_photos && (
-              <PublicPhotoGallery countries={filteredCountries} photos={photos} />
+            {shareSettings.show_photos && (
+              <PublicPhotoGallery countries={countries} photos={photos} />
             )}
           </div>
         )}
@@ -477,6 +381,18 @@ const PublicDashboard = () => {
             </Link>
           </CardContent>
         </Card>
+
+        {/* Debug Panel */}
+        {debugMode && debug && (
+          <Card className="mt-8">
+            <CardContent className="pt-6">
+              <h3 className="font-semibold mb-2">Debug Info</h3>
+              <pre className="text-xs bg-muted p-4 rounded overflow-auto max-h-96">
+                {JSON.stringify(debug, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
