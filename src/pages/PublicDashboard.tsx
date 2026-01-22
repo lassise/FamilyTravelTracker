@@ -121,12 +121,14 @@ const PublicDashboard = () => {
         setUserProfile(profileDataArr[0] as UserProfile);
       }
 
-      // Fetch family members first (needed to build visitedBy arrays)
-      const { data: membersData } = await supabase
-        .from("family_members")
-        .select("*")
-        .eq("user_id", shareData.user_id)
-        .order("created_at", { ascending: true });
+      // Fetch family members only when allowed (privacy + still allow correct visited counts when hidden)
+      const { data: membersData } = shareData.show_family_members
+        ? await supabase
+            .from("family_members")
+            .select("*")
+            .eq("user_id", shareData.user_id)
+            .order("created_at", { ascending: true })
+        : ({ data: [] } as any);
 
       // We'll set family members after we calculate countriesVisited below
 
@@ -147,18 +149,18 @@ const PublicDashboard = () => {
         setVisitDetails(visitDetailsData);
       }
 
-      // Fetch visit-member mappings
+      // Fetch visit-member mappings (supports earliest-year filters and member-specific rendering)
       let visitMembersData: any[] = [];
-      if (membersData && membersData.length > 0) {
+      {
         const { data: vmd } = await supabase
-          .from('visit_family_members')
-          .select('visit_id, family_member_id')
-          .eq('user_id', shareData.user_id);
+          .from("visit_family_members")
+          .select("visit_id, family_member_id")
+          .eq("user_id", shareData.user_id);
 
         if (vmd) {
           visitMembersData = vmd;
           const map = new globalThis.Map<string, string[]>();
-          visitMembersData.forEach(item => {
+          vmd.forEach((item: any) => {
             if (item.visit_id && item.family_member_id) {
               const existing = map.get(item.visit_id) || [];
               if (!existing.includes(item.family_member_id)) {
@@ -177,24 +179,27 @@ const PublicDashboard = () => {
         .select("country_id, family_member_id")
         .eq("user_id", shareData.user_id);
 
-      // Build visitedBy map: country_id -> Set of member names
+      // Build visitedBy map: country_id -> Set of member names OR a generic marker when members are hidden.
       const visitedByMap = new Map<string, Set<string>>();
-      if (visitsData && membersData && membersData.length > 0) {
+      const markCountryVisited = (countryId: string, memberName?: string) => {
+        if (!visitedByMap.has(countryId)) visitedByMap.set(countryId, new Set());
+        visitedByMap.get(countryId)!.add(memberName || "Visited");
+      };
+
+      if (visitsData) {
         visitsData.forEach((visit: any) => {
-          if (visit.country_id && visit.family_member_id) {
+          if (!visit.country_id) return;
+          if (shareData.show_family_members && visit.family_member_id && membersData && membersData.length > 0) {
             const member = membersData.find((m: any) => m.id === visit.family_member_id);
-            if (member) {
-              if (!visitedByMap.has(visit.country_id)) {
-                visitedByMap.set(visit.country_id, new Set());
-              }
-              visitedByMap.get(visit.country_id)!.add(member.name);
-            }
+            markCountryVisited(visit.country_id, member?.name);
+          } else {
+            markCountryVisited(visit.country_id);
           }
         });
       }
 
       // Also check visit_family_members for detailed visits
-      if (visitMembersData && visitDetailsData && membersData && membersData.length > 0) {
+      if (visitMembersData && visitDetailsData) {
         const visitToCountry = new Map<string, string>();
         visitDetailsData.forEach((vd: any) => {
           if (vd.id && vd.country_id) {
@@ -204,14 +209,12 @@ const PublicDashboard = () => {
 
         visitMembersData.forEach((vm: any) => {
           const countryId = visitToCountry.get(vm.visit_id);
-          if (countryId && vm.family_member_id) {
+          if (!countryId) return;
+          if (shareData.show_family_members && vm.family_member_id && membersData && membersData.length > 0) {
             const member = membersData.find((m: any) => m.id === vm.family_member_id);
-            if (member) {
-              if (!visitedByMap.has(countryId)) {
-                visitedByMap.set(countryId, new Set());
-              }
-              visitedByMap.get(countryId)!.add(member.name);
-            }
+            markCountryVisited(countryId, member?.name);
+          } else {
+            markCountryVisited(countryId);
           }
         });
       }
@@ -226,7 +229,7 @@ const PublicDashboard = () => {
       }
 
       // Calculate countriesVisited per family member and set familyMembers
-      if (membersData) {
+      if (shareData.show_family_members && membersData) {
         // Count unique countries visited per member
         const memberCountryCount = new Map<string, Set<string>>();
         membersData.forEach((m: any) => memberCountryCount.set(m.id, new Set<string>()));
@@ -261,6 +264,8 @@ const PublicDashboard = () => {
           countriesVisited: memberCountryCount.get(m.id)?.size || 0,
         }));
         setFamilyMembers(transformedMembers);
+      } else {
+        setFamilyMembers([]);
       }
 
       // Fetch state visits if home country supports it
@@ -417,6 +422,8 @@ const PublicDashboard = () => {
               homeCountry={userProfile?.home_country || null}
               onRefetch={() => {}}
               selectedMemberId={selectedMemberId}
+              readOnly
+              stateVisitsOverride={stateVisits}
             />
           </div>
         )}
