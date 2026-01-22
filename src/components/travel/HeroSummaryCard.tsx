@@ -257,8 +257,9 @@ const HeroSummaryCard = memo(({
       };
 
       // Generate dashboard_share_token if it doesn't exist
-      // Check if column exists by checking if property is undefined (migration might not be run)
-      if (!shareProfile.dashboard_share_token) {
+      // Use type assertion since the column was just added via migration
+      const profileWithToken = shareProfile as typeof shareProfile & { dashboard_share_token?: string };
+      if (!profileWithToken.dashboard_share_token) {
         // Generate a new token using the same method as share_token
         const newToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
           .map(b => b.toString(16).padStart(2, '0'))
@@ -287,9 +288,10 @@ const HeroSummaryCard = memo(({
         return;
       }
 
-      // Use updated profile or fallback to original
+      // Use updated profile or fallback to original - use type assertion for new column
       const finalProfile = updatedProfile || shareProfile;
-      const dashboardToken = finalProfile.dashboard_share_token || updateData.dashboard_share_token;
+      const finalProfileWithToken = finalProfile as typeof finalProfile & { dashboard_share_token?: string };
+      const dashboardToken = finalProfileWithToken.dashboard_share_token || updateData.dashboard_share_token;
 
       if (!dashboardToken) {
         toast.error("Dashboard token could not be generated. Please try again.");

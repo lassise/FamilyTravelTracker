@@ -17,11 +17,17 @@ interface ShareProfile {
   is_public: boolean;
   show_stats: boolean;
   show_map: boolean;
+  show_wishlist: boolean;
+  show_photos: boolean;
   show_countries: boolean;
   show_cities: boolean;
   show_achievements: boolean;
+  show_streaks: boolean;
   show_timeline: boolean;
   show_family_members: boolean;
+  show_travel_dna: boolean;
+  show_heatmap: boolean;
+  allow_downloads: boolean;
   custom_headline: string | null;
 }
 
@@ -44,6 +50,7 @@ interface FamilyMember {
   role: string;
   avatar: string | null;
   color: string;
+  countriesVisited: number;
 }
 
 const PublicDashboard = () => {
@@ -116,9 +123,7 @@ const PublicDashboard = () => {
         .eq("user_id", shareData.user_id)
         .order("created_at", { ascending: true });
 
-      if (membersData) {
-        setFamilyMembers(membersData as FamilyMember[]);
-      }
+      // We'll set family members after we calculate countriesVisited below
 
       // Fetch countries
       const { data: countriesData } = await supabase
@@ -213,6 +218,44 @@ const PublicDashboard = () => {
           visitedBy: Array.from(visitedByMap.get(c.id) || []),
         }));
         setCountries(transformedCountries);
+      }
+
+      // Calculate countriesVisited per family member and set familyMembers
+      if (membersData) {
+        // Count unique countries visited per member
+        const memberCountryCount = new Map<string, Set<string>>();
+        membersData.forEach((m: any) => memberCountryCount.set(m.id, new Set<string>()));
+        
+        // Count from country_visits
+        if (visitsData) {
+          visitsData.forEach((visit: any) => {
+            if (visit.family_member_id && visit.country_id) {
+              memberCountryCount.get(visit.family_member_id)?.add(visit.country_id);
+            }
+          });
+        }
+        
+        // Count from visit_family_members
+        if (visitMembersData && visitDetailsData) {
+          const visitToCountry = new Map<string, string>();
+          visitDetailsData.forEach((vd: any) => {
+            if (vd.id && vd.country_id) {
+              visitToCountry.set(vd.id, vd.country_id);
+            }
+          });
+          visitMembersData.forEach((vm: any) => {
+            const countryId = visitToCountry.get(vm.visit_id);
+            if (countryId && vm.family_member_id) {
+              memberCountryCount.get(vm.family_member_id)?.add(countryId);
+            }
+          });
+        }
+        
+        const transformedMembers: FamilyMember[] = membersData.map((m: any) => ({
+          ...m,
+          countriesVisited: memberCountryCount.get(m.id)?.size || 0,
+        }));
+        setFamilyMembers(transformedMembers);
       }
 
       // Fetch state visits if home country supports it

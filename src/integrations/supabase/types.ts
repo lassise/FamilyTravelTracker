@@ -1027,6 +1027,7 @@ export type Database = {
           allow_downloads: boolean
           created_at: string
           custom_headline: string | null
+          dashboard_share_token: string | null
           id: string
           is_public: boolean | null
           share_token: string
@@ -1050,6 +1051,7 @@ export type Database = {
           allow_downloads?: boolean
           created_at?: string
           custom_headline?: string | null
+          dashboard_share_token?: string | null
           id?: string
           is_public?: boolean | null
           share_token?: string
@@ -1073,6 +1075,7 @@ export type Database = {
           allow_downloads?: boolean
           created_at?: string
           custom_headline?: string | null
+          dashboard_share_token?: string | null
           id?: string
           is_public?: boolean | null
           share_token?: string
@@ -1938,6 +1941,28 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      get_dashboard_share_profile_by_token: {
+        Args: { token: string }
+        Returns: {
+          allow_downloads: boolean
+          custom_headline: string
+          id: string
+          is_public: boolean
+          show_achievements: boolean
+          show_cities: boolean
+          show_countries: boolean
+          show_family_members: boolean
+          show_heatmap: boolean
+          show_map: boolean
+          show_photos: boolean
+          show_stats: boolean
+          show_streaks: boolean
+          show_timeline: boolean
+          show_travel_dna: boolean
+          show_wishlist: boolean
+          user_id: string
+        }[]
+      }
       get_public_profile: {
         Args: { profile_user_id: string }
         Returns: {
