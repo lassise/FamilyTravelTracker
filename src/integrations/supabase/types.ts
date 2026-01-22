@@ -1994,6 +1994,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_shared_dashboard_data: {
+        Args: { p_share_token: string }
+        Returns: Json
+      }
       has_group_role: {
         Args: {
           _group_id: string

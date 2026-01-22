@@ -194,7 +194,7 @@ export const ShareDashboardDialog = ({ open, onOpenChange }: ShareDashboardDialo
 
   const getShareUrl = () => {
     if (!shareProfile?.dashboard_share_token) return "";
-    return `${window.location.origin}/dashboard/${shareProfile.dashboard_share_token}`;
+    return `${window.location.origin}/share/${shareProfile.dashboard_share_token}`;
   };
 
   const handleCopyLink = async () => {
