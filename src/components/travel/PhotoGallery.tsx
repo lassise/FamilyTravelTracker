@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Camera, Plus, X, Image as ImageIcon, Upload } from 'lucide-react';
 import { getEffectiveFlagCode } from '@/lib/countriesData';
 import CountryFlag from '@/components/common/CountryFlag';
+import { Switch } from '@/components/ui/switch';
 
 interface PhotoGalleryProps {
   countries: Country[];
@@ -22,6 +23,7 @@ interface TravelPhoto {
   photo_url: string;
   caption: string | null;
   taken_at: string | null;
+  is_shareable?: boolean;
 }
 
 const PhotoGallery = ({ countries }: PhotoGalleryProps) => {
@@ -105,6 +107,21 @@ const PhotoGallery = ({ countries }: PhotoGalleryProps) => {
       setSelectedPhoto(null);
       fetchPhotos();
     }
+  };
+
+  const handleToggleShareable = async (photo: TravelPhoto, next: boolean) => {
+    const { error } = await supabase
+      .from('travel_photos')
+      .update({ is_shareable: next })
+      .eq('id', photo.id);
+
+    if (error) {
+      toast({ title: 'Failed to update sharing', variant: 'destructive' });
+      return;
+    }
+
+    setPhotos((prev) => prev.map((p) => (p.id === photo.id ? { ...p, is_shareable: next } : p)));
+    setSelectedPhoto((prev) => (prev && prev.id === photo.id ? { ...prev, is_shareable: next } : prev));
   };
 
   const getCountryName = (countryId: string) => {
@@ -250,14 +267,23 @@ const PhotoGallery = ({ countries }: PhotoGalleryProps) => {
                       <p className="text-muted-foreground text-sm">{selectedPhoto.caption}</p>
                     )}
                   </div>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => handleDeletePhoto(selectedPhoto.id)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Share</span>
+                      <Switch
+                        checked={!!selectedPhoto.is_shareable}
+                        onCheckedChange={(v) => handleToggleShareable(selectedPhoto, v)}
+                      />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeletePhoto(selectedPhoto.id)}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
