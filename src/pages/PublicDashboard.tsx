@@ -100,6 +100,11 @@ const PublicDashboard = () => {
         .rpc('get_dashboard_share_profile_by_token', { token });
 
       if (shareError || !shareDataArr || shareDataArr.length === 0) {
+        console.error("PublicDashboard: share profile lookup failed", {
+          token,
+          shareError,
+          shareDataArr,
+        });
         setError("Dashboard not found or is private");
         setLoading(false);
         return;
