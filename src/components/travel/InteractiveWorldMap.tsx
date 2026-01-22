@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Globe, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useStateVisits } from '@/hooks/useStateVisits';
+import { useStateVisits, type StateVisit } from '@/hooks/useStateVisits';
 import { getSubdivisionsForCountry, iso3ToIso2All, iso2ToIso3All, countryHasSubdivisions } from '@/lib/allSubdivisionsData';
 import { getAllCountries, getEffectiveFlagCode } from '@/lib/countriesData';
 import CountryFlag from '@/components/common/CountryFlag';
 import { useHomeCountry } from '@/hooks/useHomeCountry';
 import StateMapDialog from './StateMapDialog';
+import PublicStateMapDialog from './PublicStateMapDialog';
 import CountryQuickActionDialog from './CountryQuickActionDialog';
 import MapColorSettings, { MapColors, defaultMapColors } from './MapColorSettings';
 import CountryVisitDetailsDialog from '@/components/CountryVisitDetailsDialog';
@@ -74,6 +75,8 @@ interface InteractiveWorldMapProps {
   homeCountry?: string | null;
   onRefetch?: () => void;
   selectedMemberId?: string | null;
+  readOnly?: boolean;
+  stateVisitsOverride?: StateVisit[];
 }
 
 // Validate that a color is a valid HSL/RGB/hex string
@@ -115,7 +118,15 @@ const loadMapColors = (): MapColors => {
   return { ...defaultMapColors };
 };
 
-const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, selectedMemberId }: InteractiveWorldMapProps) => {
+const InteractiveWorldMap = ({
+  countries,
+  wishlist,
+  homeCountry,
+  onRefetch,
+  selectedMemberId,
+  readOnly,
+  stateVisitsOverride,
+}: InteractiveWorldMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapToken, setMapToken] = useState<string | null>(null);
@@ -143,7 +154,15 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
     code: string;
   } | null>(null);
   
-  const { stateVisits, getStateVisitCount } = useStateVisits();
+  const { stateVisits } = useStateVisits();
+  const effectiveStateVisits = useMemo(
+    () => (readOnly ? (stateVisitsOverride ?? []) : stateVisits),
+    [readOnly, stateVisitsOverride, stateVisits]
+  );
+  const getStateVisitCount = useCallback(
+    (cc: string) => new Set(effectiveStateVisits.filter((sv) => sv.country_code === cc).map((sv) => sv.state_code)).size,
+    [effectiveStateVisits]
+  );
   
   // Use the home country hook for standardized handling
   const resolvedHome = useHomeCountry(homeCountry);
@@ -295,6 +314,11 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
         return;
       }
 
+      if (readOnly) {
+        toast.info('Read-only: region tracking is only available for countries already on this dashboard');
+        return;
+      }
+
       try {
         const { data: existing } = await supabase
           .from('countries')
@@ -338,7 +362,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
         toast.error('Failed to open region tracker');
       }
     },
-    [countries, resolvedHome.name]
+    [countries, resolvedHome.name, readOnly]
   );
 
   // Handle country click from map
@@ -351,6 +375,10 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
       // Visited countries and home country go directly to state selection
       await openStateTrackingDialogForIso3(iso3);
     } else {
+      if (readOnly) {
+        toast.info('Read-only map: sign in to add countries');
+        return;
+      }
       // Unvisited countries show the quick action dialog (add visited, wishlist, etc.)
       const iso2 = iso3ToIso2[iso3];
       const allCountriesList = getAllCountries();
@@ -366,7 +394,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
       });
       setQuickActionOpen(true);
     }
-  }, [openStateTrackingDialogForIso3, visitedCountries, homeCountryISO]);
+  }, [openStateTrackingDialogForIso3, visitedCountries, homeCountryISO, readOnly]);
 
   // Check if clicked country is the home country
   const isClickedCountryHomeCountry = useMemo(() => {
@@ -805,7 +833,7 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
           </span>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          Click any country to add or remove it
+          {readOnly ? 'Click a visited/home country to view regions' : 'Click any country to add or remove it'}
         </p>
       </CardHeader>
       <CardContent className="p-0">
@@ -875,29 +903,40 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
         </div>
       </CardContent>
       
-      <StateMapDialog
-        open={stateDialogOpen}
-        onOpenChange={setStateDialogOpen}
-        country={selectedCountry}
-        selectedMemberId={selectedMemberId}
-      />
+       {readOnly ? (
+         <PublicStateMapDialog
+           open={stateDialogOpen}
+           onOpenChange={setStateDialogOpen}
+           country={selectedCountry}
+           stateVisits={effectiveStateVisits}
+         />
+       ) : (
+         <StateMapDialog
+           open={stateDialogOpen}
+           onOpenChange={setStateDialogOpen}
+           country={selectedCountry}
+           selectedMemberId={selectedMemberId}
+         />
+       )}
 
-      <CountryQuickActionDialog
-        open={quickActionOpen}
-        onOpenChange={setQuickActionOpen}
-        countryInfo={clickedCountryInfo}
-        isVisited={isClickedCountryVisited}
-        isWishlisted={isClickedCountryWishlisted}
-        isHomeCountry={isClickedCountryHomeCountry}
-        onActionComplete={() => {
-          onRefetch?.();
-        }}
-        onOpenStateTracking={handleOpenStateTracking}
-        onOpenVisitDetails={handleOpenVisitDetails}
-      />
+       {!readOnly && (
+         <CountryQuickActionDialog
+           open={quickActionOpen}
+           onOpenChange={setQuickActionOpen}
+           countryInfo={clickedCountryInfo}
+           isVisited={isClickedCountryVisited}
+           isWishlisted={isClickedCountryWishlisted}
+           isHomeCountry={isClickedCountryHomeCountry}
+           onActionComplete={() => {
+             onRefetch?.();
+           }}
+           onOpenStateTracking={handleOpenStateTracking}
+           onOpenVisitDetails={handleOpenVisitDetails}
+         />
+       )}
 
       {/* Visit Details Dialog for "Add Details" option */}
-      {visitDetailsCountry && (
+       {!readOnly && visitDetailsCountry && (
         <CountryVisitDetailsDialog
           countryId={visitDetailsCountry.id}
           countryName={visitDetailsCountry.name}
