@@ -404,34 +404,25 @@ const InteractiveWorldMap = ({ countries, wishlist, homeCountry, onRefetch, sele
       const fallbackToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // This backend function returns a public Mapbox token and does not require auth.
+        // Using invoke keeps URLs consistent across environments.
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        const token = (data as any)?.token as string | undefined;
 
-        // If no session (e.g., anonymous visitor or auth glitch), still try with fallback env token.
-        if (!session) {
-          if (fallbackToken) {
-            setMapToken(fallbackToken);
-          } else {
-            console.error('No session found for Mapbox token fetch and no fallback token configured');
-          }
-          return;
-        }
-        
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-mapbox-token`, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        const data = await response.json();
-        if (data.token) {
-          setMapToken(data.token);
+        if (!error && token) {
+          setMapToken(token);
           return;
         }
 
-        // If function did not return a token, fall back to env token to avoid a blank map.
+        if (error) {
+          console.warn('Mapbox token fetch failed (non-fatal):', error);
+        }
+
+        // Fall back to env token to avoid a blank map.
         if (fallbackToken) {
-          console.warn('Mapbox function did not return token, using fallback env token');
           setMapToken(fallbackToken);
+        } else {
+          console.error('No Mapbox token available (function failed and no fallback configured)');
         }
       } catch (error) {
         console.error('Error fetching Mapbox token:', error);
