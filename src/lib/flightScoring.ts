@@ -1,5 +1,6 @@
-import { getAirportQuality, AIRLINES } from "./airportsData";
+import { getAirportQuality, AIRLINES, type Airline } from "./airportsData";
 import type { FlightPreferences } from "@/hooks/useFlightPreferences";
+export type { FlightPreferences };
 
 export interface FlightSegment {
   departureAirport: string;
