@@ -185,11 +185,10 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
 
       if (existingLink) {
         // Update existing link instead of creating new one
-        // Keep the existing token to maintain the same URL
         ({ data, error } = await supabase
           .from('share_links')
           .update({
-            // Don't update token - keep existing one
+            token: token,
             is_active: true,
             include_stats: includedFields.includes('stats'),
             include_countries: includedFields.includes('countries'),
@@ -201,21 +200,13 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
           .single());
         
         finalToken = existingLink.token; // Use existing token to maintain same URL
-        console.log('Updated existing share link with token:', finalToken);
       } else {
         // Insert new link
-        console.log('Creating new share link with token:', token);
         ({ data, error } = await supabase
           .from('share_links')
           .insert(insertData)
           .select()
           .single());
-        
-        if (error) {
-          console.error('Failed to insert share link:', error);
-        } else {
-          console.log('Successfully created share link:', data?.token);
-        }
       }
 
       if (!error && data) {
