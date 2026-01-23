@@ -19,7 +19,7 @@ export interface ShareTokenOptions {
   shareType: ShareType;
   itemId?: string; // Specific item ID (for memory, trip, etc.)
   includedFields: string[]; // What data to include (e.g., ['countries', 'memories', 'stats'])
-  expiresAt?: string | null; // ISO date string or null for permanent
+  // Note: All share links are permanent (never expire) for brand awareness and sharing
 }
 
 export interface ShareLinkData {
@@ -30,7 +30,7 @@ export interface ShareLinkData {
   item_id: string | null;
   included_fields: string[];
   created_at: string;
-  expires_at: string | null;
+  expires_at: string | null; // Always null - links are permanent (never expire)
   view_count: number;
 }
 
@@ -149,7 +149,7 @@ async function generateShareTokenLegacy(userId: string, shareType: ShareType): P
  * Falls back to legacy share_profiles system if share_links table doesn't exist
  */
 export async function generateShareToken(options: ShareTokenOptions): Promise<string> {
-  const { userId, shareType, itemId, includedFields, expiresAt } = options;
+  const { userId, shareType, itemId, includedFields } = options;
 
   // Generate secure random token
   const token = generateToken().toLowerCase();
@@ -159,7 +159,7 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
   
   if (tableExists) {
     try {
-      // First, try with expires_at (if column exists)
+      // Create permanent share link (never expires) for brand awareness
       let insertData: any = {
         token: token,
         user_id: userId,
@@ -167,13 +167,9 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
         item_id: itemId || null,
         included_fields: includedFields,
         created_at: new Date().toISOString(),
+        expires_at: null, // Permanent link - never expires
         view_count: 0,
       };
-
-      // Only include expires_at if provided (column might not exist)
-      if (expiresAt !== undefined) {
-        insertData.expires_at = expiresAt;
-      }
 
       let { data, error } = await supabase
         .from('share_links')
@@ -355,13 +351,8 @@ export async function getShareTokenData(token: string): Promise<ShareLinkData | 
     return null;
   }
 
-  // Check if expired
-  if (data.expires_at) {
-    const expiresAt = new Date(data.expires_at);
-    if (expiresAt < new Date()) {
-      return null; // Token expired
-    }
-  }
+  // Note: Share links are permanent and never expire (for brand awareness)
+  // No expiration check needed
 
   // Increment view count
   await supabase
