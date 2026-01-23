@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
 import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
 import TravelMilestones from "@/components/travel/TravelMilestones";
+import PublicTravelTimeline from "@/components/travel/PublicTravelTimeline";
 import PublicPhotoGallery from "@/components/travel/PublicPhotoGallery";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
 
@@ -48,11 +49,15 @@ interface VisitDetail {
   id: string;
   country_id: string;
   visit_date: string | null;
+  end_date: string | null;
+  number_of_days: number | null;
+  notes: string | null;
   approximate_year: number | null;
   approximate_month: number | null;
   is_approximate: boolean | null;
   trip_name: string | null;
   highlight: string | null;
+  why_it_mattered: string | null;
 }
 
 interface VisitFamilyMember {
@@ -314,46 +319,13 @@ const PublicDashboard = () => {
         {/* Memories Section - Timeline and Photos */}
         {(shareSettings.show_timeline || shareSettings.show_photos) && (
           <div className="mb-8 space-y-6">
-            <h2 className="text-2xl font-semibold">Memories</h2>
-
-            {/* Public Timeline (read-only) */}
+            {/* Public Timeline with proper formatting (flags, colors, dates) */}
             {shareSettings.show_timeline && visitDetails.length > 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="space-y-3">
-                    {visitDetails.slice(0, 25).map((v) => {
-                      const country = countries.find((c) => c.id === v.country_id);
-                      const title = country?.name || "Unknown";
-                      const dateLabel = v.visit_date
-                        ? new Date(v.visit_date).toLocaleDateString(undefined, { year: "numeric", month: "short" })
-                        : v.approximate_year
-                          ? `${v.approximate_month ? `${v.approximate_month}/` : ""}${v.approximate_year}`
-                          : "";
-
-                      return (
-                        <div key={v.id} className="flex items-start justify-between gap-4 border-b last:border-b-0 pb-3 last:pb-0">
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{title}</p>
-                            {v.trip_name && (
-                              <p className="text-sm text-muted-foreground truncate">{v.trip_name}</p>
-                            )}
-                            {v.highlight && (
-                              <p className="text-sm text-muted-foreground mt-1">{v.highlight}</p>
-                            )}
-                          </div>
-                          {dateLabel && (
-                            <div className="text-sm text-muted-foreground whitespace-nowrap">{dateLabel}</div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {visitDetails.length > 25 && (
-                      <p className="text-xs text-muted-foreground">Showing the latest 25 visits.</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              <PublicTravelTimeline 
+                countries={countries} 
+                visitDetails={visitDetails}
+                photos={photos}
+              />
             )}
 
             {/* Photo Gallery */}

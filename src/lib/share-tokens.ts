@@ -172,35 +172,66 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
         include_memories: includedFields.includes('memories'),
       };
 
-      const { data, error } = await supabase
+      // Check if a share link already exists for this user (to handle unique constraint)
+      const { data: existingLink } = await supabase
         .from('share_links')
-        .insert(insertData)
-        .select()
-        .single();
+        .select('token')
+        .eq('owner_user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      let finalToken = token;
+      let { data, error } = { data: null, error: null as any };
+
+      if (existingLink) {
+        // Update existing link instead of creating new one
+        ({ data, error } = await supabase
+          .from('share_links')
+          .update({
+            token: token,
+            is_active: true,
+            include_stats: includedFields.includes('stats'),
+            include_countries: includedFields.includes('countries'),
+            include_memories: includedFields.includes('memories'),
+          })
+          .eq('owner_user_id', userId)
+          .eq('is_active', true)
+          .select()
+          .single());
+        
+        finalToken = existingLink.token; // Use existing token to maintain same URL
+      } else {
+        // Insert new link
+        ({ data, error } = await supabase
+          .from('share_links')
+          .insert(insertData)
+          .select()
+          .single());
+      }
 
       if (!error && data) {
         // Success with new system
         const baseUrl = window.location.origin;
         switch (shareType) {
           case 'dashboard':
-            return `${baseUrl}/share/dashboard/${token}`;
+            return `${baseUrl}/share/dashboard/${finalToken}`;
           case 'memory':
-            return `${baseUrl}/share/memory/${token}`;
+            return `${baseUrl}/share/memory/${finalToken}`;
           case 'wishlist':
-            return `${baseUrl}/share/wishlist/${token}`;
+            return `${baseUrl}/share/wishlist/${finalToken}`;
           case 'trip':
-            return `${baseUrl}/share/trip/${token}`;
+            return `${baseUrl}/share/trip/${finalToken}`;
           case 'highlights':
-            return `${baseUrl}/highlights/${token}`;
+            return `${baseUrl}/highlights/${finalToken}`;
           default:
-            return `${baseUrl}/share/${token}`;
+            return `${baseUrl}/share/${finalToken}`;
         }
       } else if (error) {
-        console.warn('share_links insert failed, trying legacy system:', error);
+        console.warn('share_links insert/update failed, trying legacy system:', error);
         // Fall through to legacy system
       }
     } catch (err) {
-      console.warn('share_links insert error, trying legacy system:', err);
+      console.warn('share_links insert/update error, trying legacy system:', err);
       // Fall through to legacy system
     }
   }
