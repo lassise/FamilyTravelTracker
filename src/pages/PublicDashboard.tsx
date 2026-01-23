@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Globe, ArrowRight } from "lucide-react";
+import { Loader2, Globe, ArrowRight, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
 import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
 import TravelMilestones from "@/components/travel/TravelMilestones";
@@ -121,6 +122,9 @@ const PublicDashboard = () => {
     debug: null,
   });
 
+  // Family member filter state
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+
   const resolvedHome = useHomeCountry(state.data?.owner?.homeCountry || null);
 
   // Build visitMemberMap from visitFamilyMembers
@@ -146,6 +150,18 @@ const PublicDashboard = () => {
     const continents = new Set(visitedCountries.map((c) => c.continent));
     return continents.size;
   }, [state.data?.countries]);
+
+  // Filter visitDetails based on selected family member
+  const filteredVisitDetails = useMemo(() => {
+    if (!state.data?.visitDetails) return [];
+    if (!selectedMemberId) return state.data.visitDetails;
+    
+    // Filter visits where the selected member participated
+    return state.data.visitDetails.filter((visit) => {
+      const memberIds = visitMemberMap.get(visit.id) || [];
+      return memberIds.includes(selectedMemberId);
+    });
+  }, [state.data?.visitDetails, selectedMemberId, visitMemberMap]);
 
   useEffect(() => {
     async function loadPublicDashboard() {
@@ -213,7 +229,7 @@ const PublicDashboard = () => {
               <p className="text-sm text-muted-foreground">
                 Want to track your family's adventures?
               </p>
-              <Link to="/auth">
+              <Link to="/auth?tab=signup">
                 <Button className="w-full">
                   Sign up for Family Travel Tracker — it's free!
                 </Button>
@@ -247,7 +263,7 @@ const PublicDashboard = () => {
                 Sign up for Family Travel Tracker for free
               </p>
             </div>
-            <Link to="/auth">
+            <Link to="/auth?tab=signup">
               <Button size="sm" className="whitespace-nowrap">
                 Sign Up Free
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -268,6 +284,32 @@ const PublicDashboard = () => {
           </p>
         </div>
 
+        {/* Family Member Filter */}
+        {familyMembers.length > 1 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-3">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Filter by family member:</span>
+              <Select 
+                value={selectedMemberId || "all"} 
+                onValueChange={(value) => setSelectedMemberId(value === "all" ? null : value)}
+              >
+                <SelectTrigger className="w-48 h-9">
+                  <SelectValue placeholder="All members" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {familyMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
         {/* Hero Summary - Countries Visited Overview */}
         {shareSettings.show_stats && (
           <div className="mb-8">
@@ -278,11 +320,13 @@ const PublicDashboard = () => {
               homeCountry={owner.homeCountry || null}
               earliestYear={stats.earliestYear}
               visitMemberMap={visitMemberMap}
-              selectedMemberId={null}
+              selectedMemberId={selectedMemberId}
               filterComponent={
                 familyMembers.length > 1 ? (
                   <div className="text-sm text-muted-foreground">
-                    Viewing all members
+                    {selectedMemberId 
+                      ? `Viewing ${familyMembers.find(m => m.id === selectedMemberId)?.name || 'member'}`
+                      : 'Viewing all members'}
                   </div>
                 ) : undefined
               }
@@ -298,7 +342,7 @@ const PublicDashboard = () => {
               wishlist={[]}
               homeCountry={owner.homeCountry || null}
               onRefetch={() => {}}
-              selectedMemberId={null}
+              selectedMemberId={selectedMemberId}
               readOnly
               stateVisitsOverride={stateVisits}
             />
@@ -323,7 +367,7 @@ const PublicDashboard = () => {
             {shareSettings.show_timeline && visitDetails.length > 0 && (
               <PublicTravelTimeline 
                 countries={countries} 
-                visitDetails={visitDetails}
+                visitDetails={filteredVisitDetails}
                 photos={photos}
               />
             )}
@@ -345,7 +389,7 @@ const PublicDashboard = () => {
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
               Track your family's adventures, discover new destinations, and create lasting memories together.
             </p>
-            <Link to="/auth">
+            <Link to="/auth?tab=signup">
               <Button size="lg">
                 Sign Up for Free
                 <ArrowRight className="ml-2 h-4 w-4" />

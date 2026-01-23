@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -41,11 +41,14 @@ const GoogleIcon = () => (
 const Auth = () => {
   const { user, signIn, signUp, loading: authLoading, needsOnboarding, profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("signin");
+  // Default to "signup" if tab param is "signup", otherwise "signin"
+  const initialTab = searchParams.get("tab") === "signup" ? "signup" : "signin";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Form states
