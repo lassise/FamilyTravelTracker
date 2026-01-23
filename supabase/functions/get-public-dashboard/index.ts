@@ -121,21 +121,76 @@ Deno.serve(async (req) => {
     let shareLink: any = null;
     let shareLinkError: any = null;
     
-    // First attempt: new schema with owner_user_id and is_active
-    const { data: shareLinkNew, error: errorNew } = await supabase
-      .from("share_links")
-      .select("*")
-      .eq("token", tokenNormalized)
-      .maybeSingle();
+    // First attempt: Try to find share link - handle both schemas gracefully
+    // Query without is_active filter first to avoid errors if column doesn't exist
+    let shareLinkNew: any = null;
+    let errorNew: any = null;
     
+    // Try querying with all possible column combinations
+    try {
+      // Attempt 1: Try with owner_user_id (new schema)
+      const result1 = await supabase
+        .from("share_links")
+        .select("*")
+        .eq("token", tokenNormalized)
+        .maybeSingle();
+      
+      if (!result1.error && result1.data) {
+        shareLinkNew = result1.data;
+      } else if (result1.error && !result1.error.message.includes('column') && !result1.error.message.includes('does not exist')) {
+        // Only set error if it's not a schema issue
+        errorNew = result1.error;
+      }
+      
+      // If that failed with a column error, try with user_id (old schema)
+      if (!shareLinkNew && result1.error && (result1.error.message.includes('owner_user_id') || result1.error.code === '42703')) {
+        const result2 = await supabase
+          .from("share_links")
+          .select("id, token, user_id, share_type, item_id, included_fields, created_at, expires_at, view_count")
+          .eq("token", tokenNormalized)
+          .maybeSingle();
+        
+        if (!result2.error && result2.data) {
+          shareLinkNew = result2.data;
+        } else {
+          errorNew = result2.error;
+        }
+      }
+    } catch (err: any) {
+      errorNew = err;
+      (debug.failures as string[]).push(`share_links query exception: ${err.message}`);
+    }
+    
+    // If still no result, try a minimal query (just token and id) to see if record exists
+    if (!shareLinkNew && !errorNew) {
+      try {
+        const minimalResult = await supabase
+          .from("share_links")
+          .select("token, id")
+          .eq("token", tokenNormalized)
+          .maybeSingle();
+        
+        if (!minimalResult.error && minimalResult.data) {
+          // Record exists but we couldn't read all columns - schema mismatch
+          (debug.failures as string[]).push("share_link exists but schema mismatch - run migration");
+          debug.schema_mismatch = true;
+        }
+      } catch (err) {
+        // Ignore errors in fallback
+      }
+    }
+    
+    // Set debug info
     debug.share_link_query_result = {
       found: !!shareLinkNew,
       error: errorNew ? {
         message: errorNew.message,
         code: errorNew.code,
-        details: errorNew.details
+        details: errorNew.details,
+        hint: errorNew.hint
       } : null,
-      columns_found: shareLinkNew ? Object.keys(shareLinkNew) : []
+      columns_found: shareLinkNew ? Object.keys(shareLinkNew) : [],
+      token_searched: tokenNormalized
     };
     
     if (!errorNew && shareLinkNew) {

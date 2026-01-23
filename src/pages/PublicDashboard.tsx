@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { publicSupabase } from "@/integrations/supabase/public-client";
 import { Loader2, Globe, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -156,7 +156,8 @@ const PublicDashboard = () => {
 
       try {
         // Call Edge Function - ONLY data source for this page
-        const { data, error } = await supabase.functions.invoke("get-public-dashboard", {
+        // Use public client to ensure no auth interference
+        const { data, error } = await publicSupabase.functions.invoke("get-public-dashboard", {
           body: { token },
         });
 
