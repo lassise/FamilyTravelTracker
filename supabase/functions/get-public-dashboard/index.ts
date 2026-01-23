@@ -52,10 +52,9 @@ const countryToContinentMap: Record<string, string> = {
   SB: "Oceania", TO: "Oceania", TV: "Oceania", VU: "Oceania",
 };
 
-// Extract country code from country name or flag emoji
+// Extract country code from flag emoji
 function getCountryCodeFromFlag(flag: string): string | null {
   if (!flag || flag.length < 2) return null;
-  // Flag emojis are made of regional indicator symbols
   const codePoints = [...flag].map((char) => char.codePointAt(0) || 0);
   if (codePoints.length >= 2 && codePoints[0] >= 0x1f1e6 && codePoints[0] <= 0x1f1ff) {
     const first = String.fromCharCode(codePoints[0] - 0x1f1e6 + 65);
@@ -65,6 +64,11 @@ function getCountryCodeFromFlag(flag: string): string | null {
   return null;
 }
 
+/**
+ * CANONICAL Edge Function for fetching public dashboard data
+ * VERIFICATION: Logs all steps for debugging
+ * TOKEN LOOKUP ORDER: share_links (canonical) → share_profiles (legacy fallback)
+ */
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -73,15 +77,17 @@ Deno.serve(async (req) => {
 
   try {
     const { token } = await req.json();
+    console.log("[get-public-dashboard] Received token:", token);
 
-    // Normalize token
+    // Normalize token: lowercase, trimmed, must be 32 hex chars
     const tokenNormalized = token?.trim().toLowerCase();
     if (!tokenNormalized || tokenNormalized.length !== 32 || !/^[a-f0-9]+$/.test(tokenNormalized)) {
+      console.log("[get-public-dashboard] Invalid token format");
       return new Response(
         JSON.stringify({
           ok: false,
           error: "Invalid or missing token",
-          debug: { token_provided: !!token, token_format_valid: false },
+          debug: { token_provided: !!token, token_length: token?.length, token_format_valid: false },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -98,18 +104,28 @@ Deno.serve(async (req) => {
       token_found: false,
       token_source: "",
       owner_user_id: "",
-      owner_found: false,
       query_steps: [] as string[],
       query_counts: {} as Record<string, number>,
       failures: [] as string[],
     };
 
     let ownerId: string | null = null;
-    let shareProfile: any = null;
-    let shareSettings: any = null;
+    let shareSettings: {
+      show_stats: boolean;
+      show_map: boolean;
+      show_countries: boolean;
+      show_photos: boolean;
+      show_timeline: boolean;
+      show_family_members: boolean;
+      show_achievements: boolean;
+      show_wishlist: boolean;
+      include_memories: boolean; // Explicit memories flag for frontend
+    } | null = null;
 
-    // Step 1: Try new share_links table first
+    // === Step 1: Try CANONICAL share_links table first ===
     (debug.query_steps as string[]).push("lookup_share_links");
+    console.log("[get-public-dashboard] Looking up in share_links...");
+    
     const { data: shareLink, error: shareLinkError } = await supabase
       .from("share_links")
       .select("*")
@@ -117,36 +133,51 @@ Deno.serve(async (req) => {
       .eq("is_active", true)
       .maybeSingle();
 
+    console.log("[get-public-dashboard] share_links result:", { shareLink, error: shareLinkError?.message });
+
     if (!shareLinkError && shareLink) {
-      // Found in new share_links table
+      // Found in share_links table (canonical)
       debug.token_found = true;
       debug.token_source = "share_links.token";
       debug.owner_user_id = shareLink.owner_user_id;
       ownerId = shareLink.owner_user_id;
 
-      // Convert share_links format to shareSettings format
+      // Update last_accessed_at
+      await supabase
+        .from("share_links")
+        .update({ last_accessed_at: new Date().toISOString() })
+        .eq("id", shareLink.id);
+
+      // Convert share_links format to shareSettings
       shareSettings = {
-        show_stats: shareLink.include_stats,
-        show_map: true, // Default to true for new system
-        show_countries: shareLink.include_countries,
-        show_photos: shareLink.include_memories, // include_memories includes photos
-        show_timeline: shareLink.include_memories, // include_memories includes timeline
-        show_family_members: true, // Default to true
-        show_achievements: true, // Default to true
-        show_wishlist: false, // Not in new system yet
+        show_stats: shareLink.include_stats ?? true,
+        show_map: true, // Always show map
+        show_countries: shareLink.include_countries ?? true,
+        show_photos: shareLink.include_memories ?? true,
+        show_timeline: shareLink.include_memories ?? true, // Timeline = memories
+        show_family_members: true, // Always show family members on public
+        show_achievements: true, // Always show achievements
+        show_wishlist: false, // Not in canonical system yet
+        include_memories: shareLink.include_memories ?? true, // Explicit flag
       };
+      console.log("[get-public-dashboard] Found in share_links, owner:", ownerId);
     } else {
-      // Step 2: Fall back to old share_profiles table
-      (debug.query_steps as string[]).push("lookup_share_profile");
-      const { data: oldShareProfile, error: shareError } = await supabase
+      // === Step 2: Fallback to legacy share_profiles table ===
+      (debug.query_steps as string[]).push("lookup_share_profiles");
+      console.log("[get-public-dashboard] Falling back to share_profiles...");
+      
+      const { data: shareProfile, error: shareError } = await supabase
         .from("share_profiles")
         .select("*")
         .eq("dashboard_share_token", tokenNormalized)
         .eq("is_public", true)
         .maybeSingle();
 
-      if (shareError || !oldShareProfile) {
+      console.log("[get-public-dashboard] share_profiles result:", { shareProfile, error: shareError?.message });
+
+      if (shareError || !shareProfile) {
         (debug.failures as string[]).push("share_link and share_profile not found");
+        console.log("[get-public-dashboard] Token not found in either table");
         return new Response(
           JSON.stringify({
             ok: false,
@@ -159,34 +190,32 @@ Deno.serve(async (req) => {
 
       debug.token_found = true;
       debug.token_source = "share_profiles.dashboard_share_token";
-      debug.owner_user_id = oldShareProfile.user_id;
-      ownerId = oldShareProfile.user_id;
-      shareProfile = oldShareProfile;
+      debug.owner_user_id = shareProfile.user_id;
+      ownerId = shareProfile.user_id;
+      
       shareSettings = {
-        show_stats: oldShareProfile.show_stats,
-        show_map: oldShareProfile.show_map,
-        show_countries: oldShareProfile.show_countries,
-        show_photos: oldShareProfile.show_photos,
-        show_timeline: oldShareProfile.show_timeline,
-        show_family_members: oldShareProfile.show_family_members,
-        show_achievements: oldShareProfile.show_achievements,
-        show_wishlist: oldShareProfile.show_wishlist,
+        show_stats: shareProfile.show_stats ?? true,
+        show_map: shareProfile.show_map ?? true,
+        show_countries: shareProfile.show_countries ?? true,
+        show_photos: shareProfile.show_photos ?? true,
+        show_timeline: shareProfile.show_timeline ?? true,
+        show_family_members: shareProfile.show_family_members ?? true,
+        show_achievements: shareProfile.show_achievements ?? true,
+        show_wishlist: shareProfile.show_wishlist ?? false,
+        include_memories: shareProfile.show_timeline ?? true,
       };
+      console.log("[get-public-dashboard] Found in share_profiles, owner:", ownerId);
     }
 
     if (!ownerId) {
-      (debug.failures as string[]).push("owner_id not found");
+      (debug.failures as string[]).push("owner_id not determined");
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "Owner not found",
-          debug,
-        }),
+        JSON.stringify({ ok: false, error: "Owner not found", debug }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Step 2: Get owner profile
+    // === Step 3: Fetch owner profile ===
     (debug.query_steps as string[]).push("fetch_owner_profile");
     const { data: ownerProfile } = await supabase
       .from("profiles")
@@ -197,84 +226,73 @@ Deno.serve(async (req) => {
     if (!ownerProfile) {
       (debug.failures as string[]).push("owner profile not found");
       return new Response(
-        JSON.stringify({
-          ok: false,
-          error: "Owner profile not found",
-          debug,
-        }),
+        JSON.stringify({ ok: false, error: "Owner profile not found", debug }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    debug.owner_found = true;
+    console.log("[get-public-dashboard] Owner profile found:", ownerProfile.full_name);
 
-    // Step 3: Fetch countries (the user's country list)
+    // === Step 4: Fetch all travel data ===
+    
+    // Countries
     (debug.query_steps as string[]).push("fetch_countries");
     const { data: countriesData } = await supabase
       .from("countries")
       .select("id, name, flag, continent")
       .eq("user_id", ownerId);
-
     const countries = countriesData || [];
     (debug.query_counts as Record<string, number>).countries = countries.length;
 
-    // Step 4: Fetch country visits
+    // Country visits
     (debug.query_steps as string[]).push("fetch_country_visits");
     const { data: visitsData } = await supabase
       .from("country_visits")
       .select("country_id, family_member_id")
       .eq("user_id", ownerId);
-
     const visits = visitsData || [];
     (debug.query_counts as Record<string, number>).country_visits = visits.length;
 
-    // Step 5: Fetch visit details
+    // Visit details (timeline data)
     (debug.query_steps as string[]).push("fetch_visit_details");
     const { data: visitDetailsData } = await supabase
       .from("country_visit_details")
       .select("id, country_id, visit_date, end_date, number_of_days, notes, approximate_year, approximate_month, is_approximate, trip_name, highlight, why_it_mattered")
       .eq("user_id", ownerId)
       .order("visit_date", { ascending: false, nullsFirst: false });
-
     const visitDetails = visitDetailsData || [];
     (debug.query_counts as Record<string, number>).visit_details = visitDetails.length;
 
-    // Step 6: Fetch visit-family member mappings
+    // Visit-family member mappings
     (debug.query_steps as string[]).push("fetch_visit_family_members");
     const { data: visitFamilyMembersData } = await supabase
       .from("visit_family_members")
       .select("visit_id, family_member_id")
       .eq("user_id", ownerId);
-
     const visitFamilyMembers = visitFamilyMembersData || [];
     (debug.query_counts as Record<string, number>).visit_family_members = visitFamilyMembers.length;
 
-    // Step 7: Fetch family members (only if allowed)
-    let familyMembers: Array<{id: string; name: string; role: string; avatar: string; color: string}> = [];
-    if (shareSettings.show_family_members) {
-      (debug.query_steps as string[]).push("fetch_family_members");
-      const { data: familyData } = await supabase
-        .from("family_members")
-        .select("id, name, role, avatar, color")
-        .eq("user_id", ownerId)
-        .order("created_at", { ascending: true });
+    // Family members (always fetch for filtering)
+    (debug.query_steps as string[]).push("fetch_family_members");
+    const { data: familyData } = await supabase
+      .from("family_members")
+      .select("id, name, role, avatar, color")
+      .eq("user_id", ownerId)
+      .order("created_at", { ascending: true });
+    const familyMembers = familyData || [];
+    (debug.query_counts as Record<string, number>).family_members = familyMembers.length;
 
-      familyMembers = familyData || [];
-      (debug.query_counts as Record<string, number>).family_members = familyMembers.length;
-    }
-
-    // Step 8: Fetch state visits
+    // State visits
     (debug.query_steps as string[]).push("fetch_state_visits");
     const { data: stateVisitsData } = await supabase
       .from("state_visits")
       .select("id, state_code, state_name, country_code, country_id, family_member_id, created_at")
       .eq("user_id", ownerId);
-
     const stateVisits = stateVisitsData || [];
     (debug.query_counts as Record<string, number>).state_visits = stateVisits.length;
 
-    // Step 9: Fetch photos (only if allowed)
+    // Photos (only if memories/photos enabled)
     let photos: Array<{id: string; photo_url: string; caption: string | null; country_id: string | null; taken_at: string | null}> = [];
-    if (shareSettings.show_photos) {
+    if (shareSettings.show_photos || shareSettings.include_memories) {
       (debug.query_steps as string[]).push("fetch_photos");
       const { data: photosData } = await supabase
         .from("travel_photos")
@@ -282,12 +300,13 @@ Deno.serve(async (req) => {
         .eq("user_id", ownerId)
         .order("taken_at", { ascending: false, nullsFirst: false })
         .limit(50);
-
       photos = photosData || [];
       (debug.query_counts as Record<string, number>).photos = photos.length;
     }
 
-    // Step 10: Compute visited country IDs (deduped)
+    // === Step 5: Compute derived data ===
+    
+    // Visited country IDs
     const visitedCountryIds = new Set<string>();
     visits.forEach((v) => {
       if (v.country_id) visitedCountryIds.add(v.country_id);
@@ -298,18 +317,10 @@ Deno.serve(async (req) => {
 
     // Build visited-by mapping
     const visitedByMap: Record<string, string[]> = {};
-    const countryIdToCode: Record<string, string> = {};
-
-    countries.forEach((c) => {
-      const code = getCountryCodeFromFlag(c.flag);
-      if (code) countryIdToCode[c.id] = code;
-    });
-
-    // From country_visits
     visits.forEach((v) => {
       if (!v.country_id) return;
       if (!visitedByMap[v.country_id]) visitedByMap[v.country_id] = [];
-      if (shareSettings.show_family_members && v.family_member_id) {
+      if (v.family_member_id) {
         const member = familyMembers.find((m) => m.id === v.family_member_id);
         if (member && !visitedByMap[v.country_id].includes(member.name)) {
           visitedByMap[v.country_id].push(member.name);
@@ -319,7 +330,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    // From visit_family_members (for detailed visits)
+    // From visit_family_members
     const visitIdToCountryId: Record<string, string> = {};
     visitDetails.forEach((vd) => {
       if (vd.id && vd.country_id) visitIdToCountryId[vd.id] = vd.country_id;
@@ -329,7 +340,7 @@ Deno.serve(async (req) => {
       const countryId = visitIdToCountryId[vfm.visit_id];
       if (!countryId) return;
       if (!visitedByMap[countryId]) visitedByMap[countryId] = [];
-      if (shareSettings.show_family_members && vfm.family_member_id) {
+      if (vfm.family_member_id) {
         const member = familyMembers.find((m) => m.id === vfm.family_member_id);
         if (member && !visitedByMap[countryId].includes(member.name)) {
           visitedByMap[countryId].push(member.name);
@@ -345,7 +356,7 @@ Deno.serve(async (req) => {
       visitedBy: visitedByMap[c.id] || [],
     }));
 
-    // Compute continents from visited countries
+    // Compute continents
     const visitedContinents = new Set<string>();
     countriesWithVisitedBy.forEach((c) => {
       if (c.visitedBy.length > 0) {
@@ -358,7 +369,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Compute earliest year
+    // Earliest year
     let earliestYear: number | null = null;
     visitDetails.forEach((vd) => {
       const year = vd.visit_date 
@@ -369,16 +380,14 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Compute per-member country counts
+    // Per-member country counts
     const memberCountryCounts: Record<string, Set<string>> = {};
     familyMembers.forEach((m) => memberCountryCounts[m.id] = new Set());
-
     visits.forEach((v) => {
       if (v.family_member_id && v.country_id) {
         memberCountryCounts[v.family_member_id]?.add(v.country_id);
       }
     });
-
     visitFamilyMembers.forEach((vfm) => {
       const countryId = visitIdToCountryId[vfm.visit_id];
       if (countryId && vfm.family_member_id) {
@@ -391,19 +400,16 @@ Deno.serve(async (req) => {
       countriesVisited: memberCountryCounts[m.id]?.size || 0,
     }));
 
-    // Build unique visited state codes
+    // Stats
     const uniqueStateCodes = [...new Set(stateVisits.map((sv) => sv.state_code))];
-
-    // Build stats
     const visitedCountriesCount = countriesWithVisitedBy.filter((c) => c.visitedBy.length > 0).length;
     const visitedContinentsCount = visitedContinents.size;
     const visitedStatesCount = uniqueStateCodes.length;
 
     (debug.query_counts as Record<string, number>).visited_countries_computed = visitedCountriesCount;
     (debug.query_counts as Record<string, number>).visited_continents_computed = visitedContinentsCount;
-    (debug.query_counts as Record<string, number>).visited_states_computed = visitedStatesCount;
 
-    // Build response
+    // === Step 6: Build response ===
     const response = {
       ok: true,
       debug,
@@ -429,11 +435,12 @@ Deno.serve(async (req) => {
       },
     };
 
+    console.log("[get-public-dashboard] SUCCESS - returning data for", ownerProfile.full_name);
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("get-public-dashboard error:", error);
+    console.error("[get-public-dashboard] EXCEPTION:", error);
     return new Response(
       JSON.stringify({
         ok: false,
