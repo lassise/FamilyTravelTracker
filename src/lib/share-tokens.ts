@@ -153,85 +153,110 @@ async function generateShareTokenLegacy(userId: string, shareType: ShareType): P
 export async function generateShareToken(options: ShareTokenOptions): Promise<string> {
   const { userId, shareType, includedFields } = options;
 
-  // Generate secure random token
-  const token = generateToken().toLowerCase();
+  console.log('=== generateShareToken called ===');
+  console.log('User ID:', userId);
+  console.log('Share Type:', shareType);
+  console.log('Included Fields:', includedFields);
 
   // Try new share_links table first
   const tableExists = await checkShareLinksTableExists();
+  console.log('share_links table exists:', tableExists);
   
   if (tableExists) {
     try {
-      // Create permanent share link (never expires) for brand awareness
-      // Using actual database schema: owner_user_id, is_active, include_* flags
-      const insertData = {
-        token: token,
-        owner_user_id: userId,
-        is_active: true, // Always active - permanent links
-        include_stats: includedFields.includes('stats'),
-        include_countries: includedFields.includes('countries'),
-        include_memories: includedFields.includes('memories'),
-      };
-
-      // Check if a share link already exists for this user (to handle unique constraint)
-      const { data: existingLink } = await supabase
+      // Check if a share link already exists for this user
+      const { data: existingLink, error: fetchError } = await supabase
         .from('share_links')
-        .select('token')
+        .select('id, token')
         .eq('owner_user_id', userId)
         .eq('is_active', true)
         .maybeSingle();
 
-      let finalToken = token;
-      let { data, error } = { data: null, error: null as any };
+      console.log('Existing link check:', { existingLink, fetchError });
+
+      let finalToken: string;
+      let resultData: any;
+      let resultError: any;
 
       if (existingLink) {
-        // Update existing link instead of creating new one
-        ({ data, error } = await supabase
+        // User already has a share link - just update the settings, KEEP the same token
+        finalToken = existingLink.token;
+        console.log('Updating existing link with token:', finalToken);
+        
+        const { data, error } = await supabase
           .from('share_links')
           .update({
-            token: token,
             is_active: true,
             include_stats: includedFields.includes('stats'),
             include_countries: includedFields.includes('countries'),
             include_memories: includedFields.includes('memories'),
           })
-          .eq('owner_user_id', userId)
-          .eq('is_active', true)
+          .eq('id', existingLink.id)
           .select()
-          .single());
+          .single();
         
-        finalToken = existingLink.token; // Use existing token to maintain same URL
+        resultData = data;
+        resultError = error;
+        console.log('Update result:', { data, error });
       } else {
-        // Insert new link
-        ({ data, error } = await supabase
+        // Generate new token for new share link
+        finalToken = generateToken().toLowerCase();
+        console.log('Creating NEW share link with token:', finalToken);
+        
+        const insertData = {
+          token: finalToken,
+          owner_user_id: userId,
+          is_active: true,
+          include_stats: includedFields.includes('stats'),
+          include_countries: includedFields.includes('countries'),
+          include_memories: includedFields.includes('memories'),
+        };
+        console.log('Insert data:', insertData);
+        
+        const { data, error } = await supabase
           .from('share_links')
           .insert(insertData)
           .select()
-          .single());
+          .single();
+        
+        resultData = data;
+        resultError = error;
+        console.log('Insert result:', { data, error });
       }
 
-      if (!error && data) {
+      if (!resultError && resultData) {
         // Success with new system
         const baseUrl = window.location.origin;
+        let url: string;
         switch (shareType) {
           case 'dashboard':
-            return `${baseUrl}/share/dashboard/${finalToken}`;
+            url = `${baseUrl}/share/dashboard/${finalToken}`;
+            break;
           case 'memory':
-            return `${baseUrl}/share/memory/${finalToken}`;
+            url = `${baseUrl}/share/memory/${finalToken}`;
+            break;
           case 'wishlist':
-            return `${baseUrl}/share/wishlist/${finalToken}`;
+            url = `${baseUrl}/share/wishlist/${finalToken}`;
+            break;
           case 'trip':
-            return `${baseUrl}/share/trip/${finalToken}`;
+            url = `${baseUrl}/share/trip/${finalToken}`;
+            break;
           case 'highlights':
-            return `${baseUrl}/highlights/${finalToken}`;
+            url = `${baseUrl}/highlights/${finalToken}`;
+            break;
           default:
-            return `${baseUrl}/share/${finalToken}`;
+            url = `${baseUrl}/share/${finalToken}`;
         }
-      } else if (error) {
-        console.warn('share_links insert/update failed, trying legacy system:', error);
+        console.log('SUCCESS! Generated URL:', url);
+        return url;
+      } else if (resultError) {
+        console.error('share_links insert/update failed:', resultError);
+        console.warn('Falling back to legacy system');
         // Fall through to legacy system
       }
     } catch (err) {
-      console.warn('share_links insert/update error, trying legacy system:', err);
+      console.error('share_links insert/update error:', err);
+      console.warn('Falling back to legacy system');
       // Fall through to legacy system
     }
   }
