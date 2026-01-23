@@ -45,7 +45,10 @@ const Auth = () => {
   const [demoLoading, setDemoLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("signin");
+  // FIX: Support ?tab=signup query param for CTA links
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get("tab") === "signup" ? "signup" : "signin";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   // Form states

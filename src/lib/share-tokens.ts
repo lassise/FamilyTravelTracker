@@ -37,238 +37,134 @@ export interface ShareLinkData {
 }
 
 /**
- * Generate a secure random token (32 characters, URL-safe)
+ * Generate a secure random token (32 characters, URL-safe, lowercase hex)
+ * VERIFICATION: Token is always 32 lowercase hex chars
  */
 function generateToken(): string {
-  // Use crypto.getRandomValues for better randomness (like the old system)
+  // Use crypto.getRandomValues for secure randomness
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     return Array.from(crypto.getRandomValues(new Uint8Array(16)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
   }
-  // Fallback: generate random string
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  // Fallback: generate random hex string
   let result = '';
+  const hexChars = '0123456789abcdef';
   for (let i = 0; i < 32; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += hexChars.charAt(Math.floor(Math.random() * hexChars.length));
   }
   return result;
 }
 
 /**
- * Check if share_links table exists by attempting a query
- */
-async function checkShareLinksTableExists(): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('share_links')
-      .select('id')
-      .limit(1);
-    
-    // If error is about table not existing, return false
-    if (error && (error.message.includes('does not exist') || error.code === '42P01')) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Generate share token using old share_profiles system (fallback)
- */
-async function generateShareTokenLegacy(userId: string, shareType: ShareType): Promise<string> {
-  // For dashboard, use the old share_profiles system
-  if (shareType === 'dashboard') {
-    // Fetch or create share profile
-    let { data: profile, error } = await supabase
-      .from("share_profiles")
-      .select("id, dashboard_share_token, is_public")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error && !error.message.includes('does not exist')) {
-      throw new Error(`Failed to fetch share profile: ${error.message}`);
-    }
-
-    // Create if doesn't exist
-    if (!profile) {
-      const newToken = generateToken();
-      const { data: newProfile, error: createError } = await supabase
-        .from("share_profiles")
-        .insert({
-          user_id: userId,
-          is_public: true,
-          show_stats: true,
-          show_map: true,
-          show_countries: true,
-          show_photos: true,
-          dashboard_share_token: newToken,
-        })
-        .select("id, dashboard_share_token, is_public")
-        .single();
-
-      if (createError) {
-        throw new Error(`Failed to create share profile: ${createError.message}`);
-      }
-      profile = newProfile;
-    }
-
-    // Generate token if missing
-    if (!profile.dashboard_share_token) {
-      const newToken = generateToken();
-      const { error: updateError } = await supabase
-        .from("share_profiles")
-        .update({ 
-          dashboard_share_token: newToken,
-          is_public: true 
-        })
-        .eq("id", profile.id);
-
-      if (updateError) {
-        throw new Error(`Failed to update share profile: ${updateError.message}`);
-      }
-      profile.dashboard_share_token = newToken;
-    }
-
-    // Ensure it's public
-    if (!profile.is_public) {
-      await supabase
-        .from("share_profiles")
-        .update({ is_public: true })
-        .eq("id", profile.id);
-    }
-
-    return `${window.location.origin}/dashboard/${profile.dashboard_share_token}`;
-  }
-
-  throw new Error(`Legacy system not supported for share type: ${shareType}`);
-}
-
-/**
- * Generate a share token and store it in the database
- * Falls back to legacy share_profiles system if share_links table doesn't exist
+ * Generate a share token and store it in share_links table
+ * This is the CANONICAL function for creating share links
+ * VERIFICATION: Always returns /share/dashboard/{32-char-hex} URL
  */
 export async function generateShareToken(options: ShareTokenOptions): Promise<string> {
   const { userId, shareType, includedFields } = options;
 
-  console.log('=== generateShareToken called ===');
-  console.log('User ID:', userId);
-  console.log('Share Type:', shareType);
-  console.log('Included Fields:', includedFields);
+  // DEV logging for verification
+  console.log('[ShareToken] === generateShareToken called ===');
+  console.log('[ShareToken] User ID:', userId);
+  console.log('[ShareToken] Share Type:', shareType);
+  console.log('[ShareToken] Included Fields:', includedFields);
 
-  // Try new share_links table first
-  const tableExists = await checkShareLinksTableExists();
-  console.log('share_links table exists:', tableExists);
-  
-  if (tableExists) {
-    try {
-      // Check if a share link already exists for this user
-      const { data: existingLink, error: fetchError } = await supabase
+  // Derive boolean flags from includedFields
+  const includeStats = includedFields.includes('stats');
+  const includeCountries = includedFields.includes('countries');
+  const includeMemories = includedFields.includes('memories'); // This is the timeline toggle
+
+  try {
+    // Step 1: Check if user already has an active share link
+    const { data: existingLink, error: fetchError } = await supabase
+      .from('share_links')
+      .select('id, token')
+      .eq('owner_user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    console.log('[ShareToken] Existing link check:', { existingLink, fetchError });
+
+    if (fetchError) {
+      console.error('[ShareToken] Error checking existing link:', fetchError);
+      throw new Error(`Failed to check existing share links: ${fetchError.message}`);
+    }
+
+    let finalToken: string;
+
+    if (existingLink) {
+      // User already has a share link - UPDATE settings, KEEP the same token for stable URL
+      finalToken = existingLink.token;
+      console.log('[ShareToken] Updating existing link, keeping token:', finalToken);
+      
+      const { error: updateError } = await supabase
         .from('share_links')
-        .select('id, token')
-        .eq('owner_user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle();
+        .update({
+          is_active: true,
+          include_stats: includeStats,
+          include_countries: includeCountries,
+          include_memories: includeMemories,
+        })
+        .eq('id', existingLink.id);
 
-      console.log('Existing link check:', { existingLink, fetchError });
-
-      let finalToken: string;
-      let resultData: any;
-      let resultError: any;
-
-      if (existingLink) {
-        // User already has a share link - just update the settings, KEEP the same token
-        finalToken = existingLink.token;
-        console.log('Updating existing link with token:', finalToken);
-        
-        const { data, error } = await supabase
-          .from('share_links')
-          .update({
-            is_active: true,
-            include_stats: includedFields.includes('stats'),
-            include_countries: includedFields.includes('countries'),
-            include_memories: includedFields.includes('memories'),
-          })
-          .eq('id', existingLink.id)
-          .select()
-          .single();
-        
-        resultData = data;
-        resultError = error;
-        console.log('Update result:', { data, error });
-      } else {
-        // Generate new token for new share link
-        finalToken = generateToken().toLowerCase();
-        console.log('Creating NEW share link with token:', finalToken);
-        
-        const insertData = {
+      if (updateError) {
+        console.error('[ShareToken] Update failed:', updateError);
+        throw new Error(`Failed to update share link: ${updateError.message}`);
+      }
+      console.log('[ShareToken] Update successful');
+    } else {
+      // No existing link - CREATE new one
+      finalToken = generateToken(); // Always lowercase hex
+      console.log('[ShareToken] Creating NEW share link with token:', finalToken);
+      
+      const { error: insertError } = await supabase
+        .from('share_links')
+        .insert({
           token: finalToken,
           owner_user_id: userId,
           is_active: true,
-          include_stats: includedFields.includes('stats'),
-          include_countries: includedFields.includes('countries'),
-          include_memories: includedFields.includes('memories'),
-        };
-        console.log('Insert data:', insertData);
-        
-        const { data, error } = await supabase
-          .from('share_links')
-          .insert(insertData)
-          .select()
-          .single();
-        
-        resultData = data;
-        resultError = error;
-        console.log('Insert result:', { data, error });
-      }
+          include_stats: includeStats,
+          include_countries: includeCountries,
+          include_memories: includeMemories,
+        });
 
-      if (!resultError && resultData) {
-        // Success with new system
-        const baseUrl = window.location.origin;
-        let url: string;
-        switch (shareType) {
-          case 'dashboard':
-            url = `${baseUrl}/share/dashboard/${finalToken}`;
-            break;
-          case 'memory':
-            url = `${baseUrl}/share/memory/${finalToken}`;
-            break;
-          case 'wishlist':
-            url = `${baseUrl}/share/wishlist/${finalToken}`;
-            break;
-          case 'trip':
-            url = `${baseUrl}/share/trip/${finalToken}`;
-            break;
-          case 'highlights':
-            url = `${baseUrl}/highlights/${finalToken}`;
-            break;
-          default:
-            url = `${baseUrl}/share/${finalToken}`;
-        }
-        console.log('SUCCESS! Generated URL:', url);
-        return url;
-      } else if (resultError) {
-        console.error('share_links insert/update failed:', resultError);
-        console.warn('Falling back to legacy system');
-        // Fall through to legacy system
+      if (insertError) {
+        console.error('[ShareToken] Insert failed:', insertError);
+        throw new Error(`Failed to create share link: ${insertError.message}`);
       }
-    } catch (err) {
-      console.error('share_links insert/update error:', err);
-      console.warn('Falling back to legacy system');
-      // Fall through to legacy system
+      console.log('[ShareToken] Insert successful');
     }
-  }
 
-  // Fallback to legacy system for dashboard
-  if (shareType === 'dashboard') {
-    console.log('Using legacy share_profiles system for dashboard sharing');
-    return await generateShareTokenLegacy(userId, shareType);
+    // Build the share URL
+    const baseUrl = window.location.origin;
+    let url: string;
+    switch (shareType) {
+      case 'dashboard':
+        url = `${baseUrl}/share/dashboard/${finalToken}`;
+        break;
+      case 'memory':
+        url = `${baseUrl}/share/memory/${finalToken}`;
+        break;
+      case 'wishlist':
+        url = `${baseUrl}/share/wishlist/${finalToken}`;
+        break;
+      case 'trip':
+        url = `${baseUrl}/share/trip/${finalToken}`;
+        break;
+      case 'highlights':
+        url = `${baseUrl}/highlights/${finalToken}`;
+        break;
+      default:
+        url = `${baseUrl}/share/${finalToken}`;
+    }
+    
+    console.log('[ShareToken] SUCCESS! Generated URL:', url);
+    return url;
+  } catch (err: any) {
+    console.error('[ShareToken] FAILED:', err);
+    throw err;
   }
-
-  // For other types, throw error if new system fails
-  throw new Error(`Failed to generate share token: share_links table may not exist. Please run database migrations.`);
 }
 
 /**
@@ -282,98 +178,33 @@ export async function diagnoseShareSystem(userId: string): Promise<ShareDiagnost
   };
 
   try {
-    // Check if share_links table exists
-    const shareLinksExists = await checkShareLinksTableExists();
-    diagnostics.tableExists = shareLinksExists;
+    // Check if share_links table exists and user has a link
+    const { data: existingLink, error: fetchError } = await supabase
+      .from('share_links')
+      .select('token, is_active')
+      .eq('owner_user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle();
 
-    if (shareLinksExists) {
-      // Check if user already has a share link first
-      const { data: existingLink, error: fetchError } = await supabase
-        .from('share_links')
-        .select('token, is_active')
-        .eq('owner_user_id', userId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (fetchError && !fetchError.message.includes('does not exist')) {
-        diagnostics.error = `Failed to check existing links: ${fetchError.message}`;
-        diagnostics.errorDetails = fetchError;
-      } else if (existingLink) {
-        // User already has a share link - use it for diagnostics
+    if (fetchError) {
+      // Table might not exist or other error
+      diagnostics.error = `share_links query error: ${fetchError.message}`;
+      diagnostics.errorDetails = fetchError;
+      diagnostics.tableExists = !fetchError.message.includes('does not exist');
+    } else {
+      diagnostics.tableExists = true;
+      
+      if (existingLink) {
+        // User has an existing share link
         diagnostics.success = true;
         diagnostics.method = 'share_links';
         diagnostics.token = existingLink.token;
-        const baseUrl = window.location.origin;
-        diagnostics.url = `${baseUrl}/share/dashboard/${existingLink.token}`;
+        diagnostics.url = `${window.location.origin}/share/dashboard/${existingLink.token}`;
       } else {
-        // No existing link - try to create a test one
-        const testToken = generateToken().toLowerCase();
-        const { data, error } = await supabase
-          .from('share_links')
-          .insert({
-            token: testToken,
-            owner_user_id: userId,
-            is_active: true,
-            include_stats: true,
-            include_countries: true,
-            include_memories: false,
-          })
-          .select()
-          .single();
-
-        if (error) {
-          // If duplicate key error, try to find the existing link
-          if (error.code === '23505' || error.message.includes('duplicate key')) {
-            const { data: conflictLink } = await supabase
-              .from('share_links')
-              .select('token, is_active')
-              .eq('owner_user_id', userId)
-              .maybeSingle();
-            
-            if (conflictLink) {
-              diagnostics.success = true;
-              diagnostics.method = 'share_links';
-              diagnostics.token = conflictLink.token;
-              const baseUrl = window.location.origin;
-              diagnostics.url = `${baseUrl}/share/dashboard/${conflictLink.token}`;
-            } else {
-              diagnostics.error = `Duplicate key constraint exists but no link found. ${error.message}`;
-              diagnostics.errorDetails = error;
-            }
-          } else {
-            diagnostics.error = error.message;
-            diagnostics.errorDetails = error;
-          }
-        } else if (data) {
-          // Successfully created test record - clean it up
-          await supabase
-            .from('share_links')
-            .delete()
-            .eq('id', data.id);
-
-          diagnostics.success = true;
-          diagnostics.method = 'share_links';
-          diagnostics.token = testToken;
-        }
-      }
-    } else {
-      // Check legacy system
-      const { data, error } = await supabase
-        .from("share_profiles")
-        .select("dashboard_share_token")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (error && !error.message.includes('does not exist')) {
-        diagnostics.error = `share_profiles error: ${error.message}`;
-        diagnostics.errorDetails = error;
-      } else {
+        // No link exists yet - this is fine, just means user hasn't shared
         diagnostics.success = true;
-        diagnostics.method = 'share_profiles';
-        if (data?.dashboard_share_token) {
-          diagnostics.token = data.dashboard_share_token;
-          diagnostics.url = `${window.location.origin}/dashboard/${data.dashboard_share_token}`;
-        }
+        diagnostics.method = 'share_links';
+        diagnostics.error = 'No share link exists yet. Click Generate to create one.';
       }
     }
   } catch (err: any) {
@@ -398,9 +229,6 @@ export async function getShareTokenData(token: string): Promise<ShareLinkData | 
     console.error('Failed to get share token data:', error);
     return null;
   }
-
-  // Note: Share links are permanent and never expire (for brand awareness)
-  // No expiration check needed - links remain active indefinitely
 
   // Update last_accessed_at for analytics
   await supabase

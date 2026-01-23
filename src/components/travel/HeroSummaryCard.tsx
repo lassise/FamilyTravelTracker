@@ -216,10 +216,10 @@ const HeroSummaryCard = memo(({
       defaultChecked: resolvedHome.hasStateTracking,
     },
     {
-      id: 'timeline',
+      id: 'memories',
       label: 'Include travel timeline',
-      description: 'Show when you started traveling',
-      defaultChecked: false,
+      description: 'Show trip details, photos, and memories',
+      defaultChecked: true,
     },
   ];
 
