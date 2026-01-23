@@ -26,6 +26,7 @@ const YearWrapped = lazy(() => import("./pages/YearWrapped"));
 const Flights = lazy(() => import("./pages/Flights"));
 const SavedFlights = lazy(() => import("./pages/SavedFlights"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const DiagnosticShare = lazy(() => import("./pages/DiagnosticShare"));
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ const App = () => (
               <Route path="/year-wrapped" element={<YearWrapped />} />
               <Route path="/flights" element={<Flights />} />
               <Route path="/saved-flights" element={<SavedFlights />} />
+              <Route path="/diagnostic/share" element={<DiagnosticShare />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
