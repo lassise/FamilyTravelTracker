@@ -219,7 +219,7 @@ const HeroSummaryCard = memo(({
       id: 'timeline',
       label: 'Include travel timeline',
       description: 'Show when you started traveling',
-      defaultChecked: false,
+      defaultChecked: true,
     },
   ];
 
