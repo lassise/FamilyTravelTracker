@@ -22,16 +22,18 @@ export interface ShareTokenOptions {
   // Note: All share links are permanent (never expire) for brand awareness and sharing
 }
 
+// Simple share link data matching actual database schema
 export interface ShareLinkData {
   id: string;
   token: string;
-  user_id: string;
-  share_type: ShareType;
-  item_id: string | null;
-  included_fields: string[];
+  owner_user_id: string;
+  is_active: boolean;
+  include_stats: boolean;
+  include_countries: boolean;
+  include_memories: boolean;
   created_at: string;
-  expires_at: string | null; // Always null - links are permanent (never expire)
-  view_count: number;
+  last_accessed_at: string | null;
+  // Note: Share links are permanent (never expire) for brand awareness
 }
 
 /**
@@ -104,7 +106,7 @@ async function generateShareTokenLegacy(userId: string, shareType: ShareType): P
           show_photos: true,
           dashboard_share_token: newToken,
         })
-        .select("dashboard_share_token")
+        .select("id, dashboard_share_token, is_public")
         .single();
 
       if (createError) {
@@ -149,7 +151,7 @@ async function generateShareTokenLegacy(userId: string, shareType: ShareType): P
  * Falls back to legacy share_profiles system if share_links table doesn't exist
  */
 export async function generateShareToken(options: ShareTokenOptions): Promise<string> {
-  const { userId, shareType, itemId, includedFields } = options;
+  const { userId, shareType, includedFields } = options;
 
   // Generate secure random token
   const token = generateToken().toLowerCase();
@@ -160,42 +162,21 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
   if (tableExists) {
     try {
       // Create permanent share link (never expires) for brand awareness
-      let insertData: any = {
+      // Using actual database schema: owner_user_id, is_active, include_* flags
+      const insertData = {
         token: token,
-        user_id: userId,
-        share_type: shareType,
-        item_id: itemId || null,
-        included_fields: includedFields,
-        created_at: new Date().toISOString(),
-        expires_at: null, // Permanent link - never expires
-        view_count: 0,
+        owner_user_id: userId,
+        is_active: true, // Always active - permanent links
+        include_stats: includedFields.includes('stats'),
+        include_countries: includedFields.includes('countries'),
+        include_memories: includedFields.includes('memories'),
       };
 
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('share_links')
         .insert(insertData)
         .select()
         .single();
-
-      // If error is about missing column, try without expires_at
-      if (error && (error.message.includes('expires_at') || error.message.includes('column') || error.code === '42703')) {
-        console.warn('expires_at column not found, retrying without it:', error.message);
-        // Remove expires_at and try again
-        delete insertData.expires_at;
-        const retryResult = await supabase
-          .from('share_links')
-          .insert(insertData)
-          .select()
-          .single();
-        
-        if (retryResult.error) {
-          console.warn('share_links insert failed after retry, trying legacy system:', retryResult.error);
-          // Fall through to legacy system
-        } else {
-          data = retryResult.data;
-          error = null;
-        }
-      }
 
       if (!error && data) {
         // Success with new system
@@ -250,54 +231,25 @@ export async function diagnoseShareSystem(userId: string): Promise<ShareDiagnost
     diagnostics.tableExists = shareLinksExists;
 
     if (shareLinksExists) {
-      // Test insert/delete (without expires_at to avoid schema issues)
+      // Test insert/delete
       const testToken = generateToken().toLowerCase();
       const { data, error } = await supabase
         .from('share_links')
         .insert({
           token: testToken,
-          user_id: userId,
-          share_type: 'dashboard',
-          included_fields: ['test'],
-          view_count: 0,
+          owner_user_id: userId,
+          is_active: true,
+          include_stats: true,
+          include_countries: true,
+          include_memories: false,
         })
         .select()
         .single();
 
       if (error) {
-        // If it's a column error, try without expires_at
-        if (error.message.includes('expires_at') || error.message.includes('column') || error.code === '42703') {
-          const retryResult = await supabase
-            .from('share_links')
-            .insert({
-              token: testToken,
-              user_id: userId,
-              share_type: 'dashboard',
-              included_fields: ['test'],
-              view_count: 0,
-            })
-            .select()
-            .single();
-
-          if (retryResult.error) {
-            diagnostics.error = retryResult.error.message;
-            diagnostics.errorDetails = retryResult.error;
-          } else {
-            // Clean up test record
-            await supabase
-              .from('share_links')
-              .delete()
-              .eq('id', retryResult.data.id);
-
-            diagnostics.success = true;
-            diagnostics.method = 'share_links';
-            diagnostics.token = testToken;
-          }
-        } else {
-          diagnostics.error = error.message;
-          diagnostics.errorDetails = error;
-        }
-      } else {
+        diagnostics.error = error.message;
+        diagnostics.errorDetails = error;
+      } else if (data) {
         // Clean up test record
         await supabase
           .from('share_links')
@@ -352,12 +304,12 @@ export async function getShareTokenData(token: string): Promise<ShareLinkData | 
   }
 
   // Note: Share links are permanent and never expire (for brand awareness)
-  // No expiration check needed
+  // No expiration check needed - links remain active indefinitely
 
-  // Increment view count
+  // Update last_accessed_at for analytics
   await supabase
     .from('share_links')
-    .update({ view_count: (data.view_count || 0) + 1 })
+    .update({ last_accessed_at: new Date().toISOString() })
     .eq('id', data.id);
 
   return data as ShareLinkData;
@@ -371,7 +323,7 @@ export async function revokeShareToken(token: string, userId: string): Promise<v
     .from('share_links')
     .delete()
     .eq('token', token.toLowerCase())
-    .eq('user_id', userId);
+    .eq('owner_user_id', userId);
 
   if (error) {
     console.error('Failed to revoke share token:', error);
@@ -382,18 +334,12 @@ export async function revokeShareToken(token: string, userId: string): Promise<v
 /**
  * Get all share links for a user
  */
-export async function getUserShareLinks(userId: string, shareType?: ShareType): Promise<ShareLinkData[]> {
-  let query = supabase
+export async function getUserShareLinks(userId: string): Promise<ShareLinkData[]> {
+  const { data, error } = await supabase
     .from('share_links')
     .select('*')
-    .eq('user_id', userId)
+    .eq('owner_user_id', userId)
     .order('created_at', { ascending: false });
-
-  if (shareType) {
-    query = query.eq('share_type', shareType);
-  }
-
-  const { data, error } = await query;
 
   if (error) {
     console.error('Failed to get user share links:', error);
