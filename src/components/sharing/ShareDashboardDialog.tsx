@@ -95,7 +95,7 @@ export const ShareDashboardDialog = ({ open, onOpenChange }: ShareDashboardDialo
         return;
       }
 
-      // Create if doesn't exist with defaults (all enabled, public)
+      // Create if doesn't exist with defaults (ALL 4 options enabled by default, public)
       if (!profile) {
         const newToken = generateToken();
         const { data: newProfile, error: createError } = await supabase
@@ -103,13 +103,13 @@ export const ShareDashboardDialog = ({ open, onOpenChange }: ShareDashboardDialo
           .insert({
             user_id: user.id,
             is_public: true,
-            show_stats: true,
-            show_map: true,
-            show_countries: true,
-            show_photos: true,
+            show_stats: true,      // Hero Banner - ON by default
+            show_map: true,        // World Map - ON by default
+            show_countries: true,  // Countries List - ON by default
+            show_photos: true,     // Memories (Photos/Timeline) - ON by default
             show_cities: true,
             show_achievements: true,
-            show_timeline: true,
+            show_timeline: true,   // Timeline - ON by default
             show_family_members: true,
             dashboard_share_token: newToken,
           })

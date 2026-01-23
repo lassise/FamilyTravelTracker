@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Globe, ArrowRight } from "lucide-react";
+import { Loader2, Globe, ArrowRight, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
@@ -110,6 +110,7 @@ interface DashboardState {
 }
 
 const PublicDashboard = () => {
+  const navigate = useNavigate();
   const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const debugMode = searchParams.get("debug") === "1";
@@ -243,16 +244,18 @@ const PublicDashboard = () => {
               <p className="text-sm sm:text-base font-medium text-foreground">
                 Want to track your family's adventures?
               </p>
-              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
-                Sign up for Family Travel Tracker for free
-              </p>
-            </div>
-            <Link to="/auth">
-              <Button size="sm" className="whitespace-nowrap">
-                Sign Up Free
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+              Sign up for Family Travel Tracker for free
+            </p>
+          </div>
+          <Button 
+            size="sm" 
+            className="whitespace-nowrap"
+            onClick={() => navigate('/auth?mode=signup')}
+          >
+            Sign Up Free
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
           </div>
         </div>
       </div>
@@ -290,18 +293,20 @@ const PublicDashboard = () => {
           </div>
         )}
 
-        {/* Interactive World Map */}
+        {/* Interactive World Map - Responsive sizing for mobile */}
         {shareSettings.show_map && (
           <div className="mb-8">
-            <InteractiveWorldMap
-              countries={countries}
-              wishlist={[]}
-              homeCountry={owner.homeCountry || null}
-              onRefetch={() => {}}
-              selectedMemberId={null}
-              readOnly
-              stateVisitsOverride={stateVisits}
-            />
+            <div className="h-[300px] sm:h-[400px] md:h-[450px] lg:h-[500px]">
+              <InteractiveWorldMap
+                countries={countries}
+                wishlist={[]}
+                homeCountry={owner.homeCountry || null}
+                onRefetch={() => {}}
+                selectedMemberId={null}
+                readOnly
+                stateVisitsOverride={stateVisits}
+              />
+            </div>
           </div>
         )}
 
@@ -336,7 +341,7 @@ const PublicDashboard = () => {
         )}
 
         {/* Bottom CTA */}
-        <Card className="bg-gradient-to-r from-primary/5 via-background to-secondary/5 border-primary/20">
+        <Card className="bg-gradient-to-r from-primary/5 via-background to-secondary/5 border-primary/20 mb-16">
           <CardContent className="py-8 text-center">
             <Globe className="h-10 w-10 mx-auto text-primary mb-4" />
             <h3 className="text-xl font-semibold mb-2">
@@ -345,12 +350,23 @@ const PublicDashboard = () => {
             <p className="text-muted-foreground mb-4 max-w-md mx-auto">
               Track your family's adventures, discover new destinations, and create lasting memories together.
             </p>
-            <Link to="/auth">
-              <Button size="lg">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                size="lg"
+                onClick={() => navigate('/auth?mode=signup')}
+              >
                 Sign Up for Free
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-            </Link>
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={() => navigate('/auth?mode=signup')}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Install App
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
