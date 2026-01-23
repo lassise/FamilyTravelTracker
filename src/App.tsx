@@ -51,6 +51,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard/:token" element={<PublicDashboard />} />
+              <Route path="/share/dashboard/:token" element={<PublicDashboard />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/onboarding" element={<Onboarding />} />
