@@ -41,7 +41,6 @@ interface Country {
 interface FamilyMember {
   id: string;
   name: string;
-  role: string;
   avatar: string | null;
   color: string;
   countriesVisited: number;

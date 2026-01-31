@@ -11,7 +11,6 @@ import { z } from "zod";
 
 const familyMemberSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(50, "Name must be less than 50 characters"),
-  role: z.string().trim().min(1, "Role is required").max(100, "Role must be less than 100 characters"),
   avatar: z.string().trim().min(1, "Avatar emoji is required").max(10, "Avatar must be an emoji"),
 });
 
@@ -19,7 +18,6 @@ interface FamilyMemberDialogProps {
   member?: {
     id: string;
     name: string;
-    role: string;
     avatar: string;
     color: string;
   };
@@ -36,7 +34,6 @@ const colorOptions = [
 const FamilyMemberDialog = ({ member, onSuccess }: FamilyMemberDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(member?.name || "");
-  const [role, setRole] = useState(member?.role || "");
   const [avatar, setAvatar] = useState(member?.avatar || "");
   const [color, setColor] = useState(member?.color || colorOptions[0].value);
   const [loading, setLoading] = useState(false);
@@ -47,14 +44,13 @@ const FamilyMemberDialog = ({ member, onSuccess }: FamilyMemberDialogProps) => {
     setLoading(true);
 
     try {
-      const validated = familyMemberSchema.parse({ name, role, avatar });
+      const validated = familyMemberSchema.parse({ name, avatar });
 
       if (member) {
         const { error } = await supabase
           .from("family_members")
           .update({
             name: validated.name,
-            role: validated.role,
             avatar: validated.avatar,
             color: color
           })
@@ -73,7 +69,7 @@ const FamilyMemberDialog = ({ member, onSuccess }: FamilyMemberDialogProps) => {
           .from("family_members")
           .insert([{
             name: validated.name,
-            role: validated.role,
+            role: "Family",
             avatar: validated.avatar,
             color: color,
             user_id: user.id
@@ -88,7 +84,6 @@ const FamilyMemberDialog = ({ member, onSuccess }: FamilyMemberDialogProps) => {
       
       // Reset form
       setName("");
-      setRole("");
       setAvatar("");
       setColor(colorOptions[0].value);
     } catch (error) {
@@ -138,17 +133,6 @@ const FamilyMemberDialog = ({ member, onSuccess }: FamilyMemberDialogProps) => {
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter name"
               maxLength={50}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="role">Role</Label>
-            <Input
-              id="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              placeholder="e.g., Chief Planner"
-              maxLength={100}
             />
           </div>
           

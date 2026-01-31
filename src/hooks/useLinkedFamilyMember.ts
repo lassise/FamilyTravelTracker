@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 interface LinkedMember {
   id: string;
   name: string;
-  role: string;
   avatar: string;
   color: string;
 }

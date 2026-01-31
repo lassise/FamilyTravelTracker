@@ -11,6 +11,18 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.local
+.env.*.local
+
+# Migration exports (local data)
+Migration CSVs/
+
+# Local project copies
+FamilyTravelTracker/
+
+# Supabase local temp
+supabase/.temp/
 
 # Editor directories and files
 .vscode/*

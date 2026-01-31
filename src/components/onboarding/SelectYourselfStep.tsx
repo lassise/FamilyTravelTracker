@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 interface FamilyMember {
   id: string;
   name: string;
-  role: string;
   avatar: string;
   color: string;
 }
@@ -99,7 +98,6 @@ const SelectYourselfStep = ({ familyMembers, onSelect }: SelectYourselfStepProps
                 </div>
                 <div>
                   <p className="font-medium text-foreground">{member.name}</p>
-                  <p className="text-sm text-muted-foreground">{member.role}</p>
                 </div>
               </div>
               {selectedId === member.id && (

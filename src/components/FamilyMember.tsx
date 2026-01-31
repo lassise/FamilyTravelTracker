@@ -11,7 +11,6 @@ import type { Country } from "@/hooks/useFamilyData";
 interface FamilyMemberProps {
   id: string;
   name: string;
-  role: string;
   countriesVisited: number;
   avatar: string;
   color: string;
@@ -19,7 +18,7 @@ interface FamilyMemberProps {
   onUpdate: () => void;
 }
 
-const FamilyMember = ({ id, name, role, countriesVisited, avatar, color, countries, onUpdate }: FamilyMemberProps) => {
+const FamilyMember = ({ id, name, countriesVisited, avatar, color, countries, onUpdate }: FamilyMemberProps) => {
   const { toast } = useToast();
   const [earliestYear, setEarliestYear] = useState<number | null>(null);
 
@@ -108,7 +107,6 @@ const FamilyMember = ({ id, name, role, countriesVisited, avatar, color, countri
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-bold text-foreground">{name}</h3>
-              <p className="text-sm text-muted-foreground">{role}</p>
             </div>
           </div>
           
@@ -130,7 +128,7 @@ const FamilyMember = ({ id, name, role, countriesVisited, avatar, color, countri
 
             <div className="flex gap-2 pt-2">
               <FamilyMemberDialog
-                member={{ id, name, role, avatar, color }}
+                member={{ id, name, avatar, color }}
                 onSuccess={onUpdate}
               />
               <Button

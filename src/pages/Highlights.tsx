@@ -59,10 +59,9 @@ interface CityVisit {
   country_id: string;
 }
 
-interface FamilyMember {
+interface HighlightFamilyMember {
   id: string;
   name: string;
-  role: string;
   avatar: string | null;
 }
 
@@ -76,7 +75,7 @@ const Highlights = () => {
   const [photos, setPhotos] = useState<TravelPhoto[]>([]);
   const [visits, setVisits] = useState<CountryVisit[]>([]);
   const [cities, setCities] = useState<CityVisit[]>([]);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<HighlightFamilyMember[]>([]);
   const [visitedCountryIds, setVisitedCountryIds] = useState<Set<string>>(new Set());
 
   const shareUrl = useMemo(() => {
@@ -356,7 +355,7 @@ const Highlights = () => {
               {familyMembers.map((member) => (
                 <Badge key={member.id} variant="secondary" className="px-4 py-2 text-sm">
                   <span className="mr-2">{member.avatar || "👤"}</span>
-                  {member.name} <span className="text-muted-foreground ml-1">({member.role})</span>
+                  {member.name}
                 </Badge>
               ))}
             </div>

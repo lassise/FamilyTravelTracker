@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Country } from "@/hooks/useFamilyData";
 import { getCountryMetadataByName } from "@/lib/countryMetadata";
-import { getAllCountries } from "@/lib/countriesData";
+import { getAllCountries, getEffectiveFlagCode } from "@/lib/countriesData";
+import CountryFlag from "@/components/common/CountryFlag";
 import { LucideIcon, Waves, Mountain, TreePine, Sparkles, Globe } from "lucide-react";
 
 export type GeographicType = "islands" | "landlocked" | "coastal" | "g7" | "g20";
@@ -77,11 +78,6 @@ const GeographicDetailsDialog = ({ type, countries, children }: GeographicDetail
     return config.filter(metadata);
   });
 
-  const getFlag = (countryName: string) => {
-    const countryData = allCountriesData.find(c => c.name === countryName);
-    return countryData?.flag || "🏳️";
-  };
-
   const Icon = config.icon;
 
   return (
@@ -103,12 +99,19 @@ const GeographicDetailsDialog = ({ type, countries, children }: GeographicDetail
             <div className="space-y-2">
               {filteredCountries.map((country) => {
                 const metadata = getCountryMetadataByName(country.name);
+                const { code, isSubdivision } = getEffectiveFlagCode(country.name, country.flag);
                 return (
                   <div 
                     key={country.id}
                     className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
                   >
-                    <span className="text-2xl">{getFlag(country.name)}</span>
+                    <span className="inline-flex shrink-0">
+                      {isSubdivision || code ? (
+                        <CountryFlag countryCode={code} countryName={country.name} size="md" />
+                      ) : (
+                        <span className="text-2xl">{allCountriesData.find(c => c.name === country.name)?.flag || "🏳️"}</span>
+                      )}
+                    </span>
                     <div className="flex-1">
                       <p className="font-medium text-foreground">{country.name}</p>
                       {metadata && (

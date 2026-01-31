@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 export interface FamilyMember {
   id: string;
   name: string;
-  role: string;
   avatar: string;
   color: string;
   countriesVisited: number;
@@ -138,10 +137,13 @@ export const useFamilyData = () => {
       }
 
       // Map data with O(1) lookups
-      const membersWithCount = membersData.map((member) => ({
-        ...member,
-        countriesVisited: countriesByMember.get(member.id)?.size || 0
-      }));
+      const membersWithCount = membersData.map((member) => {
+        const { role: _role, ...rest } = member;
+        return {
+          ...rest,
+          countriesVisited: countriesByMember.get(member.id)?.size || 0
+        };
+      });
 
       const countriesWithVisits = countriesData.map((country) => {
         const memberSet = visitsByCountry.get(country.id);

@@ -5,7 +5,6 @@ import { Progress } from "@/components/ui/progress";
 interface LinkedMember {
   id: string;
   name: string;
-  role: string;
   avatar: string;
   color: string;
 }
@@ -66,7 +65,6 @@ const PersonalTravelSummary = ({
           </div>
           <div>
             <CardTitle className="text-2xl">{linkedMember.name}'s Travel History</CardTitle>
-            <p className="text-muted-foreground">{linkedMember.role}</p>
           </div>
         </div>
       </CardHeader>

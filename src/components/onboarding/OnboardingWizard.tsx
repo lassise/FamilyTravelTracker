@@ -27,7 +27,7 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const [isSoloTraveler, setIsSoloTraveler] = useState(false);
   const [userName, setUserName] = useState<string>("");
 
-  // Build steps: Countries → Preferences → Family members (new order)
+  // Build steps: Family members first, then countries with checkboxes
   const steps = [
     {
       title: "Welcome to Your Travel Companion!",
@@ -42,6 +42,18 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       component: <YourNameStep onNameSaved={setUserName} />,
     },
     {
+      title: "Who's Traveling?",
+      description: "Add yourself first, then anyone else you'd like to track travels for.",
+      icon: Users,
+      component: (
+        <FamilyMembersStep 
+          onMembersChange={setFamilyMembers}
+          onSoloMode={setIsSoloTraveler}
+          suggestedName={userName}
+        />
+      ),
+    },
+    {
       title: "Where's Home?",
       description: "Select your home country. It will be displayed on the map but won't count as visited.",
       icon: Home,
@@ -53,7 +65,7 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
     },
     {
       title: "Countries You've Visited",
-      description: "Add countries you've already explored. You can add details later.",
+      description: "Check the countries you've explored. Select who visited each. Add trip details later for analytics and achievements.",
       icon: Globe,
       component: (
         <CountriesStep 
@@ -66,18 +78,6 @@ const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       description: "Help us personalize your experience with a few quick questions.",
       icon: Heart,
       component: <TravelPreferencesStep />,
-    },
-    {
-      title: "Who's Traveling?",
-      description: "Add yourself first, then add anyone else you'd like to track travels for.",
-      icon: Users,
-      component: (
-        <FamilyMembersStep 
-          onMembersChange={setFamilyMembers}
-          onSoloMode={setIsSoloTraveler}
-          suggestedName={userName}
-        />
-      ),
     },
   ];
 

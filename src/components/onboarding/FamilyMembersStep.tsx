@@ -11,7 +11,6 @@ import { z } from "zod";
 
 const memberSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(50, "Name too long"),
-  role: z.string().trim().min(1, "Role is required").max(30, "Role too long"),
 });
 
 interface FamilyMembersStepProps {
@@ -20,19 +19,17 @@ interface FamilyMembersStepProps {
   suggestedName?: string;
 }
 
-const ROLE_SUGGESTIONS = ["Me", "Partner", "Son", "Daughter", "Dad", "Mom", "Friend"];
 const SPOUSE_QUICK_ADD = [
-  { label: "Add Husband", role: "Husband", avatar: "👨" },
-  { label: "Add Wife", role: "Wife", avatar: "👩" },
-  { label: "Add Spouse", role: "Spouse", avatar: "🧑" },
+  { label: "Add Husband", name: "Husband", avatar: "👨" },
+  { label: "Add Wife", name: "Wife", avatar: "👩" },
+  { label: "Add Spouse", name: "Spouse", avatar: "🧑" },
 ];
 const AVATAR_EMOJIS = ["🧑", "👨", "👩", "👦", "👧", "👴", "👵", "👶"];
 const COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F"];
 
 const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: FamilyMembersStepProps) => {
-  const [members, setMembers] = useState<Array<{ id: string; name: string; role: string; avatar: string; color: string }>>([]);
+  const [members, setMembers] = useState<Array<{ id: string; name: string; avatar: string; color: string }>>([]);
   const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState("Me");
   const [loading, setLoading] = useState(false);
   const [hasAutoFilled, setHasAutoFilled] = useState(false);
   const { toast } = useToast();
@@ -67,7 +64,7 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
 
   const handleAddMember = async () => {
     try {
-      const validated = memberSchema.parse({ name: newName, role: newRole || "Family" });
+      const validated = memberSchema.parse({ name: newName });
       
       setLoading(true);
       const avatar = AVATAR_EMOJIS[members.length % AVATAR_EMOJIS.length];
@@ -84,7 +81,7 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
         .from("family_members")
         .insert([{
           name: validated.name,
-          role: validated.role,
+          role: "Family",
           avatar,
           color,
           user_id: user.id,
@@ -96,7 +93,6 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
 
       setMembers([...members, data]);
       setNewName("");
-      setNewRole("");
       toast({ title: `${validated.name} added!` });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -131,8 +127,8 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
       const { data, error } = await supabase
         .from("family_members")
         .insert([{
-          name: spouseOption.role,
-          role: spouseOption.role,
+          name: spouseOption.name,
+          role: "Family",
           avatar: spouseOption.avatar,
           color,
           user_id: user.id,
@@ -143,7 +139,7 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
       if (error) throw error;
 
       setMembers([...members, data]);
-      toast({ title: `${spouseOption.role} added! You can edit their name anytime.` });
+      toast({ title: `${spouseOption.name} added! You can edit their name anytime.` });
     } catch (error) {
       toast({ title: "Failed to add", variant: "destructive" });
     } finally {
@@ -175,7 +171,7 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <div>
           <Label htmlFor="name">Name</Label>
           <Input
@@ -186,29 +182,6 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
             onKeyDown={(e) => e.key === "Enter" && handleAddMember()}
           />
         </div>
-        <div>
-          <Label htmlFor="role">Role (optional)</Label>
-          <Input
-            id="role"
-            placeholder="e.g., Dad, Mom, Son"
-            value={newRole}
-            onChange={(e) => setNewRole(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddMember()}
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {ROLE_SUGGESTIONS.map((role) => (
-          <Badge
-            key={role}
-            variant="outline"
-            className="cursor-pointer hover:bg-primary/10"
-            onClick={() => setNewRole(role)}
-          >
-            {role}
-          </Badge>
-        ))}
       </div>
 
       <Button onClick={handleAddMember} disabled={loading || !newName.trim()} className="w-full">
@@ -234,7 +207,6 @@ const FamilyMembersStep = ({ onMembersChange, onSoloMode, suggestedName }: Famil
                     </div>
                     <div>
                       <p className="font-medium">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.role}</p>
                     </div>
                   </div>
                   <Button
