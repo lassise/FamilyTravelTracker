@@ -64,12 +64,6 @@ function generateToken(): string {
 export async function generateShareToken(options: ShareTokenOptions): Promise<string> {
   const { userId, shareType, includedFields } = options;
 
-  // DEV logging for verification
-  console.log('[ShareToken] === generateShareToken called ===');
-  console.log('[ShareToken] User ID:', userId);
-  console.log('[ShareToken] Share Type:', shareType);
-  console.log('[ShareToken] Included Fields:', includedFields);
-
   // Derive boolean flags from includedFields
   const includeStats = includedFields.includes('stats');
   const includeCountries = includedFields.includes('countries');
@@ -84,10 +78,7 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
       .eq('is_active', true)
       .maybeSingle();
 
-    console.log('[ShareToken] Existing link check:', { existingLink, fetchError });
-
     if (fetchError) {
-      console.error('[ShareToken] Error checking existing link:', fetchError);
       throw new Error(`Failed to check existing share links: ${fetchError.message}`);
     }
 
@@ -96,7 +87,6 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
     if (existingLink) {
       // User already has a share link - UPDATE settings, KEEP the same token for stable URL
       finalToken = existingLink.token;
-      console.log('[ShareToken] Updating existing link, keeping token:', finalToken);
       
       const { error: updateError } = await supabase
         .from('share_links')
@@ -109,14 +99,11 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
         .eq('id', existingLink.id);
 
       if (updateError) {
-        console.error('[ShareToken] Update failed:', updateError);
         throw new Error(`Failed to update share link: ${updateError.message}`);
       }
-      console.log('[ShareToken] Update successful');
     } else {
       // No existing link - CREATE new one
       finalToken = generateToken(); // Always lowercase hex
-      console.log('[ShareToken] Creating NEW share link with token:', finalToken);
       
       const { error: insertError } = await supabase
         .from('share_links')
@@ -130,10 +117,8 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
         });
 
       if (insertError) {
-        console.error('[ShareToken] Insert failed:', insertError);
         throw new Error(`Failed to create share link: ${insertError.message}`);
       }
-      console.log('[ShareToken] Insert successful');
     }
 
     // Build the share URL
@@ -159,10 +144,8 @@ export async function generateShareToken(options: ShareTokenOptions): Promise<st
         url = `${baseUrl}/share/${finalToken}`;
     }
     
-    console.log('[ShareToken] SUCCESS! Generated URL:', url);
     return url;
   } catch (err: any) {
-    console.error('[ShareToken] FAILED:', err);
     throw err;
   }
 }

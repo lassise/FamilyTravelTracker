@@ -193,15 +193,11 @@ const PublicDashboard = () => {
         return;
       }
 
-      console.log("[PublicDashboard] Fetching dashboard for token:", token);
-
       try {
         // Call Edge Function - ONLY data source for this page
         const { data, error } = await supabase.functions.invoke("get-public-dashboard", {
           body: { token },
         });
-
-        console.log("[PublicDashboard] Edge function response:", { ok: data?.ok, error: error?.message });
 
         if (error) throw error;
 
@@ -223,13 +219,7 @@ const PublicDashboard = () => {
           debug: data.debug,
         });
         
-        console.log("[PublicDashboard] Data loaded successfully:", {
-          familyMembers: data.data.familyMembers?.length,
-          visitDetails: data.data.visitDetails?.length,
-          photos: data.data.photos?.length,
-        });
       } catch (err) {
-        console.error("[PublicDashboard] Edge Function error", err);
         setState({
           loading: false,
           error: err instanceof Error ? err.message : "Failed to load dashboard",
