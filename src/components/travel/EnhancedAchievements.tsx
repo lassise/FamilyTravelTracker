@@ -149,9 +149,14 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Validate target_count
+    const targetCount = newGoal.target_count < 1 ? 1 : newGoal.target_count;
+
     const { error } = await supabase.from('travel_goals').insert({
       user_id: user.id,
-      ...newGoal,
+      title: newGoal.title,
+      target_count: targetCount,
+      goal_type: newGoal.goal_type,
       deadline: newGoal.deadline || null,
     });
 
@@ -160,6 +165,8 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
       setIsAddingGoal(false);
       setNewGoal({ title: '', target_count: 5, goal_type: 'countries', deadline: '' });
       fetchGoals();
+    } else {
+      toast({ title: 'Error adding goal', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -309,8 +316,13 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                     <Input 
                       type="number" 
                       min={1}
-                      value={newGoal.target_count}
-                      onChange={(e) => setNewGoal({ ...newGoal, target_count: parseInt(e.target.value) || 1 })}
+                      value={newGoal.target_count === 0 ? '' : newGoal.target_count}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // Allow empty during editing, parse to number or 0
+                        setNewGoal({ ...newGoal, target_count: val === '' ? 0 : parseInt(val) || 0 });
+                      }}
+                      placeholder="Enter target"
                     />
                   </div>
                 </div>
@@ -322,7 +334,11 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                     onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
                   />
                 </div>
-                <Button onClick={handleAddGoal} className="w-full">
+                <Button 
+                  onClick={handleAddGoal} 
+                  className="w-full"
+                  disabled={!newGoal.title.trim() || newGoal.target_count < 1}
+                >
                   Create Goal
                 </Button>
               </div>
