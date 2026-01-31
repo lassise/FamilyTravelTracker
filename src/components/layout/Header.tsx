@@ -16,7 +16,8 @@ import {
   PlaneTakeoff,
   Bell,
   Sparkles,
-  Plane
+  Plane,
+  Crown
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -43,21 +44,21 @@ const Header = () => {
       .slice(0, 2);
   };
 
-  // Primary nav - main features
+  // Primary nav - main features (premium = paid feature)
   const primaryLinks = [
-    { href: "/", label: "Dashboard", icon: Globe },
-    { href: "/family", label: "Travel Tracker", icon: Map },
-    { href: "/flights", label: "Flights", icon: PlaneTakeoff },
-    { href: "/trips/new", label: "AI Travel Planner", icon: Sparkles },
+    { href: "/", label: "Dashboard", icon: Globe, premium: false },
+    { href: "/family", label: "Travel Tracker", icon: Map, premium: false },
+    { href: "/flights", label: "Flights", icon: PlaneTakeoff, premium: true },
+    { href: "/trips/new", label: "AI Travel Planner", icon: Sparkles, premium: true },
   ];
 
   // Trip planning links
   const tripPlanningLinks = [
-    { href: "/trips", label: "My Trips", icon: Luggage },
-    { href: "/trips/new", label: "Plan New Trip", icon: Plus },
-    { href: "/flights", label: "Find Flights", icon: PlaneTakeoff },
-    { href: "/saved-flights", label: "Saved Flights", icon: Bell },
-    { href: "/explore", label: "Explore Destinations", icon: Map },
+    { href: "/trips", label: "My Trips", icon: Luggage, premium: false },
+    { href: "/trips/new", label: "Plan New Trip", icon: Plus, premium: true },
+    { href: "/flights", label: "Find Flights", icon: PlaneTakeoff, premium: true },
+    { href: "/saved-flights", label: "Saved Flights", icon: Bell, premium: true },
+    { href: "/explore", label: "Explore Destinations", icon: Map, premium: false },
   ];
 
   // Profile links
@@ -92,13 +93,14 @@ const Header = () => {
             <Link
               key={link.href}
               to={link.href}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                 isActive(link.href)
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
               {link.label}
+              {link.premium && <Crown className="h-4 w-4 text-amber-500" title="Premium" />}
             </Link>
           ))}
         </nav>
@@ -170,8 +172,9 @@ const Header = () => {
                           : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
-                      <Icon className="h-5 w-5" />
-                      {link.label}
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <span className="flex-1 text-left">{link.label}</span>
+                      {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" title="Premium" />}
                     </button>
                   );
                 })}
@@ -194,8 +197,9 @@ const Header = () => {
                               : "text-muted-foreground hover:text-foreground hover:bg-muted"
                           }`}
                         >
-                          <Icon className="h-5 w-5" />
-                          {link.label}
+                          <Icon className="h-5 w-5 shrink-0" />
+                          <span className="flex-1 text-left">{link.label}</span>
+                          {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" title="Premium" />}
                         </button>
                       );
                     })}

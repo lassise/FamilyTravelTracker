@@ -41,7 +41,8 @@ import {
   Trophy,
   BarChart3,
   PlaneTakeoff,
-  Compass
+  Compass,
+  Crown
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -344,7 +345,8 @@ const Dashboard = () => {
               className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/50 group"
               onClick={() => navigate("/trips/new")}
             >
-              <CardContent className="flex flex-col items-center gap-3 p-4 text-center">
+              <CardContent className="flex flex-col items-center gap-3 p-4 text-center relative">
+                <Crown className="absolute top-2 right-2 h-4 w-4 text-amber-500" title="Premium" />
                 <div className="w-12 h-12 rounded-full bg-gradient-hero flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Sparkles className="h-6 w-6 text-primary-foreground" />
                 </div>
@@ -359,7 +361,8 @@ const Dashboard = () => {
               className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/50 group"
               onClick={() => navigate("/flights")}
             >
-              <CardContent className="flex flex-col items-center gap-3 p-4 text-center">
+              <CardContent className="flex flex-col items-center gap-3 p-4 text-center relative">
+                <Crown className="absolute top-2 right-2 h-4 w-4 text-amber-500" title="Premium" />
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <PlaneTakeoff className="h-6 w-6 text-primary" />
                 </div>
@@ -462,11 +465,12 @@ const Dashboard = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* AI Travel Planner Card - Always First */}
+              {/* AI Travel Planner Card - Always First (Premium) */}
               <Card 
-                className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5"
+                className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5 relative"
                 onClick={() => navigate("/trips/new")}
               >
+                <Crown className="absolute top-3 right-3 h-5 w-5 text-amber-500" title="Premium" />
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center h-full">
                   <div className="w-16 h-16 rounded-full bg-gradient-hero flex items-center justify-center mb-4">
                     <Sparkles className="h-8 w-8 text-primary-foreground" />

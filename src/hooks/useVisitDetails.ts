@@ -65,11 +65,11 @@ export const useVisitDetails = () => {
 
       if (visitsResult.error) throw visitsResult.error;
       if (citiesResult.error) throw citiesResult.error;
-      if (settingsResult.error) throw settingsResult.error;
+      if (!settingsResult.error) setTravelSettings(settingsResult.data);
+      else setTravelSettings(null);
 
       setVisitDetails(visitsResult.data || []);
       setCityVisits(citiesResult.data || []);
-      setTravelSettings(settingsResult.data);
     } catch (error) {
       console.error("Error fetching visit details:", error);
     } finally {

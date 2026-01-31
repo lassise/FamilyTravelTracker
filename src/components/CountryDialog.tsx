@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -27,7 +27,7 @@ interface CountryDialogProps {
     continent: string;
   };
   familyMembers?: Array<{ id: string; name: string }>;
-  onSuccess: () => void;
+  onSuccess: (newCountryId?: string) => void;
 }
 
 const allCountries = getAllCountries();
@@ -42,6 +42,13 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  // Auto-select sole family member when opening to add; sync when family members change
+  useEffect(() => {
+    if (open && !country) {
+      setSelectedMembers(familyMembers.length === 1 ? familyMembers.map(m => m.id) : []);
+    }
+  }, [open, country, familyMembers]);
+
   const handleCountrySelect = (countryOption: CountryOption) => {
     setSelectedCountry(countryOption);
     setComboboxOpen(false);
@@ -55,6 +62,26 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
       toast({
         title: "Validation Error",
         description: "Please select a country",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!country && familyMembers.length === 0) {
+      toast({
+        title: "Add family members first",
+        description: "Add at least one family member to track which family members have been where.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!country && selectedMembers.length === 0) {
+      toast({
+        title: "Select who has been here",
+        description: "At least one family member must be selected — the app tracks which family members have been where.",
         variant: "destructive",
       });
       setLoading(false);
@@ -100,9 +127,10 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
 
         if (error) throw error;
 
-        // Add country visits for selected members
-        if (newCountry && selectedMembers.length > 0) {
-          const visits = selectedMembers.map(memberId => ({
+        // Add country visits — required: at least one family member who has been there
+        const membersToAdd = familyMembers.length === 1 ? familyMembers.map(m => m.id) : selectedMembers;
+        if (newCountry && membersToAdd.length > 0) {
+          const visits = membersToAdd.map(memberId => ({
             country_id: newCountry.id,
             family_member_id: memberId,
             user_id: user.id
@@ -113,9 +141,24 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
             .insert(visits);
           
           if (visitsError) throw visitsError;
+        } else if (newCountry && membersToAdd.length === 0) {
+          // Should not reach here due to validation above; delete orphan country if it does
+          await supabase.from("countries").delete().eq("id", newCountry.id);
+          toast({
+            title: "Select who has been here",
+            description: "At least one family member must be selected.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
         }
 
         toast({ title: "Country added successfully!" });
+        setOpen(false);
+        setSelectedCountry(null);
+        setSelectedMembers([]);
+        onSuccess(newCountry.id);
+        return;
       }
 
       setOpen(false);
@@ -218,7 +261,7 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
 
           {!country && familyMembers.length > 0 && (
             <div>
-              <Label>Visited By (Optional)</Label>
+              <Label>Who has been here? (Required)</Label>
               <div className="space-y-2 mt-2">
                 {familyMembers.map((member) => (
                   <div key={member.id} className="flex items-center gap-2">
@@ -249,7 +292,10 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading || (!country && familyMembers.length > 1 && selectedMembers.length === 0)}
+            >
               {loading ? "Saving..." : country ? "Update" : "Add"}
             </Button>
           </div>

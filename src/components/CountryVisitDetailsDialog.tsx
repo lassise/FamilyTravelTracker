@@ -633,73 +633,54 @@ const CountryVisitDetailsDialog = ({
         return;
       }
 
-      // Insert all new visits
-      for (const draft of newVisits) {
-        const visitData = {
-          country_id: countryId,
-          trip_name: draft.tripName || null,
-          is_approximate: draft.isApproximate,
-          approximate_month: draft.approximateMonth,
-          approximate_year: draft.approximateYear,
-          visit_date: draft.visitDate,
-          end_date: draft.endDate,
-          number_of_days: draft.numberOfDays,
-          user_id: user.id,
-        };
+      // Use RPC exclusively (SECURITY DEFINER bypasses RLS)
+      // RPC also handles visit_family_members, city_visits, and country_visits
+      const knownCities = new Set(cityVisits.map((c) => c.city_name.toLowerCase()));
 
-        const { data: insertedVisit, error: visitError } = await supabase
-          .from("country_visit_details")
-          .insert(visitData)
-          .select()
-          .single();
+      for (const draft of newVisits) {
+        const newCities = draft.cities.filter(
+          (city) => !knownCities.has(city.toLowerCase())
+        );
+        newCities.forEach((c) => knownCities.add(c.toLowerCase()));
+
+        const membersForVisit =
+          draft.familyMemberIds.length > 0 ? draft.familyMemberIds : familyMembers.map((m) => m.id);
+
+        const { data: insertedVisit, error: visitError } = await supabase.rpc(
+          "insert_country_visit_detail",
+          {
+            p_country_id: countryId,
+            p_trip_name: draft.tripName || null,
+            p_is_approximate: draft.isApproximate,
+            p_approximate_month: draft.approximateMonth,
+            p_approximate_year: draft.approximateYear,
+            p_visit_date: draft.visitDate,
+            p_end_date: draft.endDate,
+            p_number_of_days: draft.numberOfDays,
+            p_family_member_ids: membersForVisit.length > 0 ? membersForVisit : null,
+            p_cities: newCities.length > 0 ? newCities : null,
+          }
+        );
 
         if (visitError) throw visitError;
-
-        // Insert family member associations
-        if (draft.familyMemberIds.length > 0 && insertedVisit) {
-          const familyInserts = draft.familyMemberIds.map((memberId) => ({
-            visit_id: insertedVisit.id,
-            family_member_id: memberId,
-            user_id: user.id,
-          }));
-
-          const { error: familyError } = await supabase
-            .from("visit_family_members")
-            .insert(familyInserts);
-
-          if (familyError) console.error("Error saving family members:", familyError);
-        }
-
-        // Insert cities for this visit
-        if (draft.cities.length > 0) {
-          const cityInserts = draft.cities.map((city) => ({
-            country_id: countryId,
-            city_name: city,
-            user_id: user.id,
-          }));
-
-          // Check for duplicates first
-          const existingCities = cityVisits.map((c) => c.city_name.toLowerCase());
-          const newCities = cityInserts.filter(
-            (c) => !existingCities.includes(c.city_name.toLowerCase())
-          );
-
-          if (newCities.length > 0) {
-            const { error: cityError } = await supabase
-              .from("city_visits")
-              .insert(newCities);
-
-            if (cityError) throw cityError;
-          }
+        if (!insertedVisit?.id) {
+          throw new Error("Insert succeeded but no visit returned");
         }
       }
 
       toast({ title: `Added ${newVisits.length} visit${newVisits.length > 1 ? "s" : ""}` });
       setNewVisits([]);
-      fetchData();
-    } catch (error) {
+      await fetchData();
+      onUpdate();
+    } catch (error: unknown) {
       console.error("Error saving visits:", error);
-      toast({ title: "Error saving visits", variant: "destructive" });
+      const msg = error && typeof error === "object" && "message" in error ? String((error as { message?: string }).message) : "Error saving visits";
+      const hint = error && typeof error === "object" && "hint" in error ? String((error as { hint?: string }).hint) : "";
+      toast({
+        title: "Error saving visits",
+        description: msg + (hint ? ` (${hint})` : ""),
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -810,6 +791,37 @@ const CountryVisitDetailsDialog = ({
         return;
       }
 
+      // Save new visits first (use RPC - includes country_visits)
+      if (newVisits.length > 0) {
+        const knownCities = new Set(cityVisits.map((c) => c.city_name.toLowerCase()));
+        for (const draft of newVisits) {
+          const newCities = draft.cities.filter(
+            (city) => !knownCities.has(city.toLowerCase())
+          );
+          newCities.forEach((c) => knownCities.add(c.toLowerCase()));
+          const membersForVisit =
+            draft.familyMemberIds.length > 0 ? draft.familyMemberIds : familyMembers.map((m) => m.id);
+          const { data: insertedVisit, error: visitError } = await supabase.rpc(
+            "insert_country_visit_detail",
+            {
+              p_country_id: countryId,
+              p_trip_name: draft.tripName || null,
+              p_is_approximate: draft.isApproximate,
+              p_approximate_month: draft.approximateMonth,
+              p_approximate_year: draft.approximateYear,
+              p_visit_date: draft.visitDate,
+              p_end_date: draft.endDate,
+              p_number_of_days: draft.numberOfDays,
+              p_family_member_ids: membersForVisit.length > 0 ? membersForVisit : null,
+              p_cities: newCities.length > 0 ? newCities : null,
+            }
+          );
+          if (visitError) throw visitError;
+          if (!insertedVisit?.id) throw new Error("Insert succeeded but no visit returned");
+        }
+        setNewVisits([]);
+      }
+
       // Save all visit changes
       for (const [visitId, changes] of Object.entries(pendingChanges)) {
         if (Object.keys(changes).length > 0) {
@@ -908,7 +920,8 @@ const CountryVisitDetailsDialog = ({
       setPendingCityDeletions([]);
       setPendingFamilyMemberChanges({});
       
-      fetchData();
+      await fetchData();
+      onUpdate();
       toast({ title: "All changes saved successfully" });
     } catch (error) {
       console.error("Error saving changes:", error);
@@ -919,6 +932,7 @@ const CountryVisitDetailsDialog = ({
   };
 
   const handleCancelAllChanges = () => {
+    setNewVisits([]);
     setPendingChanges({});
     setPendingCityAdditions([]);
     setPendingCityDeletions([]);
@@ -926,6 +940,7 @@ const CountryVisitDetailsDialog = ({
   };
 
   const hasAnyPendingChanges = () => {
+    if (newVisits.length > 0) return true;
     const hasVisitChanges = Object.values(pendingChanges).some(
       changes => changes && Object.keys(changes).length > 0
     );
@@ -933,7 +948,6 @@ const CountryVisitDetailsDialog = ({
     const hasFamilyMemberChanges = Object.keys(pendingFamilyMemberChanges).some(visitId => {
       const originalMembers = visitFamilyMembers[visitId] || [];
       const pendingMembers = pendingFamilyMemberChanges[visitId] || [];
-      // Check if arrays are different
       if (originalMembers.length !== pendingMembers.length) return true;
       return !originalMembers.every(id => pendingMembers.includes(id)) ||
              !pendingMembers.every(id => originalMembers.includes(id));
@@ -950,7 +964,8 @@ const CountryVisitDetailsDialog = ({
     if (error) {
       toast({ title: "Error deleting visit", variant: "destructive" });
     } else {
-      fetchData();
+      await fetchData();
+      onUpdate();
     }
   };
 

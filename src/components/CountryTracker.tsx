@@ -207,7 +207,16 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
             Our family's travel journey across the world
           </p>
-          <CountryDialog familyMembers={familyMembers} onSuccess={handleUpdate} />
+          <CountryDialog
+            familyMembers={familyMembers}
+            onSuccess={(newCountryId) => {
+              handleUpdate();
+              if (newCountryId) {
+                setExpandedCountries((prev) => new Set([...prev, newCountryId]));
+                setVisitDetailsDialogOpen((prev) => ({ ...prev, [newCountryId]: true }));
+              }
+            }}
+          />
         </div>
 
         {/* Filters */}

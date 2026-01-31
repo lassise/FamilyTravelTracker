@@ -13,7 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Trophy, Target, Star, Globe, Map, Plane, Award, Medal, 
-  Crown, Gem, Plus, Calendar, Trash2, ChevronDown, Check
+  Crown, Gem, Plus, Calendar, Trash2, ChevronDown, Check,
+  Compass, MapPin, Footprints, Mountain
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -56,21 +57,21 @@ const ACHIEVEMENTS: Achievement[] = [
   { key: 'thirty_countries', name: 'World Traveler', description: 'Visit 30 countries', icon: Award, color: 'bg-orange-500', requirement: 30, type: 'countries', rarity: 'rare', hint: 'Visit 30 countries to unlock this rare badge' },
   { key: 'forty_countries', name: 'Elite Explorer', description: 'Visit 40 countries', icon: Crown, color: 'bg-rose-500', requirement: 40, type: 'countries', rarity: 'legendary', hint: 'Visit 40 countries to unlock this legendary badge' },
   { key: 'fifty_countries', name: 'Legendary', description: 'Visit 50 countries', icon: Gem, color: 'bg-violet-500', requirement: 50, type: 'countries', rarity: 'legendary', hint: 'Visit 50 countries to unlock this legendary badge' },
-  { key: 'seventyfive_countries', name: 'Three Quarters', description: 'Visit 75 countries', icon: Star, color: 'bg-gradient-to-r from-indigo-500 to-purple-500', requirement: 75, type: 'countries', rarity: 'legendary', hint: 'Visit 75 countries to unlock this legendary badge' },
+  { key: 'seventyfive_countries', name: 'Three Quarters', description: 'Visit 75 countries', icon: Compass, color: 'bg-gradient-to-r from-indigo-500 to-purple-500', requirement: 75, type: 'countries', rarity: 'legendary', hint: 'Visit 75 countries to unlock this legendary badge' },
   { key: 'hundred_countries', name: 'Century Club', description: 'Visit 100 countries', icon: Trophy, color: 'bg-gradient-to-r from-amber-500 to-yellow-500', requirement: 100, type: 'countries', rarity: 'legendary', hint: 'Join the elite Century Club by visiting 100 countries' },
-  { key: 'hundredfifty_countries', name: 'Master Explorer', description: 'Visit 150 countries', icon: Crown, color: 'bg-gradient-to-r from-rose-500 to-pink-500', requirement: 150, type: 'countries', rarity: 'legendary', hint: 'Visit 150 countries - you are a true master explorer!' },
+  { key: 'hundredfifty_countries', name: 'Master Explorer', description: 'Visit 150 countries', icon: Mountain, color: 'bg-gradient-to-r from-rose-500 to-pink-500', requirement: 150, type: 'countries', rarity: 'legendary', hint: 'Visit 150 countries - you are a true master explorer!' },
   // Continent milestones
-  { key: 'two_continents', name: 'Continental Start', description: 'Visit 2 continents', icon: Globe, color: 'bg-teal-500', requirement: 2, type: 'continents', rarity: 'common', hint: 'Explore 2 continents to unlock' },
-  { key: 'three_continents', name: 'Continental', description: 'Visit 3 continents', icon: Map, color: 'bg-indigo-500', requirement: 3, type: 'continents', rarity: 'common', hint: 'Explore 3 continents to unlock' },
+  { key: 'two_continents', name: 'Continental Start', description: 'Visit 2 continents', icon: MapPin, color: 'bg-teal-500', requirement: 2, type: 'continents', rarity: 'common', hint: 'Explore 2 continents to unlock' },
+  { key: 'three_continents', name: 'Continental', description: 'Visit 3 continents', icon: Footprints, color: 'bg-indigo-500', requirement: 3, type: 'continents', rarity: 'common', hint: 'Explore 3 continents to unlock' },
   { key: 'five_continents', name: 'Global Citizen', description: 'Visit 5 continents', icon: Plane, color: 'bg-pink-500', requirement: 5, type: 'continents', rarity: 'rare', hint: 'Explore 5 continents to unlock this rare badge' },
   { key: 'six_continents', name: 'Almost There', description: 'Visit 6 continents', icon: Star, color: 'bg-fuchsia-500', requirement: 6, type: 'continents', rarity: 'rare', hint: 'Just one more continent after this!' },
   { key: 'all_continents', name: 'World Conqueror', description: 'Visit all 7 continents', icon: Crown, color: 'bg-gradient-to-r from-purple-500 to-pink-500', requirement: 7, type: 'continents', rarity: 'legendary', hint: 'Visit all 7 continents including Antarctica!' },
 ];
 
 const rarityStyles = {
-  common: { border: 'border-muted', badge: 'bg-muted text-muted-foreground', glow: '' },
-  rare: { border: 'border-blue-500/50', badge: 'bg-blue-500/20 text-blue-500', glow: 'shadow-blue-500/20' },
-  legendary: { border: 'border-amber-500/50', badge: 'bg-amber-500/20 text-amber-500', glow: 'shadow-amber-500/30 shadow-lg' },
+  common: { border: 'border-emerald-500/40', badge: 'bg-emerald-500/20 text-emerald-600', glow: 'shadow-emerald-500/25 shadow-md' },
+  rare: { border: 'border-blue-500/60', badge: 'bg-blue-500/20 text-blue-600', glow: 'shadow-blue-500/30 shadow-lg' },
+  legendary: { border: 'border-amber-500/70', badge: 'bg-amber-500/20 text-amber-600', glow: 'shadow-amber-500/40 shadow-xl' },
 };
 
 const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: EnhancedAchievementsProps) => {
@@ -198,9 +199,12 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
     return labels[goalType] || goalType;
   };
 
-  // Separate earned and locked achievements
-  const earnedList = ACHIEVEMENTS.filter(a => earnedAchievements.includes(a.key));
-  const lockedList = ACHIEVEMENTS.filter(a => !earnedAchievements.includes(a.key));
+  // Separate earned and locked (earned = in DB OR progress met)
+  const earnedList = ACHIEVEMENTS.filter(a => {
+    const current = a.type === 'countries' ? visitedCountries : totalContinents;
+    return earnedAchievements.includes(a.key) || current >= a.requirement;
+  });
+  const lockedList = ACHIEVEMENTS.filter(a => !earnedList.includes(a));
   const displayedAchievements = showAllAchievements ? ACHIEVEMENTS : [...earnedList, ...lockedList.slice(0, 6 - earnedList.length)].slice(0, 6);
 
   return (
@@ -221,9 +225,10 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
         <CardContent>
           <div className="grid grid-cols-3 gap-3">
             {displayedAchievements.map((achievement) => {
-              const isEarned = earnedAchievements.includes(achievement.key);
-              const isNewlyEarned = newlyEarnedKey === achievement.key;
               const current = achievement.type === 'countries' ? visitedCountries : totalContinents;
+              // Earned = in DB OR progress met (fixes UI when DB out of sync, e.g. Explorer 6/5)
+              const isEarned = earnedAchievements.includes(achievement.key) || current >= achievement.requirement;
+              const isNewlyEarned = newlyEarnedKey === achievement.key;
               const rarity = rarityStyles[achievement.rarity];
               
               return (

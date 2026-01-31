@@ -2050,6 +2050,22 @@ export type Database = {
         Returns: boolean
       }
       hash_email: { Args: { email: string }; Returns: string }
+      insert_country_visit_detail: {
+        Args: {
+          p_country_id: string
+          p_trip_name?: string | null
+          p_is_approximate?: boolean
+          p_approximate_month?: number | null
+          p_approximate_year?: number | null
+          p_visit_date?: string | null
+          p_end_date?: string | null
+          p_number_of_days?: number
+          p_notes?: string | null
+          p_family_member_ids?: string[] | null
+          p_cities?: string[] | null
+        }
+        Returns: Database["public"]["Tables"]["country_visit_details"]["Row"]
+      }
       is_group_member: {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean

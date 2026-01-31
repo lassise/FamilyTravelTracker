@@ -75,12 +75,18 @@ const CountryQuickActionDialog = ({
         }
       } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      const countryId = await ensureCountryExists(user.id);
-
-      // Get first family member
+      // Require at least one family member — the app tracks which family members have been where
       const {
         data: members
       } = await supabase.from('family_members').select('id').eq('user_id', user.id).limit(1);
+      if (!members || members.length === 0) {
+        toast.error('Add at least one family member first to track who has been where.');
+        setLoading(null);
+        return;
+      }
+
+      const countryId = await ensureCountryExists(user.id);
+
       if (members && members.length > 0) {
         // Check if visit already exists
         const {
@@ -118,12 +124,18 @@ const CountryQuickActionDialog = ({
         }
       } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
-      const countryId = await ensureCountryExists(user.id);
-
-      // Get first family member and add visit
+      // Require at least one family member — the app tracks which family members have been where
       const {
         data: members
       } = await supabase.from('family_members').select('id').eq('user_id', user.id).limit(1);
+      if (!members || members.length === 0) {
+        toast.error('Add at least one family member first to track who has been where.');
+        setLoading(null);
+        return;
+      }
+
+      const countryId = await ensureCountryExists(user.id);
+
       if (members && members.length > 0) {
         const {
           data: existingVisit

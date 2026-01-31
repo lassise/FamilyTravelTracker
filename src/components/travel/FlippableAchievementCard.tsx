@@ -59,9 +59,9 @@ const FlippableAchievementCard = ({
           className={cn(
             "absolute inset-0 flex flex-col items-center p-3 rounded-lg transition-all border backface-hidden",
             isEarned
-              ? `bg-muted ${rarityStyles.border} ${rarityStyles.glow}`
+              ? `bg-card/80 ${rarityStyles.border} ${rarityStyles.glow} shadow-md`
               : 'bg-muted/30 border-transparent opacity-60 hover:opacity-80',
-            isNewlyEarned && 'animate-scale-in ring-2 ring-primary ring-offset-2'
+            isNewlyEarned && 'animate-celebrate ring-2 ring-amber-400 ring-offset-2'
           )}
           style={{ backfaceVisibility: 'hidden' }}
         >
@@ -74,10 +74,11 @@ const FlippableAchievementCard = ({
 
           <div className={cn(
             "p-2 rounded-full relative",
-            isEarned ? achievement.color : 'bg-muted'
+            isEarned ? achievement.color : 'bg-muted',
+            isNewlyEarned && 'animate-icon-pop'
           )}>
             {isEarned ? (
-              <achievement.icon className="h-5 w-5 text-primary-foreground" />
+              <achievement.icon className="h-5 w-5 text-white drop-shadow-sm" />
             ) : (
               <Lock className="h-5 w-5 text-muted-foreground" />
             )}

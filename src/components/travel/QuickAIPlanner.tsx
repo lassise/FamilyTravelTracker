@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Zap, Calendar, MapPin, Sun, Moon, Clock } from "lucide-react";
+import { Loader2, Zap, Calendar, MapPin, Sun, Moon, Clock, Crown } from "lucide-react";
 import { useTravelPreferences } from "@/hooks/useTravelPreferences";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -108,7 +108,8 @@ const QuickAIPlanner = () => {
   };
 
   return (
-    <Card>
+    <Card className="relative">
+      <Crown className="absolute top-4 right-4 h-5 w-5 text-amber-500" title="Premium" />
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-yellow-500" />

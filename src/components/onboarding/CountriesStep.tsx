@@ -200,9 +200,9 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Who visited section - applies to selected countries */}
+      {/* Who visited section - required: tracks which family members have been where */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Who visited the selected countries?</Label>
+        <Label className="text-sm font-medium">Who visited the selected countries? (Required)</Label>
         <div className="flex flex-wrap gap-3 p-3 rounded-lg border bg-muted/30">
           {effectiveMembers.length === 1 ? (
             <span className="text-sm text-muted-foreground">Solo traveler — all countries will be added for you.</span>
