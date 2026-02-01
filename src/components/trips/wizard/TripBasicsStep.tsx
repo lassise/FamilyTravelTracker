@@ -3,7 +3,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TripFormData } from "../TripWizard";
-import { MapPin, Calendar, Hotel, Users, Briefcase, Palmtree, ArrowRightLeft } from "lucide-react";
+import { TripLegEditor, type TripLegDraft } from "../TripLegEditor";
+import { MapPin, Calendar, Hotel, Users, Briefcase, Palmtree, ArrowRightLeft, Globe } from "lucide-react";
 
 interface TripBasicsStepProps {
   formData: TripFormData;
@@ -17,18 +18,50 @@ const PURPOSE_OPTIONS = [
 ];
 
 export const TripBasicsStep = ({ formData, updateFormData }: TripBasicsStepProps) => {
+  const handleLegsChange = (legs: TripLegDraft[]) => {
+    // Combine all updates into a single call to prevent state sync issues
+    const updates: Partial<TripFormData> = { legs };
+    
+    if (legs.length > 0) {
+      // Calculate overall dates for backwards compatibility
+      const sortedLegs = [...legs].sort((a, b) => 
+        new Date(a.start_date || '9999').getTime() - new Date(b.start_date || '9999').getTime()
+      );
+      const firstLeg = sortedLegs.find(l => l.start_date);
+      const lastLeg = [...sortedLegs].reverse().find(l => l.end_date);
+      
+      if (firstLeg?.start_date) {
+        updates.startDate = firstLeg.start_date;
+      }
+      if (lastLeg?.end_date) {
+        updates.endDate = lastLeg.end_date;
+      }
+      
+      // Build destination string from all countries
+      const countries = legs.map(l => l.country_name).filter(Boolean);
+      if (countries.length > 0) {
+        updates.destination = [...new Set(countries)].join(" + ");
+      }
+    }
+    
+    // Single atomic update
+    updateFormData(updates);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Multi-country leg editor */}
       <div className="space-y-2">
-        <Label htmlFor="destination" className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
+        <Label className="flex items-center gap-2">
+          <Globe className="h-4 w-4" />
           Where are you going?
         </Label>
-        <Input
-          id="destination"
-          placeholder="e.g., Paris, France or Disney World, Orlando"
-          value={formData.destination}
-          onChange={(e) => updateFormData({ destination: e.target.value })}
+        <p className="text-sm text-muted-foreground">
+          Add each country you'll visit with your travel dates. You can add multiple destinations for multi-country trips.
+        </p>
+        <TripLegEditor
+          legs={formData.legs}
+          onLegsChange={handleLegsChange}
         />
       </div>
 
@@ -63,27 +96,7 @@ export const TripBasicsStep = ({ formData, updateFormData }: TripBasicsStepProps
 
       {/* Planning stage toggles */}
       <div className="space-y-4 p-4 rounded-lg bg-muted/50">
-        <p className="text-sm font-medium text-foreground">What details do you have so far?</p>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="hasDates" className="font-normal cursor-pointer">
-              I know my travel dates
-            </Label>
-          </div>
-          <Switch
-            id="hasDates"
-            checked={formData.hasDates}
-            onCheckedChange={(checked) => {
-              updateFormData({ 
-                hasDates: checked,
-                // Clear dates if user unchecks
-                ...(checked ? {} : { startDate: "", endDate: "" })
-              });
-            }}
-          />
-        </div>
+        <p className="text-sm font-medium text-foreground">Additional details</p>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -115,48 +128,6 @@ export const TripBasicsStep = ({ formData, updateFormData }: TripBasicsStepProps
           </div>
         )}
       </div>
-
-      {formData.hasDates && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="startDate" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Start Date
-            </Label>
-            <Input
-              id="startDate"
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => updateFormData({ startDate: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="endDate">End Date</Label>
-            <Input
-              id="endDate"
-              type="date"
-              value={formData.endDate}
-              min={formData.startDate || undefined}
-              onChange={(e) => {
-                const endDate = e.target.value;
-                // Validate end date is after start date
-                if (formData.startDate && endDate) {
-                  const start = new Date(formData.startDate);
-                  const end = new Date(endDate);
-                  if (end <= start) {
-                    // Don't update if invalid, or show error
-                    return;
-                  }
-                }
-                updateFormData({ endDate });
-              }}
-            />
-            {formData.startDate && formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate) && (
-              <p className="text-xs text-destructive">End date must be after start date</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {formData.hasLodging && (
         <div className="space-y-2">

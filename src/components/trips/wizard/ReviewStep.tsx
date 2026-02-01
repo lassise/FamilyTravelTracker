@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { TripFormData } from "../TripWizard";
+import CountryFlag from "@/components/common/CountryFlag";
+import { getEffectiveFlagCode } from "@/lib/countriesData";
 import { 
   MapPin, 
   Calendar, 
@@ -9,8 +11,11 @@ import {
   DollarSign,
   Home,
   Clock,
-  ShoppingCart
+  ShoppingCart,
+  Globe,
+  ArrowRight
 } from "lucide-react";
+import { format, parseISO, differenceInDays } from "date-fns";
 
 interface ReviewStepProps {
   formData: TripFormData;
@@ -50,35 +55,106 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
     });
   };
 
+  const formatShortDate = (date: string) => {
+    try {
+      return format(parseISO(date), "MMM d");
+    } catch {
+      return date;
+    }
+  };
+
   const getTripDuration = () => {
-    if (!formData.startDate || !formData.endDate) return null;
-    const start = new Date(formData.startDate);
-    const end = new Date(formData.endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (formData.legs.length === 0) {
+      if (!formData.startDate || !formData.endDate) return null;
+      const start = new Date(formData.startDate);
+      const end = new Date(formData.endDate);
+      const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      return `${days} day${days !== 1 ? "s" : ""}`;
+    }
+    // Calculate from legs
+    const sortedLegs = [...formData.legs].filter(l => l.start_date && l.end_date)
+      .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+    if (sortedLegs.length === 0) return null;
+    const firstDate = sortedLegs[0].start_date;
+    const lastDate = sortedLegs[sortedLegs.length - 1].end_date;
+    const days = differenceInDays(parseISO(lastDate), parseISO(firstDate)) + 1;
     return `${days} day${days !== 1 ? "s" : ""}`;
+  };
+
+  // Generate trip title from legs if not provided
+  const getTripTitle = () => {
+    if (formData.title) return formData.title;
+    if (formData.legs.length === 0) return `${formData.destination || "New"} Family Trip`;
+    const countries = [...new Set(formData.legs.map(l => l.country_name).filter(Boolean))];
+    if (countries.length === 1) return `${countries[0]} Family Trip`;
+    if (countries.length === 2) return `${countries[0]} & ${countries[1]} Trip`;
+    return `${countries[0]} + ${countries.length - 1} more Trip`;
   };
 
   return (
     <div className="space-y-6">
       <div className="text-center pb-4 border-b">
-        <h3 className="text-xl font-semibold">
-          {formData.title || `${formData.destination} Family Trip`}
-        </h3>
+        <h3 className="text-xl font-semibold">{getTripTitle()}</h3>
         <p className="text-muted-foreground mt-1">
           Review your trip details before generating the itinerary
         </p>
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <MapPin className="h-5 w-5 text-primary mt-0.5" />
-          <div>
-            <div className="font-medium">Destination</div>
-            <div className="text-muted-foreground">{formData.destination}</div>
+        {/* Trip Legs / Destinations */}
+        {formData.legs.length > 0 ? (
+          <div className="flex items-start gap-3">
+            <Globe className="h-5 w-5 text-primary mt-0.5" />
+            <div className="flex-1">
+              <div className="font-medium mb-2">
+                {formData.legs.length === 1 ? "Destination" : `Itinerary (${formData.legs.length} countries)`}
+              </div>
+              <div className="space-y-2">
+                {formData.legs.map((leg, index) => {
+                  const { code } = getEffectiveFlagCode(leg.country_name, "");
+                  const legDays = leg.start_date && leg.end_date 
+                    ? differenceInDays(parseISO(leg.end_date), parseISO(leg.start_date)) + 1
+                    : 0;
+                  return (
+                    <div key={leg.id} className="flex items-center gap-2 text-sm">
+                      {index > 0 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
+                      {code ? (
+                        <CountryFlag countryCode={code} countryName={leg.country_name} size="sm" />
+                      ) : null}
+                      <span className="font-medium">{leg.country_name}</span>
+                      {leg.start_date && leg.end_date && (
+                        <span className="text-muted-foreground">
+                          ({formatShortDate(leg.start_date)} – {formatShortDate(leg.end_date)}, {legDays}d)
+                        </span>
+                      )}
+                      {leg.cities.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          • {leg.cities.join(", ")}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {getTripDuration() && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Total: {getTripDuration()}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            <MapPin className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="font-medium">Destination</div>
+              <div className="text-muted-foreground">{formData.destination || "Not specified"}</div>
+            </div>
+          </div>
+        )}
 
-        {formData.hasDates && formData.startDate && formData.endDate ? (
+        {/* Only show separate dates section if no legs (legacy mode) */}
+        {formData.legs.length === 0 && formData.hasDates && formData.startDate && formData.endDate && (
           <div className="flex items-start gap-3">
             <Calendar className="h-5 w-5 text-primary mt-0.5" />
             <div>
@@ -87,14 +163,6 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
                 {formatDate(formData.startDate)} - {formatDate(formData.endDate)}
                 {getTripDuration() && <span className="text-sm ml-2">({getTripDuration()})</span>}
               </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-start gap-3">
-            <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-            <div>
-              <div className="font-medium">Dates</div>
-              <div className="text-muted-foreground italic">Still deciding on dates</div>
             </div>
           </div>
         )}

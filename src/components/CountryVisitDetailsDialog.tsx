@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -163,6 +164,8 @@ interface CountryVisitDetailsDialogProps {
   countryCode: string;
   onUpdate: () => void;
   buttonLabel?: string;
+  /** Pre-select these family member IDs for new visits (e.g. from quick-add country_visits). */
+  initialFamilyMemberIds?: string[];
   // Optional controlled props
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -499,6 +502,7 @@ const CountryVisitDetailsDialog = ({
   countryCode,
   onUpdate,
   buttonLabel = "Details",
+  initialFamilyMemberIds = [],
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: CountryVisitDetailsDialogProps) => {
@@ -594,7 +598,11 @@ const CountryVisitDetailsDialog = ({
     }
   }, [open, fetchData]);
 
-  const createNewVisitDraft = (): NewVisitDraft => ({
+  /**
+   * Creates a new visit draft. Pre-fills familyMemberIds from initialFamilyMemberIds
+   * (who already visited this country via quick add) so trip details form has smart defaults.
+   */
+  const createNewVisitDraft = (preSelectedMemberIds: string[] = []): NewVisitDraft => ({
     id: crypto.randomUUID(),
     tripName: "",
     isApproximate: false,
@@ -604,11 +612,11 @@ const CountryVisitDetailsDialog = ({
     endDate: null,
     numberOfDays: 1,
     cities: [],
-    familyMemberIds: [],
+    familyMemberIds: [...preSelectedMemberIds],
   });
 
   const handleAddNewVisitDraft = () => {
-    setNewVisits((prev) => [...prev, createNewVisitDraft()]);
+    setNewVisits((prev) => [...prev, createNewVisitDraft(initialFamilyMemberIds)]);
   };
 
   const handleUpdateNewVisitDraft = (id: string, updates: Partial<NewVisitDraft>) => {
@@ -1041,11 +1049,14 @@ const CountryVisitDetailsDialog = ({
           {buttonLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh]">
+      <DialogContent className="max-w-2xl max-h-[85vh]" aria-describedby="country-visit-dialog-description">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
             {countryName} Visit Details
           </DialogTitle>
+          <DialogDescription id="country-visit-dialog-description" className="sr-only">
+            View and edit visits to {countryName}. Add new visits, add another country to a trip, or manage existing visit details.
+          </DialogDescription>
           <div className="flex gap-2 mt-2">
             <Badge variant="secondary">
               <Clock className="w-3 h-3 mr-1" />
@@ -1090,7 +1101,7 @@ const CountryVisitDetailsDialog = ({
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={handleAddNewVisitDraft}>
                   <Plus className="w-4 h-4 mr-1" />
                   Add Another Visit

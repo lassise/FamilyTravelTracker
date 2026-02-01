@@ -17,6 +17,8 @@ import {
   Train,
   Hotel,
   Share2,
+  Globe,
+  ArrowRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,6 +27,10 @@ import { CustomActivityDialog } from "@/components/trips/CustomActivityDialog";
 import ActivityBookingCard from "@/components/trips/ActivityBookingCard";
 import TrainSegmentCard from "@/components/trips/TrainSegmentCard";
 import LodgingSuggestionsCard from "@/components/trips/LodgingSuggestionsCard";
+import CountryFlag from "@/components/common/CountryFlag";
+import { getEffectiveFlagCode } from "@/lib/countriesData";
+import { useTripLegs, type TripLeg } from "@/hooks/useTripLegs";
+import { format, parseISO, differenceInDays } from "date-fns";
 
 interface ItineraryItem {
   id: string;
@@ -136,7 +142,9 @@ const TripDetail = () => {
   const { tripId } = useParams<{ tripId: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { fetchLegsForTrip } = useTripLegs();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [tripLegs, setTripLegs] = useState<TripLeg[]>([]);
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [trainSegments, setTrainSegments] = useState<TrainSegment[]>([]);
   const [lodgingSuggestions, setLodgingSuggestions] = useState<LodgingSuggestion[]>([]);
@@ -198,6 +206,12 @@ const TripDetail = () => {
 
       if (!lodgingError && lodgingData) {
         setLodgingSuggestions(lodgingData);
+      }
+
+      // Fetch trip legs
+      const { data: legsData } = await fetchLegsForTrip(tripId!);
+      if (legsData) {
+        setTripLegs(legsData);
       }
     } catch (error: any) {
       console.error("Error fetching trip:", error);
@@ -353,6 +367,51 @@ const TripDetail = () => {
                 Kids: {trip.kids_ages.join(", ")} years
               </span>
             </div>
+          )}
+
+          {/* Trip Legs / Multi-country itinerary */}
+          {tripLegs.length > 1 && (
+            <Card className="mt-4">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Trip Itinerary ({tripLegs.length} countries)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  {tripLegs.map((leg, index) => {
+                    const { code } = getEffectiveFlagCode(leg.country_name, "");
+                    const legDays = leg.start_date && leg.end_date
+                      ? differenceInDays(parseISO(leg.end_date), parseISO(leg.start_date)) + 1
+                      : leg.number_of_days;
+                    return (
+                      <div key={leg.id} className="flex items-center gap-2">
+                        {index > 0 && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
+                        <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+                          {code && (
+                            <CountryFlag countryCode={code} countryName={leg.country_name} size="sm" />
+                          )}
+                          <div>
+                            <div className="font-medium text-sm">{leg.country_name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {leg.start_date && format(parseISO(leg.start_date), "MMM d")}
+                              {leg.end_date && ` – ${format(parseISO(leg.end_date), "MMM d")}`}
+                              {legDays > 0 && ` (${legDays}d)`}
+                            </div>
+                            {leg.cities && leg.cities.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                {leg.cities.join(", ")}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 

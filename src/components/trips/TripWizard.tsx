@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useTrips } from "@/hooks/useTrips";
+import { useTripLegs } from "@/hooks/useTripLegs";
 import { supabase } from "@/integrations/supabase/client";
 import { TripBasicsStep } from "./wizard/TripBasicsStep";
 import { KidsStep } from "./wizard/KidsStep";
@@ -15,6 +16,7 @@ import { ReviewStep } from "./wizard/ReviewStep";
 import { PlannerModeStep, type ClientInfo } from "./wizard/PlannerModeStep";
 import { ContextStep } from "./wizard/ContextStep";
 import { useTravelProfiles } from "@/hooks/useTravelProfiles";
+import type { TripLegDraft } from "./TripLegEditor";
 
 export interface TripFormData {
   title: string;
@@ -41,6 +43,8 @@ export interface TripFormData {
   // Accessibility
   needsWheelchairAccess: boolean;
   hasStroller: boolean;
+  // Multi-country trip legs
+  legs: TripLegDraft[];
 }
 
 const STEPS = [
@@ -53,13 +57,19 @@ const STEPS = [
   { id: 7, title: "Generate", description: "Create itinerary" },
 ];
 
+/** Generate a temporary ID for a leg draft */
+const generateTempId = () => `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
 const TripWizard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { createTrip } = useTrips();
+  const { createLegs, calculateTripDatesFromLegs } = useTripLegs();
   const { profiles, activeProfile } = useTravelProfiles();
   const [currentStep, setCurrentStep] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
-  
+  const appliedFromCountryRef = useRef(false);
+
   const [formData, setFormData] = useState<TripFormData>({
     title: "",
     destination: "",
@@ -91,7 +101,42 @@ const TripWizard = () => {
     // Accessibility
     needsWheelchairAccess: false,
     hasStroller: false,
+    // Multi-country trip legs
+    legs: [],
   });
+
+  // Pre-fill legs when opened via "Add Another Country To Trip" (from CountryVisitDetailsDialog)
+  useEffect(() => {
+    if (appliedFromCountryRef.current) return;
+    const fromCountryName = searchParams.get("fromCountryName");
+    const fromCountryCode = searchParams.get("fromCountryCode") || null;
+    if (fromCountryName) {
+      appliedFromCountryRef.current = true;
+      const firstLeg: TripLegDraft = {
+        id: generateTempId(),
+        country_name: fromCountryName,
+        country_code: fromCountryCode,
+        start_date: "",
+        end_date: "",
+        cities: [],
+        notes: "",
+      };
+      const secondLeg: TripLegDraft = {
+        id: generateTempId(),
+        country_name: "",
+        country_code: null,
+        start_date: "",
+        end_date: "",
+        cities: [],
+        notes: "",
+      };
+      setFormData((prev) => ({
+        ...prev,
+        legs: [firstLeg, secondLeg],
+        destination: fromCountryName,
+      }));
+    }
+  }, [searchParams]);
 
   const updateFormData = (updates: Partial<TripFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -105,17 +150,16 @@ const TripWizard = () => {
         // Mode step - always can proceed
         return true;
       case 2:
-        // Destination required, dates only if they said they have them
-        if (!formData.destination.trim()) return false;
-        if (formData.hasDates) {
-          if (!formData.startDate || !formData.endDate) return false;
-          // Validate end date is after start date
-          if (formData.startDate && formData.endDate) {
-            const start = new Date(formData.startDate);
-            const end = new Date(formData.endDate);
-            if (end <= start) return false;
-          }
-        }
+        // At least one leg with country and dates required
+        if (formData.legs.length === 0) return false;
+        // All legs must have country_name and dates
+        const hasValidLegs = formData.legs.every(leg => 
+          leg.country_name.trim() && 
+          leg.start_date && 
+          leg.end_date &&
+          new Date(leg.end_date) >= new Date(leg.start_date)
+        );
+        if (!hasValidLegs) return false;
         return true;
       case 3:
         // Kids ages only required if traveling with kids
@@ -149,8 +193,17 @@ const TripWizard = () => {
     setIsGenerating(true);
     
     try {
+      // Calculate trip dates and destination from legs
+      const tripDates = calculateTripDatesFromLegs(formData.legs);
+      const countryNames = formData.legs.map(leg => leg.country_name);
+      const uniqueCountries = [...new Set(countryNames)];
+      const destinationString = uniqueCountries.join(" + ");
+      
       // Generate title if not provided
-      const tripTitle = formData.title || `${formData.destination} Family Trip`;
+      const tripTitle = formData.title || 
+        (uniqueCountries.length === 1 
+          ? `${uniqueCountries[0]} Family Trip`
+          : `${uniqueCountries.slice(0, 2).join(" & ")}${uniqueCountries.length > 2 ? ` +${uniqueCountries.length - 2}` : ""} Trip`);
       
       // Determine kids ages based on mode
       const effectiveKidsAges = formData.plannerMode === 'planner' 
@@ -169,9 +222,9 @@ const TripWizard = () => {
       // First create the trip in the database
       const { data: trip, error: tripError } = await createTrip({
         title: tripTitle,
-        destination: formData.destination,
-        start_date: formData.startDate,
-        end_date: formData.endDate,
+        destination: destinationString,
+        start_date: tripDates.start_date || formData.startDate,
+        end_date: tripDates.end_date || formData.endDate,
         kids_ages: effectiveKidsAges,
         interests: formData.interests,
         pace_preference: formData.pacePreference,
@@ -186,14 +239,45 @@ const TripWizard = () => {
         throw new Error(tripError?.message || 'Failed to create trip');
       }
 
+      // Save trip legs
+      if (formData.legs.length > 0) {
+        const legsToCreate = formData.legs.map((leg, index) => ({
+          trip_id: trip.id,
+          country_name: leg.country_name,
+          country_code: leg.country_code,
+          start_date: leg.start_date,
+          end_date: leg.end_date,
+          order_index: index,
+          cities: leg.cities.length > 0 ? leg.cities : null,
+          notes: leg.notes || null,
+        }));
+
+        const { error: legsError } = await createLegs(legsToCreate);
+        if (legsError) {
+          console.error("Error saving trip legs:", legsError);
+          // Don't throw - trip is created, legs are just additional data
+          toast.warning("Trip created but some destination details may be missing");
+        }
+      }
+
       toast.info("Generating your personalized itinerary...");
 
       // Call the edge function to generate itinerary with enhanced data
+      const effectiveStartDate = tripDates.start_date || formData.startDate;
+      const effectiveEndDate = tripDates.end_date || formData.endDate;
       const { data: itineraryData, error: itineraryError } = await supabase.functions.invoke('generate-itinerary', {
         body: {
-          destination: formData.destination,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
+          destination: destinationString,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          // Pass legs info for multi-country itinerary generation
+          tripLegs: formData.legs.map((leg, index) => ({
+            country_name: leg.country_name,
+            start_date: leg.start_date,
+            end_date: leg.end_date,
+            cities: leg.cities,
+            order: index,
+          })),
           kidsAges: formData.travelingWithKids ? effectiveKidsAges : [],
           interests: formData.interests,
           pacePreference: selectedProfile?.pace || formData.pacePreference,

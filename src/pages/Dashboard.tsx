@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
-import { TripDetailsEncouragementCard } from "@/components/travel/TripDetailsEncouragementCard";
 import DashboardMemberFilter from "@/components/travel/DashboardMemberFilter";
 import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
 import TravelMilestones from "@/components/travel/TravelMilestones";
@@ -254,9 +253,6 @@ const Dashboard = () => {
             Track your family's adventures, plan your next trip, and explore new destinations.
           </p>
         </div>
-
-        {/* Post-onboarding encouragement: add trip details for analytics and achievements */}
-        <TripDetailsEncouragementCard />
 
         {/* Travel Tracker Section - DO NOT MODIFY */}
         <section ref={travelTrackerRef} className="mb-12 scroll-mt-4">

@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CheckCircle2, Trash2, Calendar, MapPin, Clock, ChevronDown } from "lucide-react";
+import { CheckCircle2, Trash2, Calendar, MapPin, Clock, ChevronDown, Plane, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CountryDialog from "./CountryDialog";
@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils";
 import CountryFlag from "./common/CountryFlag";
 import CountryFilters from "./travel/CountryFilters";
 import DeleteConfirmDialog from "./common/DeleteConfirmDialog";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, differenceInDays } from "date-fns";
+import { useTripLegs, type TripLeg } from "@/hooks/useTripLegs";
+import { Link } from "react-router-dom";
 
 interface CountryTrackerProps {
   countries: Country[];
@@ -28,6 +30,7 @@ interface CountryTrackerProps {
 const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, onMemberChange }: CountryTrackerProps) => {
   const { toast } = useToast();
   const { visitDetails, getCountrySummary, refetch: refetchVisitDetails } = useVisitDetails();
+  const { fetchLegsForCountry } = useTripLegs();
   const allCountriesData = getAllCountries();
   const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
   const [selectedContinent, setSelectedContinent] = useState<string>('all');
@@ -39,6 +42,27 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
   });
   const [isDeleting, setIsDeleting] = useState(false);
   const [visitDetailsDialogOpen, setVisitDetailsDialogOpen] = useState<Record<string, boolean>>({});
+  const [tripLegsByCountry, setTripLegsByCountry] = useState<Record<string, TripLeg[]>>({});
+
+  // Fetch trip legs for all countries on mount
+  useEffect(() => {
+    const fetchAllTripLegs = async () => {
+      const legsByCountry: Record<string, TripLeg[]> = {};
+      
+      for (const country of countries) {
+        const { data } = await fetchLegsForCountry(country.id, country.name);
+        if (data && data.length > 0) {
+          legsByCountry[country.id] = data;
+        }
+      }
+      
+      setTripLegsByCountry(legsByCountry);
+    };
+    
+    if (countries.length > 0) {
+      fetchAllTripLegs();
+    }
+  }, [countries, fetchLegsForCountry]);
 
   // Get unique continents and years from countries
   const { continents, years } = useMemo(() => {
@@ -245,6 +269,9 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
         <div className="space-y-3">
           {filteredCountries.map((country) => {
             const summary = getCountrySummary(country.id);
+            const hasVisitDetails = visitDetails.filter((v) => v.country_id === country.id).length > 0;
+            const hasTripLegs = (tripLegsByCountry[country.id]?.length ?? 0) > 0;
+            const hasAtLeastOneTrip = hasVisitDetails || hasTripLegs;
 
             // Parse country name in case it has ISO2 prefix (legacy data: "AT Austria")
             const parsed = (country.name || "").match(/^([A-Z]{2})\s+(.+)$/);
@@ -310,10 +337,28 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                 {summary.citiesCount}
                               </Badge>
                             )}
+                            {!hasAtLeastOneTrip && (
+                              <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                No trips yet
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {!hasAtLeastOneTrip && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: true }));
+                            }}
+                          >
+                            Add Details
+                          </Button>
+                        )}
                         <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                         <ChevronDown 
                           className={cn(
@@ -454,6 +499,54 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                         ) : null;
                       })()}
 
+                      {/* Trip Legs from Multi-Country Trips */}
+                      {tripLegsByCountry[country.id]?.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                            <Plane className="inline w-3 h-3 mr-1" />
+                            From Multi-Country Trips ({tripLegsByCountry[country.id].length})
+                          </p>
+                          <div className="max-h-40 overflow-y-auto pr-1 space-y-1">
+                            {tripLegsByCountry[country.id]
+                              .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+                              .map((leg) => {
+                                const legDays = leg.start_date && leg.end_date
+                                  ? differenceInDays(parseISO(leg.end_date), parseISO(leg.start_date)) + 1
+                                  : leg.number_of_days;
+                                
+                                const dateDisplay = leg.start_date && leg.end_date
+                                  ? `${format(parseISO(leg.start_date), "MMM d")} - ${format(parseISO(leg.end_date), "MMM d, yyyy")}`
+                                  : leg.start_date
+                                    ? format(parseISO(leg.start_date), "MMM d, yyyy")
+                                    : "";
+                                
+                                return (
+                                  <Link
+                                    key={leg.id}
+                                    to={`/trips/${leg.trip_id}`}
+                                    className="flex items-center justify-between w-full text-xs py-1.5 px-2 rounded hover:bg-muted transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Plane className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                      <span className="text-foreground">
+                                        {dateDisplay}
+                                        {legDays > 0 && ` • ${legDays}d`}
+                                      </span>
+                                      {leg.cities && leg.cities.length > 0 && (
+                                        <span className="text-muted-foreground">
+                                          ({leg.cities.join(", ")})
+                                        </span>
+                                      )}
+                                    </div>
+                                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                                  </Link>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
                       {summary.cities.length > 0 && (
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-2">
@@ -501,7 +594,13 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                           countryName={country.name}
                           countryCode={countryCode}
                           onUpdate={handleUpdate}
-                          buttonLabel="View / Add Trips"
+                          buttonLabel={hasAtLeastOneTrip ? "View / Add Trips" : "Add Details"}
+                          initialFamilyMemberIds={
+                            // Pre-select family members who already visited this country (from quick add)
+                            familyMembers
+                              .filter((m) => country.visitedBy.includes(m.name))
+                              .map((m) => m.id)
+                          }
                           open={visitDetailsDialogOpen[country.id]}
                           onOpenChange={(open) => {
                             setVisitDetailsDialogOpen(prev => ({ ...prev, [country.id]: open }));

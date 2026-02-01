@@ -15,8 +15,11 @@ import {
   Loader2,
   MoreHorizontal,
   Trash2,
-  Edit
+  Edit,
+  Award
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { differenceInDays, parseISO } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +35,29 @@ const Trips = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get("status") || "all");
+  const [selectedTripIds, setSelectedTripIds] = useState<Set<string>>(new Set());
+
+  const getTripDays = (trip: { start_date: string | null; end_date: string | null }) => {
+    if (!trip.start_date || !trip.end_date) return null;
+    try {
+      const start = parseISO(trip.start_date);
+      const end = parseISO(trip.end_date);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+      return differenceInDays(end, start) + 1;
+    } catch {
+      return null;
+    }
+  };
+
+  const selectedTrips = trips.filter((t) => selectedTripIds.has(t.id));
+  const longestOfSelected =
+    selectedTrips.length >= 2
+      ? selectedTrips.reduce<{ trip: (typeof trips)[0]; days: number } | null>((best, trip) => {
+          const days = getTripDays(trip) ?? 0;
+          if (!best || days > best.days) return { trip, days };
+          return best;
+        }, null)
+      : null;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -100,7 +126,7 @@ const Trips = () => {
               Manage and view all your family adventures
             </p>
           </div>
-          <Button onClick={() => navigate("/trips/new")}>
+          <Button onClick={() => navigate("/trips/add")}>
             <Plus className="h-4 w-4 mr-2" />
             New Trip
           </Button>
@@ -108,6 +134,78 @@ const Trips = () => {
 
         {/* Pending Invites */}
         <PendingInvitesCard onAccepted={refetch} />
+
+        {/* Compare trips: checkboxes + which is longest */}
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Award className="h-4 w-4" />
+              Compare trips (find longest)
+            </CardTitle>
+            <CardDescription>
+              Tick the trips you want to compare. The longest trip by duration will be shown below.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {selectedTripIds.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-muted-foreground">
+                  {selectedTripIds.size} selected
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedTripIds(new Set())}
+                >
+                  Clear selection
+                </Button>
+                {longestOfSelected && (
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Award className="h-4 w-4 text-primary" />
+                    Longest: {longestOfSelected.trip.title}
+                    {longestOfSelected.trip.destination && ` (${longestOfSelected.trip.destination})`}
+                    {" — "}
+                    <span className="text-primary">{longestOfSelected.days} days</span>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="max-h-48 overflow-y-auto rounded-md border bg-muted/30 p-3">
+              <ul className="space-y-2">
+                {trips.map((trip) => {
+                  const days = getTripDays(trip);
+                  const isSelected = selectedTripIds.has(trip.id);
+                  return (
+                    <li key={trip.id} className="flex items-center gap-3">
+                      <Checkbox
+                        id={`compare-${trip.id}`}
+                        checked={isSelected}
+                        onCheckedChange={() => {
+                          setSelectedTripIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(trip.id)) next.delete(trip.id);
+                            else next.add(trip.id);
+                            return next;
+                          });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <label
+                        htmlFor={`compare-${trip.id}`}
+                        className="flex-1 text-sm cursor-pointer flex items-center justify-between gap-2"
+                      >
+                        <span className="font-medium truncate">{trip.title}</span>
+                        <span className="text-muted-foreground shrink-0">
+                          {days != null ? `${days} days` : "—"}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
           <TabsList className="mb-6">
@@ -137,7 +235,7 @@ const Trips = () => {
                         ? "Start planning your first family adventure!"
                         : `No ${tab} trips yet.`}
                     </p>
-                    <Button onClick={() => navigate("/trips/new")}>
+                    <Button onClick={() => navigate("/trips/add")}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create Trip
                     </Button>

@@ -1816,6 +1816,70 @@ export type Database = {
           },
         ]
       }
+      trip_legs: {
+        Row: {
+          id: string
+          trip_id: string
+          country_id: string | null
+          country_name: string
+          country_code: string | null
+          start_date: string
+          end_date: string
+          number_of_days: number
+          order_index: number
+          cities: string[] | null
+          notes: string | null
+          user_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          country_id?: string | null
+          country_name: string
+          country_code?: string | null
+          start_date: string
+          end_date: string
+          order_index?: number
+          cities?: string[] | null
+          notes?: string | null
+          user_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          trip_id?: string
+          country_id?: string | null
+          country_name?: string
+          country_code?: string | null
+          start_date?: string
+          end_date?: string
+          order_index?: number
+          cities?: string[] | null
+          notes?: string | null
+          user_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_legs_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_legs_country_id_fkey"
+            columns: ["country_id"]
+            isOneToOne: false
+            referencedRelation: "countries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trips: {
         Row: {
           budget_total: number | null
