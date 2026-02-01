@@ -45,7 +45,7 @@ const AddTrip = () => {
     if (step === POST_ACTIONS_STEP && trips?.length > 0) {
       setScreen("post-actions");
       setCurrentTrip((prev) => prev?.id ? prev : trips[0]);
-      setFirstCountryLabel((prev) => prev || trips[0]?.destination ?? "");
+      setFirstCountryLabel((prev) => prev || (trips[0]?.destination ?? ""));
     } else if (addLegToId && trips?.length > 0) {
       const trip = trips.find((t) => t.id === addLegToId) ?? trips[0];
       if (trip) {

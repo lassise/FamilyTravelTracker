@@ -135,7 +135,22 @@ const CountriesStep = ({ familyMembers }: CountriesStepProps) => {
         return;
       }
 
-      const toAdd = allCountriesList.filter((c) => selectedCountryNames.has(c.name));
+      let toAdd = allCountriesList.filter((c) => selectedCountryNames.has(c.name));
+      const { data: existingCountries } = await supabase
+        .from("countries")
+        .select("name")
+        .eq("user_id", user.id);
+      const existingNames = new Set((existingCountries || []).map((c) => (c.name || "").trim().toLowerCase()));
+      toAdd = toAdd.filter((c) => !existingNames.has((c.name || "").trim().toLowerCase()));
+      if (toAdd.length === 0) {
+        toast({
+          title: "Countries already in your list",
+          description: "The selected countries are already in your visited list.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
       const inserts = toAdd.map((c) => ({
         name: c.name,
         flag: c.flag,

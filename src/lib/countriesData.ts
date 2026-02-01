@@ -101,6 +101,19 @@ export const getEffectiveFlagCode = (countryName: string, storedFlag?: string): 
   return { code: effectiveCode, isSubdivision };
 };
 
+// Get country code (ISO 2-letter or subdivision) by name; empty string if not found
+export const getCountryCode = (name: string): string => {
+  if (!name?.trim()) return '';
+  const normalized = name.trim().toLowerCase();
+  const all = getAllCountries();
+  const exact = all.find((c) => c.name.toLowerCase() === normalized);
+  if (exact) return exact.code;
+  const region = getRegionCode(name);
+  if (region) return region;
+  const partial = all.find((c) => c.name.toLowerCase().includes(normalized) || normalized.includes(c.name.toLowerCase()));
+  return partial?.code ?? '';
+};
+
 // Search countries by name (including aliases)
 export const searchCountries = (query: string): CountryOption[] => {
   const lowercaseQuery = query.toLowerCase().trim();

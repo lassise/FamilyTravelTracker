@@ -28,11 +28,13 @@ interface CountryDialogProps {
   };
   familyMembers?: Array<{ id: string; name: string }>;
   onSuccess: (newCountryId?: string) => void;
+  /** Custom label for the trigger button when adding (e.g. "Quick Add Country"). Default: "Add Country" */
+  triggerLabel?: string;
 }
 
 const allCountries = getAllCountries();
 
-const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialogProps) => {
+const CountryDialog = ({ country, familyMembers = [], onSuccess, triggerLabel }: CountryDialogProps) => {
   const [open, setOpen] = useState(false);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(
@@ -111,6 +113,23 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           toast({ title: "You must be logged in", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+        // Prevent duplicate: country with same name already in user's list
+        const { data: existing } = await supabase
+          .from("countries")
+          .select("id")
+          .eq("user_id", user.id)
+          .ilike("name", validated.name)
+          .limit(1)
+          .maybeSingle();
+        if (existing?.id) {
+          toast({
+            title: "Country already in your list",
+            description: `"${validated.name}" is already in your visited countries.`,
+            variant: "destructive",
+          });
           setLoading(false);
           return;
         }
@@ -197,7 +216,7 @@ const CountryDialog = ({ country, familyMembers = [], onSuccess }: CountryDialog
         ) : (
           <Button>
             <Plus className="w-4 h-4 mr-2" />
-            Add Country
+            {triggerLabel ?? "Add Country"}
           </Button>
         )}
       </DialogTrigger>

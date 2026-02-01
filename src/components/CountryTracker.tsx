@@ -3,10 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CheckCircle2, Trash2, Calendar, MapPin, Clock, ChevronDown, Plane, ExternalLink } from "lucide-react";
+import { CheckCircle2, Trash2, Calendar, MapPin, Clock, ChevronDown, Plane, ExternalLink, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CountryDialog from "./CountryDialog";
+import AddCountryWithDetailsDialog from "./AddCountryWithDetailsDialog";
+import AIFindOnMyPhoneDialog from "./travel/AIFindOnMyPhoneDialog";
 import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
@@ -27,7 +29,7 @@ interface CountryTrackerProps {
   onMemberChange?: (memberId: string | null) => void;
 }
 
-const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, onMemberChange }: CountryTrackerProps) => {
+const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, onMemberChange, homeCountry }: CountryTrackerProps) => {
   const { toast } = useToast();
   const { visitDetails, getCountrySummary, refetch: refetchVisitDetails } = useVisitDetails();
   const { fetchLegsForCountry } = useTripLegs();
@@ -231,15 +233,40 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4">
             Our family's travel journey across the world
           </p>
-          <CountryDialog
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <CountryDialog
+              familyMembers={familyMembers}
+              triggerLabel="Quick Add Country"
+              onSuccess={(newCountryId) => {
+                handleUpdate();
+                if (newCountryId) {
+                  setExpandedCountries((prev) => new Set([...prev, newCountryId]));
+                  setVisitDetailsDialogOpen((prev) => ({ ...prev, [newCountryId]: true }));
+                }
+              }}
+            />
+            <AddCountryWithDetailsDialog
+              familyMembers={familyMembers}
+              onSuccess={(newCountryId) => {
+                handleUpdate();
+                if (newCountryId) {
+                  setExpandedCountries((prev) => new Set([...prev, newCountryId]));
+                  setVisitDetailsDialogOpen((prev) => ({ ...prev, [newCountryId]: true }));
+                }
+              }}
+            />
+            <Button variant="outline" onClick={() => setAiFindDialogOpen(true)}>
+              <Smartphone className="w-4 h-4 mr-2" />
+              AI Find On My Phone
+            </Button>
+          </div>
+          <AIFindOnMyPhoneDialog
+            open={aiFindDialogOpen}
+            onOpenChange={setAiFindDialogOpen}
             familyMembers={familyMembers}
-            onSuccess={(newCountryId) => {
-              handleUpdate();
-              if (newCountryId) {
-                setExpandedCountries((prev) => new Set([...prev, newCountryId]));
-                setVisitDetailsDialogOpen((prev) => ({ ...prev, [newCountryId]: true }));
-              }
-            }}
+            countries={countries}
+            homeCountry={homeCountry}
+            onSuccess={handleUpdate}
           />
         </div>
 
@@ -416,7 +443,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                             <p className="text-xs font-medium text-muted-foreground mb-2">
                               Logged Trips ({countryTrips.length})
                             </p>
-                            <div className="max-h-60 overflow-y-auto pr-1 space-y-1">
+                            <div className="max-h-60 overflow-y-auto pr-1 space-y-2">
                               {countryTrips.map((trip) => {
                                 // Build date display - prioritize exact dates
                                 let dateDisplay = "";
@@ -439,7 +466,6 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                       hasExactDate = true;
                                     }
                                   } catch {
-                                    // Fallback if date parsing fails
                                     dateDisplay = trip.visit_date || "";
                                   }
                                 } else if (trip.approximate_year) {
@@ -450,48 +476,49 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                   dateDisplay = [monthName, trip.approximate_year].filter(Boolean).join(" ") || `${trip.approximate_year}`;
                                 }
                                 
-                                const daysText = trip.number_of_days ? ` • ${trip.number_of_days} day${trip.number_of_days !== 1 ? "s" : ""}` : "";
-                                
-                                // Build display text: when we have exact dates, show them prominently
-                                // Format: "Trip Name • Date Range • Days" or just "Date Range • Days" if no trip name
-                                let displayText = "";
-                                if (hasExactDate && dateDisplay) {
-                                  // We have exact dates - show them prominently
-                                  if (trip.trip_name) {
-                                    displayText = `${trip.trip_name} • ${dateDisplay}${daysText}`;
-                                  } else {
-                                    displayText = `${dateDisplay}${daysText}`;
-                                  }
-                                } else if (trip.trip_name) {
-                                  // No exact date, but we have trip name
-                                  if (dateDisplay) {
-                                    displayText = `${trip.trip_name} • ${dateDisplay}${daysText}`;
-                                  } else {
-                                    displayText = trip.trip_name + daysText;
-                                  }
-                                } else if (dateDisplay) {
-                                  // Just date (approximate)
-                                  displayText = dateDisplay + daysText;
-                                } else {
-                                  displayText = "Date unknown";
-                                }
+                                const daysText = trip.number_of_days ? `${trip.number_of_days} day${trip.number_of_days !== 1 ? "s" : ""}` : "";
+                                const tripTitle = trip.trip_name?.trim() || null;
                                 
                                 return (
-                                  <Button
+                                  <button
                                     key={trip.id}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start text-xs h-auto py-1.5 px-2 hover:bg-muted"
+                                    type="button"
+                                    className="w-full text-left rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-1"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setVisitDetailsDialogOpen(prev => ({ ...prev, [country.id]: true }));
                                     }}
                                   >
-                                    <Calendar className="w-3 h-3 text-muted-foreground mr-2 flex-shrink-0" />
-                                    <span className="text-foreground text-left">
-                                      {displayText}
-                                    </span>
-                                  </Button>
+                                    <div className="flex items-start gap-3">
+                                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                        <Calendar className="h-4 w-4" />
+                                      </div>
+                                      <div className="min-w-0 flex-1 space-y-0.5">
+                                        {tripTitle && (
+                                          <p className="text-sm font-medium text-foreground leading-tight">
+                                            {tripTitle}
+                                          </p>
+                                        )}
+                                        {!tripTitle && dateDisplay && (
+                                          <p className="text-sm font-medium text-foreground leading-tight">
+                                            {dateDisplay}
+                                          </p>
+                                        )}
+                                        {!tripTitle && !dateDisplay && (
+                                          <p className="text-sm text-muted-foreground">Date unknown</p>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                          {dateDisplay && tripTitle && <span>{dateDisplay}</span>}
+                                          {daysText && (
+                                            <span className="inline-flex items-center rounded bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                              <Clock className="h-3 w-3 mr-0.5 inline" />
+                                              {daysText}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -506,7 +533,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                             <Plane className="inline w-3 h-3 mr-1" />
                             From Multi-Country Trips ({tripLegsByCountry[country.id].length})
                           </p>
-                          <div className="max-h-40 overflow-y-auto pr-1 space-y-1">
+                          <div className="max-h-40 overflow-y-auto pr-1 space-y-2">
                             {tripLegsByCountry[country.id]
                               .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
                               .map((leg) => {
@@ -524,22 +551,29 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                   <Link
                                     key={leg.id}
                                     to={`/trips/${leg.trip_id}`}
-                                    className="flex items-center justify-between w-full text-xs py-1.5 px-2 rounded hover:bg-muted transition-colors"
+                                    className="flex items-start gap-3 w-full rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm transition-all hover:border-secondary/40 hover:bg-secondary/5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-secondary/20 focus:ring-offset-1"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <Plane className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                                      <span className="text-foreground">
-                                        {dateDisplay}
-                                        {legDays > 0 && ` • ${legDays}d`}
-                                      </span>
+                                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary/10 text-secondary">
+                                      <Plane className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                        <span>{dateDisplay}</span>
+                                        {legDays > 0 && (
+                                          <span className="inline-flex items-center rounded bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                            <Clock className="h-3 w-3 mr-0.5 inline" />
+                                            {legDays} day{legDays !== 1 ? "s" : ""}
+                                          </span>
+                                        )}
+                                      </div>
                                       {leg.cities && leg.cities.length > 0 && (
-                                        <span className="text-muted-foreground">
-                                          ({leg.cities.join(", ")})
-                                        </span>
+                                        <p className="text-xs text-muted-foreground truncate">
+                                          {leg.cities.join(", ")}
+                                        </p>
                                       )}
                                     </div>
-                                    <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                                    <ExternalLink className="mt-1.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                   </Link>
                                 );
                               })}

@@ -1402,6 +1402,61 @@ const CountryVisitDetailsDialog = ({
                                     </div>
                                   </div>
                                 )}
+
+                                {/* Cities (optional) - add cities in context of this visit */}
+                                <div>
+                                  <Label className="text-xs mb-1 block flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    Cities (optional)
+                                  </Label>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" size="sm" className="w-full justify-start">
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add a city...
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[280px] p-0" align="start">
+                                      <Command>
+                                        <CommandInput placeholder="Search or type city name..." />
+                                        <CommandList className="max-h-[300px] overflow-y-auto">
+                                          <CommandEmpty>
+                                            <Button
+                                              variant="ghost"
+                                              className="w-full justify-start"
+                                              onClick={(e) => {
+                                                const input = (e.target as HTMLElement).closest('[cmdk-root]')?.querySelector('input');
+                                                if (input?.value) handleAddCity(input.value);
+                                              }}
+                                            >
+                                              <Plus className="w-4 h-4 mr-2" />
+                                              Add custom city
+                                            </Button>
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            {cities
+                                              .filter(
+                                                (city) =>
+                                                  !cityVisits.some(
+                                                    (c) => c.city_name.toLowerCase() === city.toLowerCase()
+                                                  )
+                                              )
+                                              .map((city) => (
+                                                <CommandItem
+                                                  key={city}
+                                                  value={city}
+                                                  onSelect={() => handleAddCity(city)}
+                                                >
+                                                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                                                  {city}
+                                                </CommandItem>
+                                              ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
                               </div>
                             </CardContent>
                           </CollapsibleContent>
@@ -1412,108 +1467,6 @@ const CountryVisitDetailsDialog = ({
                 </div>
               </div>
             )}
-
-            {/* All Cities Section */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">All Cities Visited</h3>
-              </div>
-
-              <div className="mb-3">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add a city...
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[280px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search or type city name..." />
-                      <CommandList className="max-h-[300px] overflow-y-auto">
-                        <CommandEmpty>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={(e) => {
-                              const input = (e.target as HTMLElement).closest('[cmdk-root]')?.querySelector('input');
-                              if (input?.value) handleAddCity(input.value);
-                            }}
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add custom city
-                          </Button>
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {cities
-                            .filter(
-                              (city) =>
-                                !cityVisits.some(
-                                  (c) => c.city_name.toLowerCase() === city.toLowerCase()
-                                )
-                            )
-                            .map((city) => (
-                              <CommandItem
-                                key={city}
-                                value={city}
-                                onSelect={() => handleAddCity(city)}
-                              >
-                                <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                                {city}
-                              </CommandItem>
-                            ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {cityVisits.length === 0 && pendingCityAdditions.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No cities recorded yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {/* Show existing cities that aren't pending deletion */}
-                  {cityVisits
-                    .filter(city => !pendingCityDeletions.includes(city.id))
-                    .map((city) => (
-                      <Badge
-                        key={city.id}
-                        variant="secondary"
-                        className="text-sm py-1 px-3 flex items-center gap-1"
-                      >
-                        <MapPin className="w-3 h-3" />
-                        {city.city_name}
-                        <button
-                          onClick={() => handleDeleteCity(city.id)}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  {/* Show pending additions */}
-                  {pendingCityAdditions.map((cityName) => (
-                    <Badge
-                      key={`pending-${cityName}`}
-                      variant="outline"
-                      className="text-sm py-1 px-3 flex items-center gap-1 border-primary text-primary"
-                    >
-                      <MapPin className="w-3 h-3" />
-                      {cityName}
-                      <button
-                        onClick={() => {
-                          setPendingCityAdditions(prev => prev.filter(c => c !== cityName));
-                        }}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Save/Cancel Buttons */}
             <div className="flex items-center justify-end gap-2 pt-4 border-t mt-4">

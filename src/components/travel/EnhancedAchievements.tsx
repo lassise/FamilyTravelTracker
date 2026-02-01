@@ -9,16 +9,41 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Country, FamilyMember } from '@/hooks/useFamilyData';
+import { useVisitDetails } from '@/hooks/useVisitDetails';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Trophy, Target, Star, Globe, Map, Plane, Award, Medal, 
   Crown, Gem, Plus, Calendar, Trash2, ChevronDown, Check,
-  Compass, MapPin, Footprints, Mountain
+  Compass, MapPin, Footprints, Mountain, Sparkles
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import FlippableAchievementCard from './FlippableAchievementCard';
+
+// Visit has visit_date + end_date; trip spans New Year's if start <= Dec 31 and end >= Jan 1 next year
+function visitSpansNewYear(visit: { visit_date: string | null; end_date: string | null }): boolean {
+  const start = visit.visit_date ? parseISO(visit.visit_date) : null;
+  const end = visit.end_date ? parseISO(visit.end_date) : null;
+  if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return false;
+  const startYear = start.getFullYear();
+  const dec31 = new Date(startYear, 11, 31);
+  const jan1Next = new Date(startYear + 1, 0, 1);
+  return start <= dec31 && end >= jan1Next;
+}
+
+function getNewYearsAbroadTrips(
+  visitDetails: Array<{ visit_date: string | null; end_date: string | null; trip_name: string | null }>
+): string[] {
+  return visitDetails
+    .filter(visitSpansNewYear)
+    .map((v) => {
+      const start = v.visit_date ? format(parseISO(v.visit_date), 'MMM d, yyyy') : '';
+      const end = v.end_date ? format(parseISO(v.end_date), 'MMM d, yyyy') : '';
+      const label = v.trip_name?.trim() || `${start} – ${end}`;
+      return label;
+    });
+}
 
 interface EnhancedAchievementsProps {
   countries: Country[];
@@ -33,7 +58,7 @@ interface Achievement {
   icon: React.ElementType;
   color: string;
   requirement: number;
-  type: 'countries' | 'continents';
+  type: 'countries' | 'continents' | 'special';
   rarity: 'common' | 'rare' | 'legendary';
   hint: string;
 }
@@ -66,6 +91,8 @@ const ACHIEVEMENTS: Achievement[] = [
   { key: 'five_continents', name: 'Global Citizen', description: 'Visit 5 continents', icon: Plane, color: 'bg-pink-500', requirement: 5, type: 'continents', rarity: 'rare', hint: 'Explore 5 continents to unlock this rare badge' },
   { key: 'six_continents', name: 'Almost There', description: 'Visit 6 continents', icon: Star, color: 'bg-fuchsia-500', requirement: 6, type: 'continents', rarity: 'rare', hint: 'Just one more continent after this!' },
   { key: 'all_continents', name: 'World Conqueror', description: 'Visit all 7 continents', icon: Crown, color: 'bg-gradient-to-r from-purple-500 to-pink-500', requirement: 7, type: 'continents', rarity: 'legendary', hint: 'Visit all 7 continents including Antarctica!' },
+  // Special / milestone
+  { key: 'new_years_abroad', name: 'New Year\'s Abroad', description: 'Spend New Year\'s Eve abroad — trip spans Dec 31 into Jan 1', icon: Sparkles, color: 'bg-gradient-to-r from-amber-500 to-yellow-500', requirement: 1, type: 'special', rarity: 'rare', hint: 'Add a visit that spans from Dec 31 of one year into Jan 1 of the next' },
 ];
 
 const rarityStyles = {
@@ -83,8 +110,67 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
   const [showAllAchievements, setShowAllAchievements] = useState(false);
   const [newlyEarnedKey, setNewlyEarnedKey] = useState<string | null>(null);
   const { toast } = useToast();
+  const { visitDetails } = useVisitDetails();
 
-  const visitedCountries = countries.filter(c => c.visitedBy.length > 0).length;
+  // Visited countries (unique)
+  const visitedCountriesList = countries.filter((c) => c.visitedBy.length > 0);
+  const visitedCountries = visitedCountriesList.length;
+
+  // Earliest visit date per country (for ordering "which countries unlocked" each achievement)
+  const earliestSortKeyByCountryId = React.useMemo(() => {
+    const map = new globalThis.Map<string, number>();
+    for (const v of visitDetails) {
+      if (!v.country_id) continue;
+      let key: number;
+      if (v.visit_date) {
+        try {
+          const d = new Date(v.visit_date);
+          key = isNaN(d.getTime()) ? Infinity : d.getTime();
+        } catch {
+          key = Infinity;
+        }
+      } else if (v.approximate_year != null) {
+        const month = (v.approximate_month != null && v.approximate_month >= 1 && v.approximate_month <= 12)
+          ? v.approximate_month - 1
+          : 0;
+        key = new Date(v.approximate_year, month, 1).getTime();
+      } else {
+        key = Infinity;
+      }
+      const existing = map.get(v.country_id);
+      if (existing === undefined || key < existing) map.set(v.country_id, key);
+    }
+    return map;
+  }, [visitDetails]);
+
+  // Countries ordered by oldest visit first (so "first N" = the N that unlocked that tier)
+  const countriesByOldestVisit = React.useMemo(() => {
+    return [...visitedCountriesList].sort((a, b) => {
+      const keyA = earliestSortKeyByCountryId.get(a.id) ?? Infinity;
+      const keyB = earliestSortKeyByCountryId.get(b.id) ?? Infinity;
+      return keyA - keyB;
+    });
+  }, [visitedCountriesList, earliestSortKeyByCountryId]);
+
+  // For each country-type achievement: the N countries that "unlocked" it (oldest N by visit date)
+  const unlockedByCountryNamesByAchievementKey = React.useMemo(() => {
+    const out: Record<string, string[]> = {};
+    for (const a of ACHIEVEMENTS) {
+      if (a.type !== 'countries') continue;
+      const n = Math.min(a.requirement, countriesByOldestVisit.length);
+      out[a.key] = countriesByOldestVisit.slice(0, n).map((c) => c.name);
+    }
+    return out;
+  }, [countriesByOldestVisit]);
+
+  const hasNewYearsAbroad = React.useMemo(
+    () => visitDetails.some(visitSpansNewYear),
+    [visitDetails]
+  );
+  const newYearsAbroadTripLabels = React.useMemo(
+    () => getNewYearsAbroadTrips(visitDetails),
+    [visitDetails]
+  );
 
   useEffect(() => {
     fetchGoals();
@@ -117,9 +203,12 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
     const newlyEarned: string[] = [];
 
     for (const achievement of ACHIEVEMENTS) {
-      const current = achievement.type === 'countries' ? visitedCountries : totalContinents;
-      if (current >= achievement.requirement && 
-          !earnedAchievements.includes(achievement.key) && 
+      const isSpecialEarned = achievement.type === 'special' && achievement.key === 'new_years_abroad' && hasNewYearsAbroad;
+      const current = achievement.type === 'countries' ? visitedCountries
+        : achievement.type === 'continents' ? totalContinents
+        : isSpecialEarned ? 1 : 0;
+      if ((current >= achievement.requirement || isSpecialEarned) &&
+          !earnedAchievements.includes(achievement.key) &&
           !newlyEarned.includes(achievement.key)) {
         
         const { error } = await supabase.from('user_achievements').insert({
@@ -206,12 +295,13 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
     return labels[goalType] || goalType;
   };
 
-  // Separate earned and locked (earned = in DB OR progress met)
-  const earnedList = ACHIEVEMENTS.filter(a => {
+  // Earned only when current count meets requirement (or special condition for type 'special')
+  const earnedList = ACHIEVEMENTS.filter((a) => {
+    if (a.type === 'special' && a.key === 'new_years_abroad') return hasNewYearsAbroad;
     const current = a.type === 'countries' ? visitedCountries : totalContinents;
-    return earnedAchievements.includes(a.key) || current >= a.requirement;
+    return current >= a.requirement;
   });
-  const lockedList = ACHIEVEMENTS.filter(a => !earnedList.includes(a));
+  const lockedList = ACHIEVEMENTS.filter((a) => !earnedList.includes(a));
   const displayedAchievements = showAllAchievements ? ACHIEVEMENTS : [...earnedList, ...lockedList.slice(0, 6 - earnedList.length)].slice(0, 6);
 
   return (
@@ -232,12 +322,20 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
         <CardContent>
           <div className="grid grid-cols-3 gap-3">
             {displayedAchievements.map((achievement) => {
-              const current = achievement.type === 'countries' ? visitedCountries : totalContinents;
-              // Earned = in DB OR progress met (fixes UI when DB out of sync, e.g. Explorer 6/5)
-              const isEarned = earnedAchievements.includes(achievement.key) || current >= achievement.requirement;
+              const isSpecialEarned = achievement.type === 'special' && achievement.key === 'new_years_abroad' && hasNewYearsAbroad;
+              const current = achievement.type === 'countries' ? visitedCountries
+                : achievement.type === 'continents' ? totalContinents
+                : isSpecialEarned ? 1 : 0;
+              const isEarned = achievement.type === 'special' ? isSpecialEarned : current >= achievement.requirement;
               const isNewlyEarned = newlyEarnedKey === achievement.key;
               const rarity = rarityStyles[achievement.rarity];
-              
+              const countryNames = achievement.type === 'countries'
+                ? unlockedByCountryNamesByAchievementKey[achievement.key] ?? []
+                : undefined;
+              const detailLines = achievement.type === 'special' && achievement.key === 'new_years_abroad'
+                ? newYearsAbroadTripLabels
+                : undefined;
+
               return (
                 <FlippableAchievementCard
                   key={achievement.key}
@@ -246,6 +344,8 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                   isNewlyEarned={isNewlyEarned}
                   current={current}
                   rarityStyles={rarity}
+                  countryNames={countryNames}
+                  detailLines={detailLines}
                 />
               );
             })}

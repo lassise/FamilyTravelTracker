@@ -8,7 +8,7 @@ import FamilyMemberDialog from "@/components/FamilyMemberDialog";
 import { useFamilyData } from "@/hooks/useFamilyData";
 
 const Index = () => {
-  const { familyMembers, countries, wishlist, loading, refetch, totalContinents } = useFamilyData();
+  const { familyMembers, countries, wishlist, homeCountry, loading, refetch, totalContinents } = useFamilyData();
 
   if (loading) {
     return (
@@ -44,6 +44,7 @@ const Index = () => {
         countries={countries} 
         familyMembers={familyMembers}
         onUpdate={refetch}
+        homeCountry={homeCountry}
       />
 
       <section className="py-12 container mx-auto px-4">

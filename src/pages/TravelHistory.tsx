@@ -358,6 +358,7 @@ const TravelHistory = () => {
                     onUpdate={refetch}
                     selectedMemberId={selectedMemberId}
                     onMemberChange={setSelectedMemberId}
+                    homeCountry={homeCountry}
                   />
                   <CountryWishlist 
                     countries={countries}
