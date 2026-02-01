@@ -206,7 +206,7 @@ const CityPicker = ({
               value={searchValue}
               onValueChange={setSearchValue}
             />
-            <CommandList>
+            <CommandList className="max-h-[300px] overflow-y-auto">
               <CommandEmpty>
                 {searchValue.trim() && (
                   <Button
@@ -225,7 +225,7 @@ const CityPicker = ({
                 )}
               </CommandEmpty>
               <CommandGroup>
-                {filteredCities.slice(0, 30).map((city) => (
+                {filteredCities.map((city) => (
                   <CommandItem
                     key={city}
                     value={city}
@@ -1419,7 +1419,7 @@ const CountryVisitDetailsDialog = ({
                   <PopoverContent className="w-[280px] p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Search or type city name..." />
-                      <CommandList className="max-h-[200px] overflow-y-auto">
+                      <CommandList className="max-h-[300px] overflow-y-auto">
                         <CommandEmpty>
                           <Button
                             variant="ghost"
@@ -1441,7 +1441,6 @@ const CountryVisitDetailsDialog = ({
                                   (c) => c.city_name.toLowerCase() === city.toLowerCase()
                                 )
                             )
-                            .slice(0, 50)
                             .map((city) => (
                               <CommandItem
                                 key={city}

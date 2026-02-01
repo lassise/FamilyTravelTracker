@@ -371,7 +371,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                             <p className="text-xs font-medium text-muted-foreground mb-2">
                               Logged Trips ({countryTrips.length})
                             </p>
-                            <div className="max-h-40 overflow-y-auto pr-1 space-y-1">
+                            <div className="max-h-60 overflow-y-auto pr-1 space-y-1">
                               {countryTrips.map((trip) => {
                                 // Build date display - prioritize exact dates
                                 let dateDisplay = "";
@@ -459,7 +459,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                           <p className="text-xs font-medium text-muted-foreground mb-2">
                             Cities visited ({summary.cities.length}):
                           </p>
-                          <div className="max-h-32 overflow-y-auto pr-1">
+                          <div className="max-h-64 overflow-y-auto pr-1">
                             <div className="flex flex-wrap gap-1">
                               {summary.cities.sort().map((city) => (
                                 <Badge key={city} variant="outline" className="text-xs bg-background">

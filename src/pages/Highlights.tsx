@@ -406,15 +406,14 @@ const Highlights = () => {
               <h2 className="text-2xl font-bold text-foreground">Cities Explored</h2>
               <Badge variant="secondary">{cities.length} cities</Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {cities.slice(0, 30).map((city) => (
-                <Badge key={city.id} variant="outline" className="text-sm">
-                  {city.city_name}
-                </Badge>
-              ))}
-              {cities.length > 30 && (
-                <Badge variant="secondary">+{cities.length - 30} more</Badge>
-              )}
+            <div className="max-h-64 overflow-y-auto pr-1">
+              <div className="flex flex-wrap gap-2">
+                {cities.map((city) => (
+                  <Badge key={city.id} variant="outline" className="text-sm">
+                    {city.city_name}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </section>
         )}
