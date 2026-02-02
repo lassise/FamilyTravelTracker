@@ -20,6 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Command,
   CommandEmpty,
@@ -30,13 +32,14 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Smartphone, Search, X, Pencil, PlusCircle, Loader2, Check, ChevronsUpDown, CheckCircle2, AlertCircle, Sparkles, Image, Mail, CheckSquare } from "lucide-react";
+import { Smartphone, Search, X, Pencil, PlusCircle, Loader2, Check, ChevronsUpDown, CheckCircle2, AlertCircle, Sparkles, Image, Mail, CheckSquare, ShieldCheck, RefreshCw, FolderOpen, Inbox, ChevronDown } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
 import { parsePastedText, markDuplicateSuggestions, type TripSuggestion, type ExistingTrip } from "@/lib/tripSuggestionsParser";
-import { parseEmailContent, generateDemoSuggestions, mergeNearbyTrips } from "@/lib/emailTripParser";
+import { parseEmailContent, mergeNearbyTrips } from "@/lib/emailTripParser";
 import { getSuggestionsFromPhotos } from "@/lib/photoTripSuggestions";
+import { getDemoScanSources, runFindOnMyPhoneDemoScan } from "@/lib/findOnMyPhoneEngine";
 import { getAllCountries, type CountryOption } from "@/lib/countriesData";
 import CountryFlag from "@/components/common/CountryFlag";
 import { TravelDatePicker } from "@/components/TravelDatePicker";
@@ -125,6 +128,16 @@ export default function AIFindOnMyPhoneDialog({
   const [editTripName, setEditTripName] = useState("");
   const [showDuplicates, setShowDuplicates] = useState(true);
   const [demoMode, setDemoMode] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [autoScanStatus, setAutoScanStatus] = useState<"idle" | "scanning" | "completed" | "error">("idle");
+  const [autoScanProgress, setAutoScanProgress] = useState({ percent: 0, message: "" });
+  const [autoScanError, setAutoScanError] = useState<string | null>(null);
+  const [includePhotos, setIncludePhotos] = useState(true);
+  const [includeEmails, setIncludeEmails] = useState(true);
+  const [excludedAlbums, setExcludedAlbums] = useState<string[]>([]);
+  const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
+
+  const demoSources = useMemo(() => getDemoScanSources(), []);
 
   // Convert existing visit details to ExistingTrip format for duplicate detection
   const existingTrips: ExistingTrip[] = useMemo(() => {
@@ -206,6 +219,56 @@ export default function AIFindOnMyPhoneDialog({
       });
     }
   }, [pasteValue, toast, existingTrips]);
+
+  const handleAutoScan = useCallback(async () => {
+    if (!includeEmails && !includePhotos) {
+      toast({ title: "Select a data source", description: "Enable photo or email scanning to continue.", variant: "destructive" });
+      return;
+    }
+    setAutoScanStatus("scanning");
+    setAutoScanError(null);
+    setAutoScanProgress({ percent: 0, message: "Preparing scan…" });
+    try {
+      const result = await runFindOnMyPhoneDemoScan({
+        includePhotos,
+        includeEmails,
+        excludeAlbums: excludedAlbums,
+        excludeEmailFolders: excludedFolders,
+        homeCountryIso2: homeCountryIso2 ?? null,
+        onProgress: (progress) => {
+          setAutoScanProgress({ percent: progress.percent, message: progress.message });
+        },
+      });
+      const withDuplicates = markDuplicateSuggestions(result.suggestions, existingTrips);
+      setSuggestions(withDuplicates);
+      setDemoMode(true);
+      setAutoScanStatus("completed");
+      toast({
+        title: "Scan complete",
+        description: `Suggested ${result.summary.tripsSuggested} trip${result.summary.tripsSuggested === 1 ? "" : "s"} from your device data.`,
+      });
+    } catch (error) {
+      console.error("Auto scan failed", error);
+      setAutoScanStatus("error");
+      setAutoScanError("Unable to scan this device in web mode. Try uploading photos instead.");
+    }
+  }, [
+    includeEmails,
+    includePhotos,
+    excludedAlbums,
+    excludedFolders,
+    homeCountryIso2,
+    existingTrips,
+    toast,
+  ]);
+
+  const toggleExcludedAlbum = useCallback((album: string) => {
+    setExcludedAlbums((prev) => (prev.includes(album) ? prev.filter((item) => item !== album) : [...prev, album]));
+  }, []);
+
+  const toggleExcludedFolder = useCallback((folder: string) => {
+    setExcludedFolders((prev) => (prev.includes(folder) ? prev.filter((item) => item !== folder) : [...prev, folder]));
+  }, []);
 
   const handleDismiss = useCallback((id: string) => {
     setSuggestions((prev) => prev.filter((s) => s.id !== id));
@@ -293,18 +356,6 @@ export default function AIFindOnMyPhoneDialog({
     setSuggestions((prev) => prev.map((s) => (s.id === editingId ? updated : s)));
     setEditingId(null);
   }, [editingId, editingSuggestion, editCountry, editVisitDate, editEndDate, editIsApproximate, editApproximateMonth, editApproximateYear, editTripName]);
-
-  // Load demo suggestions
-  const handleLoadDemo = useCallback(() => {
-    setDemoMode(true);
-    const demoTrips = generateDemoSuggestions();
-    const withDuplicates = markDuplicateSuggestions(demoTrips, existingTrips);
-    setSuggestions((prev) => [...prev, ...withDuplicates]);
-    toast({
-      title: "Demo mode activated",
-      description: `Loaded ${demoTrips.length} sample trips to preview the feature.`,
-    });
-  }, [existingTrips, toast]);
 
   // Toggle selection for bulk action
   const handleToggleSelect = useCallback((id: string) => {
@@ -400,109 +451,199 @@ export default function AIFindOnMyPhoneDialog({
     <>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: homeCopy.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-        
-        {/* Demo Mode Button */}
-        {suggestions.length === 0 && (
-          <div className="flex items-center justify-between p-3 rounded-lg border border-dashed border-primary/30 bg-primary/5">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm">Try demo mode to see how it works</span>
+
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Find On My Phone
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              This demo simulates scanning your photos and email inbox locally. Nothing leaves your device.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-4 text-xs">
+              <label className="flex items-center gap-2">
+                <Checkbox checked={includePhotos} onCheckedChange={(value) => setIncludePhotos(!!value)} />
+                Scan photos (EXIF + location)
+              </label>
+              <label className="flex items-center gap-2">
+                <Checkbox checked={includeEmails} onCheckedChange={(value) => setIncludeEmails(!!value)} />
+                Scan travel emails
+              </label>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={handleLoadDemo}>
-              Load Demo
-            </Button>
-          </div>
-        )}
-
-        {/* Paste Text Section */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-muted-foreground" />
-            <Label htmlFor="ai-find-paste">Paste email or text (OOO, boarding pass, hotel confirmation)</Label>
-          </div>
-          <Textarea
-            id="ai-find-paste"
-            placeholder="Paste flight confirmation, hotel booking, OOO message, or any travel-related text..."
-            value={pasteValue}
-            onChange={(e) => setPasteValue(e.target.value)}
-            className="min-h-[80px]"
-            aria-label="Paste text to find trips"
-          />
-          <Button type="button" variant="secondary" size="sm" onClick={handleFindTrips}>
-            <Search className="w-4 h-4 mr-2" />
-            Find trips in text
-          </Button>
-        </div>
-
-        {/* Photo Upload Section */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Image className="w-4 h-4 text-muted-foreground" />
-            <Label htmlFor="ai-find-photos">Upload photos with location data</Label>
-          </div>
-          <input
-            id="ai-find-photos"
-            type="file"
-            accept="image/*"
-            multiple
-            className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-primary-foreground file:cursor-pointer cursor-pointer"
-            aria-label="Add photos with location"
-            disabled={photoLoading}
-            onChange={async (e) => {
-              const files = e.target.files;
-              if (!files?.length) return;
-              setPhotoLoading(true);
-              setPhotoProgress({ current: 0, total: files.length });
-              try {
-                const result = await getSuggestionsFromPhotos(Array.from(files), homeCountryIso2 ?? null);
-                if (result.length === 0) {
-                  toast({ title: "No photos with location/date found", description: "Photos need GPS and date in EXIF. Set your home country in Settings to filter by trips abroad.", variant: "destructive" });
-                } else {
-                  // Merge nearby trips and mark duplicates
-                  const merged = mergeNearbyTrips(result);
-                  const withDuplicates = markDuplicateSuggestions(merged, existingTrips);
-                  const duplicates = withDuplicates.filter(s => s.alreadyExists);
-                  const newTrips = withDuplicates.filter(s => !s.alreadyExists);
-                  
-                  setSuggestions((prev) => [...prev, ...withDuplicates]);
-                  
-                  if (duplicates.length > 0 && newTrips.length === 0) {
-                    toast({ 
-                      title: "Trips already logged", 
-                      description: `All ${duplicates.length} photo trip${duplicates.length > 1 ? 's' : ''} found are already in your travels.`,
-                    });
-                  } else if (duplicates.length > 0) {
-                    toast({
-                      title: `Found ${merged.length} trip${merged.length > 1 ? 's' : ''} from photos`,
-                      description: `${duplicates.length} already logged, ${newTrips.length} new.`,
-                    });
-                  } else {
-                    toast({
-                      title: `Found ${merged.length} trip${merged.length > 1 ? 's' : ''} from photos`,
-                    });
-                  }
-                }
-              } catch {
-                toast({ title: "Error reading photos", variant: "destructive" });
-              } finally {
-                setPhotoLoading(false);
-                setPhotoProgress({ current: 0, total: 0 });
-                e.target.value = "";
-              }
-            }}
-          />
-          {photoLoading && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Processing photos... (this may take a moment due to rate limits)</span>
+            <div className="grid gap-3 sm:grid-cols-2 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <FolderOpen className="h-3 w-3" />
+                  Exclude albums
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {demoSources.albums.map((album) => (
+                    <label key={album} className="flex items-center gap-1">
+                      <Checkbox
+                        checked={excludedAlbums.includes(album)}
+                        onCheckedChange={() => toggleExcludedAlbum(album)}
+                      />
+                      {album}
+                    </label>
+                  ))}
+                </div>
               </div>
-              {photoProgress.total > 0 && (
-                <Progress value={(photoProgress.current / photoProgress.total) * 100} className="h-2" />
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <Inbox className="h-3 w-3" />
+                  Exclude email folders
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {demoSources.folders.map((folder) => (
+                    <label key={folder} className="flex items-center gap-1">
+                      <Checkbox
+                        checked={excludedFolders.includes(folder)}
+                        onCheckedChange={() => toggleExcludedFolder(folder)}
+                      />
+                      {folder}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Button type="button" onClick={handleAutoScan} disabled={autoScanStatus === "scanning"}>
+                {autoScanStatus === "scanning" ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Scanning…
+                  </>
+                ) : (
+                  <>
+                    <Smartphone className="w-4 h-4 mr-2" />
+                    Allow access & scan
+                  </>
+                )}
+              </Button>
+              {autoScanStatus === "completed" && (
+                <Button type="button" variant="ghost" size="sm" onClick={handleAutoScan}>
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Rescan
+                </Button>
               )}
             </div>
-          )}
-        </div>
+            {autoScanStatus === "scanning" && (
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">{autoScanProgress.message}</div>
+                <Progress value={autoScanProgress.percent} className="h-2" />
+              </div>
+            )}
+            {autoScanStatus === "error" && (
+              <p className="text-xs text-destructive">{autoScanError}</p>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Manual import (optional)
+              </span>
+              <ChevronDown className={cn("h-4 w-4 transition-transform", manualOpen && "rotate-180")} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 pt-2">
+            {/* Paste Text Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="ai-find-paste">Paste email or text (OOO, boarding pass, hotel confirmation)</Label>
+              </div>
+              <Textarea
+                id="ai-find-paste"
+                placeholder="Paste flight confirmation, hotel booking, OOO message, or any travel-related text..."
+                value={pasteValue}
+                onChange={(e) => setPasteValue(e.target.value)}
+                className="min-h-[80px]"
+                aria-label="Paste text to find trips"
+              />
+              <Button type="button" variant="secondary" size="sm" onClick={handleFindTrips}>
+                <Search className="w-4 h-4 mr-2" />
+                Find trips in text
+              </Button>
+            </div>
+
+            {/* Photo Upload Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Image className="w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="ai-find-photos">Upload photos with location data</Label>
+              </div>
+              <input
+                id="ai-find-photos"
+                type="file"
+                accept="image/*"
+                multiple
+                className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-primary-foreground file:cursor-pointer cursor-pointer"
+                aria-label="Add photos with location"
+                disabled={photoLoading}
+                onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files?.length) return;
+                  setPhotoLoading(true);
+                  setPhotoProgress({ current: 0, total: files.length });
+                  try {
+                    const result = await getSuggestionsFromPhotos(Array.from(files), homeCountryIso2 ?? null);
+                    if (result.length === 0) {
+                      toast({ title: "No photos with location/date found", description: "Photos need GPS and date in EXIF. Set your home country in Settings to filter by trips abroad.", variant: "destructive" });
+                    } else {
+                      // Merge nearby trips and mark duplicates
+                      const merged = mergeNearbyTrips(result);
+                      const withDuplicates = markDuplicateSuggestions(merged, existingTrips);
+                      const duplicates = withDuplicates.filter(s => s.alreadyExists);
+                      const newTrips = withDuplicates.filter(s => !s.alreadyExists);
+                      
+                      setSuggestions((prev) => [...prev, ...withDuplicates]);
+                      
+                      if (duplicates.length > 0 && newTrips.length === 0) {
+                        toast({ 
+                          title: "Trips already logged", 
+                          description: `All ${duplicates.length} photo trip${duplicates.length > 1 ? 's' : ''} found are already in your travels.`,
+                        });
+                      } else if (duplicates.length > 0) {
+                        toast({
+                          title: `Found ${merged.length} trip${merged.length > 1 ? 's' : ''} from photos`,
+                          description: `${duplicates.length} already logged, ${newTrips.length} new.`,
+                        });
+                      } else {
+                        toast({
+                          title: `Found ${merged.length} trip${merged.length > 1 ? 's' : ''} from photos`,
+                        });
+                      }
+                    }
+                  } catch {
+                    toast({ title: "Error reading photos", variant: "destructive" });
+                  } finally {
+                    setPhotoLoading(false);
+                    setPhotoProgress({ current: 0, total: 0 });
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {photoLoading && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Processing photos... (this may take a moment due to rate limits)</span>
+                  </div>
+                  {photoProgress.total > 0 && (
+                    <Progress value={(photoProgress.current / photoProgress.total) * 100} className="h-2" />
+                  )}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       {suggestions.length > 0 && (
@@ -622,7 +763,43 @@ export default function AIFindOnMyPhoneDialog({
                         {s.photoCount} photos
                       </Badge>
                     )}
+                    {s.emailCount && s.emailCount > 0 && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                        {s.emailCount} emails
+                      </Badge>
+                    )}
+                    {s.relatedCountries && s.relatedCountries.length > 0 && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                        Multi-country
+                      </Badge>
+                    )}
                   </div>
+                  {(s.evidence?.photos?.length || s.evidence?.emails?.length) && (
+                    <div className="mt-2 space-y-1">
+                      {s.evidence.photos && s.evidence.photos.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          {s.evidence.photos.slice(0, 3).map((photo) => (
+                            <img
+                              key={photo.id}
+                              src={photo.thumbnailUrl}
+                              alt={`Photo evidence from ${photo.countryName}`}
+                              className="h-8 w-8 rounded-md object-cover border"
+                            />
+                          ))}
+                          {s.evidence.photos.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">
+                              +{s.evidence.photos.length - 3} more photos
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {s.evidence.emails && s.evidence.emails.length > 0 && (
+                        <div className="text-[10px] text-muted-foreground line-clamp-2">
+                          “{s.evidence.emails[0].snippet}”
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(s.id)} aria-label="Edit">
@@ -796,7 +973,7 @@ export default function AIFindOnMyPhoneDialog({
               <Smartphone className="w-5 h-5" />
               AI Find On My Phone
             </SheetTitle>
-            <SheetDescription>Paste text or add photos to suggest trips. {homeCopy.replace(/\*\*/g, "")}</SheetDescription>
+            <SheetDescription>Allow access to scan device data, or paste text and photos manually. {homeCopy.replace(/\*\*/g, "")}</SheetDescription>
           </SheetHeader>
           <div className="mt-4 pb-8">{content}</div>
         </SheetContent>
@@ -813,7 +990,7 @@ export default function AIFindOnMyPhoneDialog({
             AI Find On My Phone
           </DialogTitle>
           <DialogDescription id="ai-find-desc">
-            Paste text (OOO, boarding pass) or add photos with location to suggest trips.
+            Allow access to scan device data, or paste text (OOO, boarding pass) and photos manually.
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2">{content}</div>
