@@ -12,8 +12,8 @@ import { Country, FamilyMember } from '@/hooks/useFamilyData';
 import { useVisitDetails } from '@/hooks/useVisitDetails';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  Trophy, Target, Star, Globe, Map, Plane, Award, Medal, 
+import {
+  Trophy, Target, Star, Globe, Map, Plane, Award, Medal,
   Crown, Gem, Plus, Calendar, Trash2, ChevronDown, Check,
   Compass, MapPin, Footprints, Mountain, Sparkles
 } from 'lucide-react';
@@ -76,7 +76,7 @@ const ACHIEVEMENTS: Achievement[] = [
   // Country milestones
   { key: 'first_country', name: 'First Steps', description: 'Visit your first country', icon: Globe, color: 'bg-emerald-500', requirement: 1, type: 'countries', rarity: 'common', hint: 'Mark your first country as visited to unlock' },
   { key: 'five_countries', name: 'Explorer', description: 'Visit 5 countries', icon: Map, color: 'bg-blue-500', requirement: 5, type: 'countries', rarity: 'common', hint: 'Visit 5 countries to unlock' },
-  { key: 'ten_countries', name: 'Adventurer', description: 'Visit 10 countries', icon: Plane, color: 'bg-cyan-500', requirement: 10, type: 'countries', rarity: 'common', hint: 'Visit 10 countries to unlock' },
+  { key: 'ten_countries', name: 'Wanderer', description: 'Visit 10 countries', icon: Plane, color: 'bg-cyan-500', requirement: 10, type: 'countries', rarity: 'common', hint: 'Visit 10 countries to unlock' },
   { key: 'twenty_countries', name: 'Globetrotter', description: 'Visit 20 countries', icon: Star, color: 'bg-purple-500', requirement: 20, type: 'countries', rarity: 'rare', hint: 'Visit 20 countries to unlock this rare badge' },
   { key: 'twentyfive_countries', name: 'Quarter Century', description: 'Visit 25 countries', icon: Medal, color: 'bg-amber-500', requirement: 25, type: 'countries', rarity: 'rare', hint: 'Visit 25 countries to unlock this rare badge' },
   { key: 'thirty_countries', name: 'World Traveler', description: 'Visit 30 countries', icon: Award, color: 'bg-orange-500', requirement: 30, type: 'countries', rarity: 'rare', hint: 'Visit 30 countries to unlock this rare badge' },
@@ -93,6 +93,9 @@ const ACHIEVEMENTS: Achievement[] = [
   { key: 'all_continents', name: 'World Conqueror', description: 'Visit all 7 continents', icon: Crown, color: 'bg-gradient-to-r from-purple-500 to-pink-500', requirement: 7, type: 'continents', rarity: 'legendary', hint: 'Visit all 7 continents including Antarctica!' },
   // Special / milestone
   { key: 'new_years_abroad', name: 'New Year\'s Abroad', description: 'Spend New Year\'s Eve abroad — trip spans Dec 31 into Jan 1', icon: Sparkles, color: 'bg-gradient-to-r from-amber-500 to-yellow-500', requirement: 1, type: 'special', rarity: 'rare', hint: 'Add a visit that spans from Dec 31 of one year into Jan 1 of the next' },
+  { key: 'family_fun', name: 'Family Fun', description: 'Travel with 3+ family members', icon: Award, color: 'bg-rose-500', requirement: 3, type: 'special', rarity: 'common', hint: 'Log a trip with at least 3 family members' },
+  { key: 'goal_setter', name: 'Goal Setter', description: 'Create your first travel goal', icon: Target, color: 'bg-blue-400', requirement: 1, type: 'special', rarity: 'common', hint: 'Set a new travel goal to unlock' },
+  { key: 'goal_getter', name: 'Goal Getter', description: 'Complete a travel goal', icon: Check, color: 'bg-green-500', requirement: 1, type: 'special', rarity: 'rare', hint: 'Complete 100% of any travel goal' },
 ];
 
 const rarityStyles = {
@@ -206,16 +209,16 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
       const isSpecialEarned = achievement.type === 'special' && achievement.key === 'new_years_abroad' && hasNewYearsAbroad;
       const current = achievement.type === 'countries' ? visitedCountries
         : achievement.type === 'continents' ? totalContinents
-        : isSpecialEarned ? 1 : 0;
+          : isSpecialEarned ? 1 : 0;
       if ((current >= achievement.requirement || isSpecialEarned) &&
-          !earnedAchievements.includes(achievement.key) &&
-          !newlyEarned.includes(achievement.key)) {
-        
+        !earnedAchievements.includes(achievement.key) &&
+        !newlyEarned.includes(achievement.key)) {
+
         const { error } = await supabase.from('user_achievements').insert({
           user_id: user.id,
           achievement_key: achievement.key,
         });
-        
+
         if (!error) {
           newlyEarned.push(achievement.key);
           setNewlyEarnedKey(achievement.key);
@@ -305,7 +308,7 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
   const displayedAchievements = showAllAchievements ? ACHIEVEMENTS : [...earnedList, ...lockedList.slice(0, 6 - earnedList.length)].slice(0, 6);
 
   return (
-    <div className="grid md:grid-cols-2 gap-6">
+    <div className="flex flex-col gap-8">
       {/* Achievements */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-3">
@@ -325,7 +328,7 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
               const isSpecialEarned = achievement.type === 'special' && achievement.key === 'new_years_abroad' && hasNewYearsAbroad;
               const current = achievement.type === 'countries' ? visitedCountries
                 : achievement.type === 'continents' ? totalContinents
-                : isSpecialEarned ? 1 : 0;
+                  : isSpecialEarned ? 1 : 0;
               const isEarned = achievement.type === 'special' ? isSpecialEarned : current >= achievement.requirement;
               const isNewlyEarned = newlyEarnedKey === achievement.key;
               const rarity = rarityStyles[achievement.rarity];
@@ -350,11 +353,11 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
               );
             })}
           </div>
-          
+
           {ACHIEVEMENTS.length > 6 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="w-full mt-4 text-muted-foreground"
               onClick={() => setShowAllAchievements(!showAllAchievements)}
             >
@@ -386,7 +389,7 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
               <div className="space-y-4">
                 <div>
                   <Label>Goal Title</Label>
-                  <Input 
+                  <Input
                     placeholder="e.g., Visit 10 new countries this year"
                     value={newGoal.title}
                     onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })}
@@ -413,8 +416,8 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                   </div>
                   <div>
                     <Label>Target</Label>
-                    <Input 
-                      type="number" 
+                    <Input
+                      type="number"
                       min={1}
                       value={newGoal.target_count === 0 ? '' : newGoal.target_count}
                       onChange={(e) => {
@@ -428,14 +431,14 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                 </div>
                 <div>
                   <Label>Deadline (optional)</Label>
-                  <Input 
+                  <Input
                     type="date"
                     value={newGoal.deadline}
                     onChange={(e) => setNewGoal({ ...newGoal, deadline: e.target.value })}
                   />
                 </div>
-                <Button 
-                  onClick={handleAddGoal} 
+                <Button
+                  onClick={handleAddGoal}
                   className="w-full"
                   disabled={!newGoal.title.trim() || newGoal.target_count < 1}
                 >
@@ -457,7 +460,7 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                 const progress = Math.min(getGoalProgress(goal), 100);
                 const current = getGoalCurrent(goal);
                 const typeLabel = getGoalTypeLabel(goal.goal_type);
-                
+
                 return (
                   <div key={goal.id} className="bg-muted/50 rounded-lg p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -468,8 +471,8 @@ const EnhancedAchievements = ({ countries, familyMembers, totalContinents }: Enh
                           {goal.deadline && ` • Due ${format(new Date(goal.deadline), 'MMM d, yyyy')}`}
                         </p>
                       </div>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => handleDeleteGoal(goal.id)}

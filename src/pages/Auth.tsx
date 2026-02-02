@@ -135,19 +135,19 @@ const Auth = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
       setErrors({ email: emailResult.error.errors[0].message });
       return;
     }
-    
+
     setResetLoading(true);
-    
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    
+
     setResetLoading(false);
 
     if (error) {
@@ -203,7 +203,7 @@ const Auth = () => {
         redirectTo: `${window.location.origin}/auth`,
       },
     });
-    
+
     if (error) {
       toast.error(error.message);
       setGoogleLoading(false);
@@ -417,25 +417,6 @@ const Auth = () => {
                 Continue with Google
               </Button>
 
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full gap-2 text-muted-foreground"
-                onClick={handleDemoLogin}
-                disabled={demoLoading || loading}
-              >
-                {demoLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading demo...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    Try Demo (No account needed)
-                  </>
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>

@@ -28,7 +28,7 @@ const CONTINENT_TOTALS: Record<string, number> = {
 };
 
 const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const { visitDetails } = useVisitDetails();
   const [tripLegs, setTripLegs] = useState<TripLeg[]>([]);
 
@@ -39,12 +39,12 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
         .from('trip_legs')
         .select('*')
         .order('start_date', { ascending: false });
-      
+
       if (!error && data) {
         setTripLegs(data as TripLeg[]);
       }
     };
-    
+
     fetchTripLegs();
   }, []);
 
@@ -74,10 +74,10 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
   const analyticsInsights = useMemo(() => {
     const visitedCountries = countries.filter(c => c.visitedBy.length > 0);
     const validVisits = visitDetails.filter(v => v.visit_date || v.approximate_year);
-    
+
     // Combine data from trip legs
     const legsWithDates = tripLegs.filter(leg => leg.start_date && leg.end_date);
-    
+
     // Calculate multi-country trip count
     const multiCountryTripIds = new Set<string>();
     const tripLegCounts: Record<string, number> = {};
@@ -88,18 +88,18 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
       if (count > 1) multiCountryTripIds.add(tripId);
     });
     const multiCountryTripCount = multiCountryTripIds.size;
-    
+
     // Additional days from trip legs (for countries not already counted in visitDetails)
     const tripLegDays = legsWithDates.reduce((sum, leg) => {
       return sum + (leg.number_of_days || differenceInDays(parseISO(leg.end_date), parseISO(leg.start_date)) + 1);
     }, 0);
-    
+
     // Countries from trip legs that might not be in visitDetails
     const legCountryNames = new Set(tripLegs.map(leg => leg.country_name.toLowerCase()));
-    
+
     // Countries visited via multi-country trips
     const countriesFromLegs = new Set(tripLegs.map(leg => leg.country_name));
-    
+
     // 1. Travel Frequency Over Time
     const visitsByYear = validVisits.reduce((acc, visit) => {
       const year = visit.visit_date ? getYear(parseISO(visit.visit_date)) : (visit.approximate_year || 0);
@@ -107,13 +107,13 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
       return acc;
     }, {} as Record<number, number>);
     const mostActiveYear = Object.entries(visitsByYear).sort((a, b) => b[1] - a[1])[0];
-    
+
     // 2. Average Trip Duration
     const tripsWithDuration = validVisits.filter(v => v.number_of_days && v.number_of_days > 0);
     const avgDuration = tripsWithDuration.length > 0
       ? Math.round(tripsWithDuration.reduce((sum, v) => sum + (v.number_of_days || 0), 0) / tripsWithDuration.length)
       : 0;
-    
+
     // 3. Most Visited Country
     const countryVisitCounts = validVisits.reduce((acc, visit) => {
       const country = visitedCountries.find(c => c.id === visit.country_id);
@@ -121,11 +121,11 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
       return acc;
     }, {} as Record<string, number>);
     const mostVisited = Object.entries(countryVisitCounts).sort((a, b) => b[1] - a[1])[0];
-    
+
     // 4. Longest Single Trip
     const longestTrip = tripsWithDuration.sort((a, b) => (b.number_of_days || 0) - (a.number_of_days || 0))[0];
     const longestTripCountry = longestTrip ? visitedCountries.find(c => c.id === longestTrip.country_id) : null;
-    
+
     // 5. Travel Seasonality
     const visitsByMonth = validVisits.reduce((acc, visit) => {
       if (visit.visit_date) {
@@ -138,23 +138,23 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
     }, {} as Record<number, number>);
     const favoriteMonth = Object.entries(visitsByMonth).sort((a, b) => b[1] - a[1])[0];
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     // 6. Countries Visited Multiple Times
     const repeatVisits = Object.entries(countryVisitCounts).filter(([_, count]) => count > 1);
-    
+
     // 7. Travel Velocity (countries per year)
     const years = Object.keys(visitsByYear).map(Number).sort();
     const firstYear = years[0];
     const lastYear = years[years.length - 1];
     const yearsActive = lastYear && firstYear ? lastYear - firstYear + 1 : 1;
     const velocity = yearsActive > 0 ? (totalVisited / yearsActive).toFixed(1) : '0';
-    
+
     // 8. Trip Diversity
     const uniqueTrips = new Set(validVisits.filter(v => v.trip_name).map(v => v.trip_name));
-    
+
     // 9. Geographic Spread (continents visited)
     const continentsVisited = new Set(visitedCountries.map(c => c.continent)).size;
-    
+
     // 10. Travel Streak (consecutive years)
     let maxStreak = 0;
     let currentStreak = 0;
@@ -198,7 +198,7 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
     const percentOfYearAbroad = totalDaysAbroad > 0 ? ((totalDaysAbroad / 365) * 100).toFixed(1) : '0';
 
     // 18. First & last country by visit date (earliest/latest visit)
-    const visitsWithDate = validVisits.filter(v => v.visit_date).sort((a, b) => 
+    const visitsWithDate = validVisits.filter(v => v.visit_date).sort((a, b) =>
       new Date(a.visit_date!).getTime() - new Date(b.visit_date!).getTime()
     );
     const firstVisitByDate = visitsWithDate[0];
@@ -279,7 +279,7 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
             </CollapsibleTrigger>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           {/* Key insight - always visible */}
           <div className="p-4 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg border border-primary/10 mb-4">
@@ -315,7 +315,7 @@ const AnalyticsInsightCard = ({ countries }: AnalyticsInsightCardProps) => {
                   <span className="font-medium text-foreground">{continent.percentage}%</span>
                 </div>
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-primary transition-all duration-500"
                     style={{ width: `${continent.percentage}%` }}
                   />
