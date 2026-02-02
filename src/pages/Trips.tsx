@@ -43,6 +43,7 @@ const Trips = () => {
       const start = parseISO(trip.start_date);
       const end = parseISO(trip.end_date);
       if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+      if (end < start) return null;
       return differenceInDays(end, start) + 1;
     } catch {
       return null;
@@ -64,6 +65,15 @@ const Trips = () => {
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    setSelectedTripIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(trips.map((trip) => trip.id));
+      const next = new Set(Array.from(prev).filter((id) => validIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [trips]);
 
   const handleDeleteTrip = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
