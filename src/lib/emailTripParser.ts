@@ -565,14 +565,29 @@ export function mergeNearbyTrips(
           if (daysBetween <= maxDaysApart) {
             // Merge trips
             const totalPhotos = (current.photoCount || 0) + (next.photoCount || 0);
+            const totalEmails = (current.emailCount || 0) + (next.emailCount || 0);
+            const mergedEvidence = current.evidence || next.evidence
+              ? {
+                  photos: [
+                    ...(current.evidence?.photos ?? []),
+                    ...(next.evidence?.photos ?? []),
+                  ],
+                  emails: [
+                    ...(current.evidence?.emails ?? []),
+                    ...(next.evidence?.emails ?? []),
+                  ],
+                }
+              : undefined;
             current = {
               ...current,
               endDate: next.endDate || current.endDate,
               photoCount: totalPhotos || undefined,
+              emailCount: totalEmails || undefined,
               sourceLabel: totalPhotos > 0 
                 ? `From ${totalPhotos} photos` 
                 : `${current.sourceLabel} + ${next.sourceLabel}`,
               confidence: Math.max(current.confidence || 0.5, next.confidence || 0.5),
+              evidence: mergedEvidence,
             };
             continue;
           }

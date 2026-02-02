@@ -14,6 +14,12 @@ export interface TripSuggestion {
   sourceLabel: string;
   photoCount?: number;
   photoFileNames?: string[];
+  emailCount?: number;
+  evidence?: {
+    photos?: TripSuggestionEvidencePhoto[];
+    emails?: TripSuggestionEvidenceEmail[];
+  };
+  relatedCountries?: string[];
   /** True if this trip already exists in user's travels */
   alreadyExists?: boolean;
   /** Message explaining why it's a duplicate */
@@ -37,6 +43,24 @@ export interface ExistingTrip {
   approximateMonth: number | null;
   approximateYear: number | null;
   tripName: string | null;
+}
+
+export interface TripSuggestionEvidencePhoto {
+  id: string;
+  date: string | null;
+  countryCode: string;
+  countryName: string;
+  album: string;
+  thumbnailUrl: string;
+  isTransit?: boolean;
+}
+
+export interface TripSuggestionEvidenceEmail {
+  id: string;
+  date: string | null;
+  subject: string;
+  snippet: string;
+  folder: string;
 }
 
 const DATE_PATTERNS: { pattern: RegExp; parseFn: (match: RegExpMatchArray) => { visit: string | null; end: string | null; approxMonth: number | null; approxYear: number | null } }[] = [
