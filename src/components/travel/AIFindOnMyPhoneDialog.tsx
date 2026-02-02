@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +29,11 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Smartphone, Search, X, Pencil, PlusCircle, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { Smartphone, Search, X, Pencil, PlusCircle, Loader2, Check, ChevronsUpDown, CheckCircle2, AlertCircle } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
-import { parsePastedText, type TripSuggestion } from "@/lib/tripSuggestionsParser";
+import { useVisitDetails } from "@/hooks/useVisitDetails";
+import { parsePastedText, markDuplicateSuggestions, type TripSuggestion, type ExistingTrip } from "@/lib/tripSuggestionsParser";
 import { getSuggestionsFromPhotos } from "@/lib/photoTripSuggestions";
 import { getAllCountries, type CountryOption } from "@/lib/countriesData";
 import CountryFlag from "@/components/common/CountryFlag";
@@ -104,6 +105,7 @@ export default function AIFindOnMyPhoneDialog({
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const { iso2: homeCountryIso2, name: homeCountryName } = useHomeCountry(homeCountry);
+  const { visitDetails } = useVisitDetails();
   const [pasteValue, setPasteValue] = useState("");
   const [suggestions, setSuggestions] = useState<TripSuggestion[]>([]);
   const [photoLoading, setPhotoLoading] = useState(false);
@@ -117,8 +119,38 @@ export default function AIFindOnMyPhoneDialog({
   const [editApproximateYear, setEditApproximateYear] = useState<number | null>(null);
   const [editIsApproximate, setEditIsApproximate] = useState(false);
   const [editTripName, setEditTripName] = useState("");
+  const [showDuplicates, setShowDuplicates] = useState(true);
+
+  // Convert existing visit details to ExistingTrip format for duplicate detection
+  const existingTrips: ExistingTrip[] = useMemo(() => {
+    return visitDetails.map(v => {
+      // Find country info from the countries prop
+      const country = countries.find(c => c.id === v.country_id);
+      return {
+        countryId: v.country_id,
+        countryName: country?.name ?? "",
+        countryCode: country?.flag,
+        visitDate: v.visit_date,
+        endDate: v.end_date,
+        approximateMonth: v.approximate_month,
+        approximateYear: v.approximate_year,
+        tripName: v.trip_name,
+      };
+    }).filter(t => t.countryName); // Filter out any with missing country data
+  }, [visitDetails, countries]);
 
   const editingSuggestion = suggestions.find((s) => s.id === editingId);
+
+  // Filter suggestions based on showDuplicates toggle
+  const displayedSuggestions = useMemo(() => {
+    if (showDuplicates) return suggestions;
+    return suggestions.filter(s => !s.alreadyExists);
+  }, [suggestions, showDuplicates]);
+
+  // Count duplicates for display
+  const duplicateCount = useMemo(() => 
+    suggestions.filter(s => s.alreadyExists).length
+  , [suggestions]);
 
   useEffect(() => {
     if (editingSuggestion) {
@@ -139,13 +171,36 @@ export default function AIFindOnMyPhoneDialog({
     : "Set your home country in Settings to filter photos by trips abroad.";
 
   const handleFindTrips = useCallback(() => {
-    const parsed = parsePastedText(pasteValue);
-    if (parsed.length === 0) {
-      setSuggestions((prev) => prev);
+    const trimmed = pasteValue.trim();
+    if (!trimmed) {
+      toast({ title: "Enter some text first", description: "Paste text that mentions a country and dates.", variant: "destructive" });
       return;
     }
-    setSuggestions((prev) => [...prev, ...parsed]);
-  }, [pasteValue]);
+    const parsed = parsePastedText(trimmed);
+    if (parsed.length === 0) {
+      toast({ title: "No trips found in that text", description: "Try pasting text that mentions a country and dates (e.g. Iceland from 3/25/13 to 3/30/13).", variant: "destructive" });
+      return;
+    }
+    // Mark duplicates before adding
+    const withDuplicates = markDuplicateSuggestions(parsed, existingTrips);
+    const duplicates = withDuplicates.filter(s => s.alreadyExists);
+    const newTrips = withDuplicates.filter(s => !s.alreadyExists);
+    
+    setSuggestions((prev) => [...prev, ...withDuplicates]);
+    setPasteValue("");
+    
+    if (duplicates.length > 0 && newTrips.length === 0) {
+      toast({ 
+        title: "Trip already logged", 
+        description: duplicates[0].duplicateReason || "This trip appears to already be in your travels.",
+      });
+    } else if (duplicates.length > 0) {
+      toast({
+        title: `Found ${parsed.length} trip${parsed.length > 1 ? 's' : ''}`,
+        description: `${duplicates.length} already logged, ${newTrips.length} new.`,
+      });
+    }
+  }, [pasteValue, toast, existingTrips]);
 
   const handleDismiss = useCallback((id: string) => {
     setSuggestions((prev) => prev.filter((s) => s.id !== id));
@@ -164,7 +219,7 @@ export default function AIFindOnMyPhoneDialog({
         const countryName = s.countryName;
         const countryCode = (s.countryCode ?? "").toUpperCase();
         const continent = allCountries.find((c) => c.code === countryCode)?.continent ?? "Unknown";
-        let countryId: string | null = countries.find(
+        let countryId: string | null = (countries ?? []).find(
           (c) => c.name === countryName || (c.flag && c.flag.toUpperCase() === countryCode)
         )?.id ?? null;
         const memberIds = familyMembers.length > 0 ? familyMembers.map((m) => m.id) : null;
@@ -268,9 +323,31 @@ export default function AIFindOnMyPhoneDialog({
               setPhotoLoading(true);
               try {
                 const result = await getSuggestionsFromPhotos(Array.from(files), homeCountryIso2 ?? null);
-                setSuggestions((prev) => [...prev, ...result]);
                 if (result.length === 0) {
                   toast({ title: "No photos with location/date found", description: "Photos need GPS and date in EXIF. Set your home country in Settings to filter by trips abroad.", variant: "destructive" });
+                } else {
+                  // Mark duplicates before adding
+                  const withDuplicates = markDuplicateSuggestions(result, existingTrips);
+                  const duplicates = withDuplicates.filter(s => s.alreadyExists);
+                  const newTrips = withDuplicates.filter(s => !s.alreadyExists);
+                  
+                  setSuggestions((prev) => [...prev, ...withDuplicates]);
+                  
+                  if (duplicates.length > 0 && newTrips.length === 0) {
+                    toast({ 
+                      title: "Trips already logged", 
+                      description: `All ${duplicates.length} photo trip${duplicates.length > 1 ? 's' : ''} found are already in your travels.`,
+                    });
+                  } else if (duplicates.length > 0) {
+                    toast({
+                      title: `Found ${result.length} trip${result.length > 1 ? 's' : ''} from photos`,
+                      description: `${duplicates.length} already logged, ${newTrips.length} new.`,
+                    });
+                  } else {
+                    toast({
+                      title: `Found ${result.length} trip${result.length > 1 ? 's' : ''} from photos`,
+                    });
+                  }
                 }
               } catch {
                 toast({ title: "Error reading photos", variant: "destructive" });
@@ -291,40 +368,111 @@ export default function AIFindOnMyPhoneDialog({
 
       {suggestions.length > 0 && (
         <div className="mt-6 space-y-3">
-          <h3 className="text-sm font-medium">Suggested trips</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">
+              Suggested trips
+              {suggestions.length > 0 && (
+                <span className="ml-2 text-muted-foreground font-normal">
+                  ({displayedSuggestions.length}{duplicateCount > 0 && !showDuplicates ? ` of ${suggestions.length}` : ''})
+                </span>
+              )}
+            </h3>
+            {duplicateCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2"
+                onClick={() => setShowDuplicates(!showDuplicates)}
+              >
+                {showDuplicates ? `Hide ${duplicateCount} already logged` : `Show ${duplicateCount} already logged`}
+              </Button>
+            )}
+          </div>
+          
+          {displayedSuggestions.length === 0 && duplicateCount > 0 && (
+            <div className="text-center py-4 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
+              <p>All {duplicateCount} trip{duplicateCount > 1 ? 's' : ''} already logged!</p>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="mt-1"
+                onClick={() => setShowDuplicates(true)}
+              >
+                Show anyway
+              </Button>
+            </div>
+          )}
+          
           <ul className="space-y-2 max-h-[280px] overflow-y-auto">
-            {suggestions.map((s) => (
+            {displayedSuggestions.map((s) => (
               <li
                 key={s.id}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm",
-                  "hover:border-primary/40 hover:bg-primary/5"
+                  "flex items-center gap-3 rounded-lg border px-3 py-2.5 shadow-sm transition-colors",
+                  s.alreadyExists
+                    ? "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
                 )}
               >
                 <CountryFlag countryCode={s.countryCode} countryName={s.countryName} size="sm" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{s.countryName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm truncate">{s.countryName}</p>
+                    {s.alreadyExists && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-green-100 text-green-700 border-green-300 dark:bg-green-900 dark:text-green-300 dark:border-green-700">
+                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                        Logged
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{formatSuggestionDate(s)}</p>
-                  <Badge variant="secondary" className="mt-1 text-xs">
-                    {s.sourceLabel}
-                  </Badge>
+                  {s.tripName && (
+                    <p className="text-xs text-muted-foreground truncate">{s.tripName}</p>
+                  )}
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                      {s.sourceLabel}
+                    </Badge>
+                    {s.photoCount && s.photoCount > 1 && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                        {s.photoCount} photos
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(s.id)} aria-label="Edit">
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label="Add to travels"
-                    title="Add to travels"
-                    disabled={addingId === s.id}
-                    onClick={() => handleAddToTravels(s)}
-                  >
-                    {addingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-                  </Button>
+                  {!s.alreadyExists ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-primary hover:text-primary"
+                      aria-label="Add to travels"
+                      title="Add to travels"
+                      disabled={addingId === s.id}
+                      onClick={() => handleAddToTravels(s)}
+                    >
+                      {addingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      aria-label="Already added"
+                      title={s.duplicateReason || "Already in your travels"}
+                      disabled
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    </Button>
+                  )}
                   <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDismiss(s.id)} aria-label="Dismiss">
                     <X className="h-4 w-4" />
                   </Button>

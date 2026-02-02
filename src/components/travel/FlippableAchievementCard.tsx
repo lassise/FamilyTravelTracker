@@ -39,6 +39,7 @@ const FlippableAchievementCard = ({
   current,
   rarityStyles,
   countryNames = [],
+  detailLines = [],
 }: FlippableAchievementCardProps) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const progress = Math.min((current / achievement.requirement) * 100, 100);

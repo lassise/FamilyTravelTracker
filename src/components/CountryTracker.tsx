@@ -27,6 +27,7 @@ interface CountryTrackerProps {
   onUpdate: () => void;
   selectedMemberId?: string | null;
   onMemberChange?: (memberId: string | null) => void;
+  homeCountry?: string | null;
 }
 
 const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, onMemberChange, homeCountry }: CountryTrackerProps) => {
@@ -45,6 +46,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
   const [isDeleting, setIsDeleting] = useState(false);
   const [visitDetailsDialogOpen, setVisitDetailsDialogOpen] = useState<Record<string, boolean>>({});
   const [tripLegsByCountry, setTripLegsByCountry] = useState<Record<string, TripLeg[]>>({});
+  const [aiFindDialogOpen, setAiFindDialogOpen] = useState(false);
 
   // Fetch trip legs for all countries on mount
   useEffect(() => {
