@@ -10,7 +10,7 @@ export interface TripSuggestion {
   approximateMonth: number | null;
   approximateYear: number | null;
   tripName: string | null;
-  sourceType: "pasted_text" | "photo_exif";
+  sourceType: "pasted_text" | "photo_exif" | "email";
   sourceLabel: string;
   photoCount?: number;
   photoFileNames?: string[];
@@ -18,6 +18,10 @@ export interface TripSuggestion {
   alreadyExists?: boolean;
   /** Message explaining why it's a duplicate */
   duplicateReason?: string;
+  /** Confidence score 0-1 based on data quality */
+  confidence?: number;
+  /** Selected for bulk action */
+  selected?: boolean;
 }
 
 /**

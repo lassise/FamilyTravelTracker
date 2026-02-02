@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import {
   Command,
   CommandEmpty,
@@ -29,11 +30,12 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Smartphone, Search, X, Pencil, PlusCircle, Loader2, Check, ChevronsUpDown, CheckCircle2, AlertCircle } from "lucide-react";
+import { Smartphone, Search, X, Pencil, PlusCircle, Loader2, Check, ChevronsUpDown, CheckCircle2, AlertCircle, Sparkles, Image, Mail, CheckSquare } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useHomeCountry } from "@/hooks/useHomeCountry";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
 import { parsePastedText, markDuplicateSuggestions, type TripSuggestion, type ExistingTrip } from "@/lib/tripSuggestionsParser";
+import { parseEmailContent, generateDemoSuggestions, mergeNearbyTrips } from "@/lib/emailTripParser";
 import { getSuggestionsFromPhotos } from "@/lib/photoTripSuggestions";
 import { getAllCountries, type CountryOption } from "@/lib/countriesData";
 import CountryFlag from "@/components/common/CountryFlag";
@@ -109,7 +111,9 @@ export default function AIFindOnMyPhoneDialog({
   const [pasteValue, setPasteValue] = useState("");
   const [suggestions, setSuggestions] = useState<TripSuggestion[]>([]);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState({ current: 0, total: 0 });
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editComboboxOpen, setEditComboboxOpen] = useState(false);
   const [editCountry, setEditCountry] = useState<CountryOption | null>(null);
@@ -120,6 +124,7 @@ export default function AIFindOnMyPhoneDialog({
   const [editIsApproximate, setEditIsApproximate] = useState(false);
   const [editTripName, setEditTripName] = useState("");
   const [showDuplicates, setShowDuplicates] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
 
   // Convert existing visit details to ExistingTrip format for duplicate detection
   const existingTrips: ExistingTrip[] = useMemo(() => {
@@ -289,45 +294,173 @@ export default function AIFindOnMyPhoneDialog({
     setEditingId(null);
   }, [editingId, editingSuggestion, editCountry, editVisitDate, editEndDate, editIsApproximate, editApproximateMonth, editApproximateYear, editTripName]);
 
+  // Load demo suggestions
+  const handleLoadDemo = useCallback(() => {
+    setDemoMode(true);
+    const demoTrips = generateDemoSuggestions();
+    const withDuplicates = markDuplicateSuggestions(demoTrips, existingTrips);
+    setSuggestions((prev) => [...prev, ...withDuplicates]);
+    toast({
+      title: "Demo mode activated",
+      description: `Loaded ${demoTrips.length} sample trips to preview the feature.`,
+    });
+  }, [existingTrips, toast]);
+
+  // Toggle selection for bulk action
+  const handleToggleSelect = useCallback((id: string) => {
+    setSuggestions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, selected: !s.selected } : s))
+    );
+  }, []);
+
+  // Select all non-duplicate suggestions
+  const handleSelectAll = useCallback(() => {
+    setSuggestions((prev) =>
+      prev.map((s) => ({ ...s, selected: !s.alreadyExists }))
+    );
+  }, []);
+
+  // Deselect all
+  const handleDeselectAll = useCallback(() => {
+    setSuggestions((prev) =>
+      prev.map((s) => ({ ...s, selected: false }))
+    );
+  }, []);
+
+  // Bulk add selected suggestions
+  const handleBulkAdd = useCallback(async () => {
+    const selectedTrips = suggestions.filter((s) => s.selected && !s.alreadyExists);
+    if (selectedTrips.length === 0) {
+      toast({ title: "No trips selected", variant: "destructive" });
+      return;
+    }
+
+    setBulkAdding(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const trip of selectedTrips) {
+      try {
+        await handleAddToTravels(trip);
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    setBulkAdding(false);
+    if (failCount === 0) {
+      toast({ title: `Added ${successCount} trips!` });
+    } else {
+      toast({
+        title: `Added ${successCount} trips`,
+        description: `${failCount} failed to add.`,
+        variant: "destructive",
+      });
+    }
+  }, [suggestions, handleAddToTravels, toast]);
+
+  // Count of selected non-duplicate suggestions
+  const selectedCount = useMemo(
+    () => suggestions.filter((s) => s.selected && !s.alreadyExists).length,
+    [suggestions]
+  );
+
+  // Count of selectable (non-duplicate) suggestions
+  const selectableCount = useMemo(
+    () => suggestions.filter((s) => !s.alreadyExists).length,
+    [suggestions]
+  );
+
+  // Get confidence badge color
+  const getConfidenceBadge = (confidence?: number) => {
+    if (confidence === undefined) return null;
+    if (confidence >= 0.85) {
+      return (
+        <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+          High
+        </Badge>
+      );
+    }
+    if (confidence >= 0.6) {
+      return (
+        <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700">
+          Medium
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-700">
+        Low
+      </Badge>
+    );
+  };
+
   const content = (
     <>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: homeCopy.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-        <div>
-          <Label htmlFor="ai-find-paste">Paste text (OOO, boarding pass, etc.)</Label>
+        
+        {/* Demo Mode Button */}
+        {suggestions.length === 0 && (
+          <div className="flex items-center justify-between p-3 rounded-lg border border-dashed border-primary/30 bg-primary/5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm">Try demo mode to see how it works</span>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={handleLoadDemo}>
+              Load Demo
+            </Button>
+          </div>
+        )}
+
+        {/* Paste Text Section */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-muted-foreground" />
+            <Label htmlFor="ai-find-paste">Paste email or text (OOO, boarding pass, hotel confirmation)</Label>
+          </div>
           <Textarea
             id="ai-find-paste"
-            placeholder="e.g. I'll be OOO in Iceland from 3/25/13 to 3/30/13"
+            placeholder="Paste flight confirmation, hotel booking, OOO message, or any travel-related text..."
             value={pasteValue}
             onChange={(e) => setPasteValue(e.target.value)}
-            className="mt-2 min-h-[100px]"
+            className="min-h-[80px]"
             aria-label="Paste text to find trips"
           />
-          <Button type="button" variant="secondary" className="mt-2" onClick={handleFindTrips}>
+          <Button type="button" variant="secondary" size="sm" onClick={handleFindTrips}>
             <Search className="w-4 h-4 mr-2" />
-            Find trips
+            Find trips in text
           </Button>
         </div>
-        <div>
-          <Label htmlFor="ai-find-photos">Add photos with location</Label>
+
+        {/* Photo Upload Section */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Image className="w-4 h-4 text-muted-foreground" />
+            <Label htmlFor="ai-find-photos">Upload photos with location data</Label>
+          </div>
           <input
             id="ai-find-photos"
             type="file"
             accept="image/*"
             multiple
-            className="mt-2 block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-primary-foreground"
+            className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-primary-foreground file:cursor-pointer cursor-pointer"
             aria-label="Add photos with location"
+            disabled={photoLoading}
             onChange={async (e) => {
               const files = e.target.files;
               if (!files?.length) return;
               setPhotoLoading(true);
+              setPhotoProgress({ current: 0, total: files.length });
               try {
                 const result = await getSuggestionsFromPhotos(Array.from(files), homeCountryIso2 ?? null);
                 if (result.length === 0) {
                   toast({ title: "No photos with location/date found", description: "Photos need GPS and date in EXIF. Set your home country in Settings to filter by trips abroad.", variant: "destructive" });
                 } else {
-                  // Mark duplicates before adding
-                  const withDuplicates = markDuplicateSuggestions(result, existingTrips);
+                  // Merge nearby trips and mark duplicates
+                  const merged = mergeNearbyTrips(result);
+                  const withDuplicates = markDuplicateSuggestions(merged, existingTrips);
                   const duplicates = withDuplicates.filter(s => s.alreadyExists);
                   const newTrips = withDuplicates.filter(s => !s.alreadyExists);
                   
@@ -340,12 +473,12 @@ export default function AIFindOnMyPhoneDialog({
                     });
                   } else if (duplicates.length > 0) {
                     toast({
-                      title: `Found ${result.length} trip${result.length > 1 ? 's' : ''} from photos`,
+                      title: `Found ${merged.length} trip${merged.length > 1 ? 's' : ''} from photos`,
                       description: `${duplicates.length} already logged, ${newTrips.length} new.`,
                     });
                   } else {
                     toast({
-                      title: `Found ${result.length} trip${result.length > 1 ? 's' : ''} from photos`,
+                      title: `Found ${merged.length} trip${merged.length > 1 ? 's' : ''} from photos`,
                     });
                   }
                 }
@@ -353,42 +486,78 @@ export default function AIFindOnMyPhoneDialog({
                 toast({ title: "Error reading photos", variant: "destructive" });
               } finally {
                 setPhotoLoading(false);
+                setPhotoProgress({ current: 0, total: 0 });
                 e.target.value = "";
               }
             }}
           />
           {photoLoading && (
-            <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Reading photos…
-            </p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Processing photos... (this may take a moment due to rate limits)</span>
+              </div>
+              {photoProgress.total > 0 && (
+                <Progress value={(photoProgress.current / photoProgress.total) * 100} className="h-2" />
+              )}
+            </div>
           )}
         </div>
       </div>
 
       {suggestions.length > 0 && (
         <div className="mt-6 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-sm font-medium">
               Suggested trips
-              {suggestions.length > 0 && (
-                <span className="ml-2 text-muted-foreground font-normal">
-                  ({displayedSuggestions.length}{duplicateCount > 0 && !showDuplicates ? ` of ${suggestions.length}` : ''})
-                </span>
-              )}
+              <span className="ml-2 text-muted-foreground font-normal">
+                ({displayedSuggestions.length}{duplicateCount > 0 && !showDuplicates ? ` of ${suggestions.length}` : ''})
+              </span>
             </h3>
-            {duplicateCount > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs h-7 px-2"
-                onClick={() => setShowDuplicates(!showDuplicates)}
-              >
-                {showDuplicates ? `Hide ${duplicateCount} already logged` : `Show ${duplicateCount} already logged`}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {duplicateCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 px-2"
+                  onClick={() => setShowDuplicates(!showDuplicates)}
+                >
+                  {showDuplicates ? `Hide ${duplicateCount} logged` : `Show ${duplicateCount} logged`}
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Bulk Actions */}
+          {selectableCount > 1 && (
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+              <Checkbox
+                id="select-all"
+                checked={selectedCount === selectableCount && selectableCount > 0}
+                onCheckedChange={(checked) => checked ? handleSelectAll() : handleDeselectAll()}
+              />
+              <Label htmlFor="select-all" className="text-xs cursor-pointer flex-1">
+                {selectedCount > 0 ? `${selectedCount} selected` : "Select all new trips"}
+              </Label>
+              {selectedCount > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  disabled={bulkAdding}
+                  onClick={handleBulkAdd}
+                >
+                  {bulkAdding ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <CheckSquare className="w-3 h-3 mr-1" />
+                  )}
+                  Add {selectedCount} trips
+                </Button>
+              )}
+            </div>
+          )}
           
           {displayedSuggestions.length === 0 && duplicateCount > 0 && (
             <div className="text-center py-4 text-sm text-muted-foreground">
@@ -411,15 +580,26 @@ export default function AIFindOnMyPhoneDialog({
               <li
                 key={s.id}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-3 py-2.5 shadow-sm transition-colors",
+                  "flex items-center gap-2 rounded-lg border px-3 py-2.5 shadow-sm transition-colors",
                   s.alreadyExists
                     ? "border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20"
+                    : s.selected
+                    ? "border-primary bg-primary/5"
                     : "border-border bg-card hover:border-primary/40 hover:bg-primary/5"
                 )}
               >
+                {/* Selection checkbox for non-duplicates */}
+                {!s.alreadyExists && selectableCount > 1 && (
+                  <Checkbox
+                    checked={s.selected || false}
+                    onCheckedChange={() => handleToggleSelect(s.id)}
+                    className="shrink-0"
+                  />
+                )}
+                
                 <CountryFlag countryCode={s.countryCode} countryName={s.countryName} size="sm" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-sm truncate">{s.countryName}</p>
                     {s.alreadyExists && (
                       <Badge variant="outline" className="text-[10px] h-4 px-1.5 bg-green-100 text-green-700 border-green-300 dark:bg-green-900 dark:text-green-300 dark:border-green-700">
@@ -427,12 +607,13 @@ export default function AIFindOnMyPhoneDialog({
                         Logged
                       </Badge>
                     )}
+                    {getConfidenceBadge(s.confidence)}
                   </div>
                   <p className="text-xs text-muted-foreground">{formatSuggestionDate(s)}</p>
                   {s.tripName && (
                     <p className="text-xs text-muted-foreground truncate">{s.tripName}</p>
                   )}
-                  <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
                       {s.sourceLabel}
                     </Badge>
@@ -455,7 +636,7 @@ export default function AIFindOnMyPhoneDialog({
                       className="h-8 w-8 text-primary hover:text-primary"
                       aria-label="Add to travels"
                       title="Add to travels"
-                      disabled={addingId === s.id}
+                      disabled={addingId === s.id || bulkAdding}
                       onClick={() => handleAddToTravels(s)}
                     >
                       {addingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
@@ -480,6 +661,14 @@ export default function AIFindOnMyPhoneDialog({
               </li>
             ))}
           </ul>
+          
+          {/* Demo mode indicator */}
+          {demoMode && (
+            <p className="text-xs text-center text-muted-foreground">
+              <Sparkles className="w-3 h-3 inline mr-1" />
+              Demo mode - these are sample trips
+            </p>
+          )}
         </div>
       )}
 
