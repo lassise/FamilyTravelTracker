@@ -8,12 +8,13 @@
  * - Multiple layovers (3+ segments)
  */
 
-import { 
-  calculateTotalDuration, 
+import {
+  calculateTotalDuration,
   calculateTotalDurationBySum,
   getAllLayoverDurations,
-  calculateLayoverDuration 
+  calculateLayoverDuration
 } from '../flightDurationUtils';
+import { describe, it, expect } from 'vitest';
 
 describe('Flight Duration Calculation', () => {
   const baseDate = '2026-01-24';
@@ -29,7 +30,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, [], baseDate);
-      
+
       // Should be approximately 6h 30m = 390 minutes
       expect(duration).toBeGreaterThan(380);
       expect(duration).toBeLessThan(400);
@@ -56,7 +57,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, layovers, baseDate);
-      
+
       // Should be: 4h + 2h layover + 4.5h = 10.5h = 630 minutes
       expect(duration).toBeGreaterThan(620);
       expect(duration).toBeLessThan(640);
@@ -89,7 +90,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, layovers, baseDate);
-      
+
       // Should be: 3h + 2h + 3h + 2h + 4h = 14h = 840 minutes
       expect(duration).toBeGreaterThan(830);
       expect(duration).toBeLessThan(850);
@@ -128,7 +129,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, layovers, baseDate);
-      
+
       // Should be: 3h + 2h + 3h + 2h + 3h + 2h + 5h = 20h = 1200 minutes
       // Plus day change handling
       expect(duration).toBeGreaterThan(1190);
@@ -148,7 +149,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, [], baseDate);
-      
+
       // Should be approximately 10 hours (overnight flight)
       expect(duration).toBeGreaterThan(590);
       expect(duration).toBeLessThan(610);
@@ -173,7 +174,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, layovers, baseDate);
-      
+
       // Should be: 3h + 11h layover + 4h = 18h = 1080 minutes
       expect(duration).toBeGreaterThan(1070);
       expect(duration).toBeLessThan(1090);
@@ -209,7 +210,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, layovers, baseDate);
-      
+
       // Should include all segments and layovers regardless of airline
       expect(duration).toBeGreaterThan(1070); // 4h + 2h + 4h + 2h + 6h = 18h
       expect(duration).toBeLessThan(1090);
@@ -230,7 +231,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDurationBySum(segments, layovers);
-      
+
       // Should be: 180 + 240 + 300 + 120 + 90 = 930 minutes
       expect(duration).toBe(930);
     });
@@ -252,7 +253,7 @@ describe('Flight Duration Calculation', () => {
       ];
 
       const duration = calculateTotalDuration(segments, [], baseDate);
-      
+
       // Should fallback to sum method
       expect(duration).toBeGreaterThan(0);
     });

@@ -68,18 +68,20 @@ interface NewVisitDraft {
   numberOfDays: number;
   cities: string[];
   familyMemberIds: string[];
+  highlight: string;
+  whyItMattered: string;
 }
 
 // Debounced input component for trip name
-const TripNameInput = ({ 
-  initialValue, 
-  onSave 
-}: { 
-  initialValue: string; 
+const TripNameInput = ({
+  initialValue,
+  onSave
+}: {
+  initialValue: string;
   onSave: (value: string) => void;
 }) => {
   const [value, setValue] = useState(initialValue);
-  
+
   useEffect(() => {
     setValue(initialValue);
   }, [initialValue]);
@@ -101,17 +103,17 @@ const TripNameInput = ({
 };
 
 // Debounced input component for days
-const DaysInput = ({ 
-  initialValue, 
+const DaysInput = ({
+  initialValue,
   disabled,
-  onSave 
-}: { 
-  initialValue: number; 
+  onSave
+}: {
+  initialValue: number;
   disabled: boolean;
   onSave: (value: number) => void;
 }) => {
   const [value, setValue] = useState(initialValue.toString());
-  
+
   useEffect(() => {
     setValue(initialValue.toString());
   }, [initialValue]);
@@ -148,6 +150,8 @@ interface VisitDetail {
   approximate_month?: number | null;
   approximate_year?: number | null;
   is_approximate?: boolean;
+  highlight?: string | null;
+  why_it_mattered?: string | null;
 }
 
 interface CityVisit {
@@ -247,7 +251,7 @@ const CityPicker = ({
           </Command>
         </PopoverContent>
       </Popover>
-      
+
       {selectedCities.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {selectedCities.map((city) => (
@@ -490,6 +494,34 @@ const NewVisitCard = ({
               </div>
             </div>
           )}
+
+          {/* Journal / Memories */}
+          <div>
+            <Label className="text-xs mb-2 block flex items-center gap-1 font-semibold text-primary">
+              <Edit3 className="w-3 h-3" />
+              Journal & Memories
+            </Label>
+            <div className="space-y-3 pl-2 border-l-2 border-primary/20">
+              <div>
+                <Label className="text-xs mb-1 block">Highlight (e.g. "Sunset at the castle")</Label>
+                <Input
+                  value={draft.highlight}
+                  onChange={(e) => onUpdate(draft.id, { highlight: e.target.value })}
+                  className="h-8 text-sm bg-background/50"
+                  placeholder="What was the best moment?"
+                />
+              </div>
+              <div>
+                <Label className="text-xs mb-1 block">Why it mattered (e.g. "First family hike")</Label>
+                <Input
+                  value={draft.whyItMattered}
+                  onChange={(e) => onUpdate(draft.id, { whyItMattered: e.target.value })}
+                  className="h-8 text-sm bg-background/50"
+                  placeholder="Why is this trip special?"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -507,7 +539,7 @@ const CountryVisitDetailsDialog = ({
   onOpenChange: controlledOnOpenChange,
 }: CountryVisitDetailsDialogProps) => {
   const [internalOpen, setInternalOpen] = useState(false);
-  
+
   // Support both controlled and uncontrolled usage
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : internalOpen;
@@ -613,6 +645,8 @@ const CountryVisitDetailsDialog = ({
     numberOfDays: 1,
     cities: [],
     familyMemberIds: [...preSelectedMemberIds],
+    highlight: "",
+    whyItMattered: "",
   });
 
   const handleAddNewVisitDraft = () => {
@@ -674,6 +708,27 @@ const CountryVisitDetailsDialog = ({
         if (!insertedVisit?.id) {
           throw new Error("Insert succeeded but no visit returned");
         }
+
+        // Update the journal fields separately (in case RPC doesn't support them yet)
+        if (draft.highlight || draft.whyItMattered) {
+          const { error: updateError } = await supabase
+            .from("country_visit_details")
+            .update({
+              highlight: draft.highlight || null,
+              why_it_mattered: draft.whyItMattered || null
+            })
+            .eq("id", insertedVisit.id);
+
+          if (updateError) {
+            console.error("Error updating journal fields:", updateError);
+            // Don't throw, as the visit was created successfully
+            toast({
+              title: "Visit created but memories failed to save",
+              description: updateError.message,
+              variant: "default"
+            });
+          }
+        }
       }
 
       toast({ title: `Added ${newVisits.length} visit${newVisits.length > 1 ? "s" : ""}` });
@@ -697,24 +752,24 @@ const CountryVisitDetailsDialog = ({
   const handleToggleVisitFamilyMember = (visitId: string, memberId: string) => {
     const originalMembers = visitFamilyMembers[visitId] || [];
     const pendingMembers = pendingFamilyMemberChanges[visitId];
-    
+
     // Get the current state (original + pending changes)
-    const currentMembers = pendingMembers !== undefined 
-      ? pendingMembers 
+    const currentMembers = pendingMembers !== undefined
+      ? pendingMembers
       : originalMembers;
-    
+
     const isCurrentlySelected = currentMembers.includes(memberId);
 
     // Update pending changes
     setPendingFamilyMemberChanges((prev) => {
-      const currentPending = prev[visitId] !== undefined 
-        ? prev[visitId] 
+      const currentPending = prev[visitId] !== undefined
+        ? prev[visitId]
         : originalMembers;
-      
+
       const newMembers = isCurrentlySelected
         ? currentPending.filter((id) => id !== memberId)
         : [...currentPending, memberId];
-      
+
       return {
         ...prev,
         [visitId]: newMembers,
@@ -882,7 +937,7 @@ const CountryVisitDetailsDialog = ({
       // Save family member changes
       for (const [visitId, pendingMembers] of Object.entries(pendingFamilyMemberChanges)) {
         const originalMembers = visitFamilyMembers[visitId] || [];
-        
+
         // Find members to add and remove
         const membersToAdd = pendingMembers.filter(id => !originalMembers.includes(id));
         const membersToRemove = originalMembers.filter(id => !pendingMembers.includes(id));
@@ -927,7 +982,7 @@ const CountryVisitDetailsDialog = ({
       setPendingCityAdditions([]);
       setPendingCityDeletions([]);
       setPendingFamilyMemberChanges({});
-      
+
       await fetchData();
       onUpdate();
       toast({ title: "All changes saved successfully" });
@@ -958,7 +1013,7 @@ const CountryVisitDetailsDialog = ({
       const pendingMembers = pendingFamilyMemberChanges[visitId] || [];
       if (originalMembers.length !== pendingMembers.length) return true;
       return !originalMembers.every(id => pendingMembers.includes(id)) ||
-             !pendingMembers.every(id => originalMembers.includes(id));
+        !pendingMembers.every(id => originalMembers.includes(id));
     });
     return hasVisitChanges || hasCityChanges || hasFamilyMemberChanges;
   };
@@ -1084,7 +1139,7 @@ const CountryVisitDetailsDialog = ({
               <p className="text-xs text-muted-foreground mb-3">
                 Add one or more visits at once. Include cities you visited on each trip.
               </p>
-              
+
               {newVisits.length > 0 && (
                 <div className="space-y-3 mb-3">
                   {newVisits.map((draft, index) => (
@@ -1128,7 +1183,7 @@ const CountryVisitDetailsDialog = ({
                     // Get pending changes for this visit
                     const pending = pendingChanges[visit.id] || {};
                     const displayVisit = { ...visit, ...pending };
-                    
+
                     const hasDateRange = (displayVisit.visit_date as string | null) && (displayVisit.end_date as string | null);
                     const isAutoCalculated = hasDateRange && calculateDays(displayVisit.visit_date as string | null, displayVisit.end_date as string | null) !== null;
                     const isApproximate = (displayVisit.is_approximate as boolean | undefined) ?? (visit.is_approximate || false);
@@ -1357,8 +1412,8 @@ const CountryVisitDetailsDialog = ({
                                       const numValue = parseInt(value);
                                       setPendingChanges(prev => ({
                                         ...prev,
-                                        [visit.id]: { 
-                                          ...prev[visit.id], 
+                                        [visit.id]: {
+                                          ...prev[visit.id],
                                           number_of_days: value === "" ? null : (isNaN(numValue) ? null : numValue)
                                         }
                                       }));
@@ -1367,6 +1422,38 @@ const CountryVisitDetailsDialog = ({
                                     className="h-8 text-sm"
                                     placeholder="Enter days"
                                   />
+                                </div>
+
+                                {/* Journal / Memories */}
+                                <div className="pt-2 border-t border-dashed">
+                                  <Label className="text-xs mb-2 block flex items-center gap-1 font-semibold text-primary">
+                                    <Edit3 className="w-3 h-3" />
+                                    Journal & Memories
+                                  </Label>
+                                  <div className="space-y-3 pl-2 border-l-2 border-primary/20">
+                                    <div>
+                                      <Label className="text-xs mb-1 block">Highlight</Label>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          value={(pendingChanges[visit.id]?.highlight as string | undefined) ?? visit.highlight ?? ""}
+                                          onChange={(e) => handleUpdateVisit(visit.id, "highlight", e.target.value, visit)}
+                                          className="h-8 text-sm bg-background/50"
+                                          placeholder="What was the best moment?"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs mb-1 block">Why it mattered</Label>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          value={(pendingChanges[visit.id]?.why_it_mattered as string | undefined) ?? visit.why_it_mattered ?? ""}
+                                          onChange={(e) => handleUpdateVisit(visit.id, "why_it_mattered", e.target.value, visit)}
+                                          className="h-8 text-sm bg-background/50"
+                                          placeholder="Why is this trip special?"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
 
                                 {/* Family Members */}
@@ -1380,11 +1467,11 @@ const CountryVisitDetailsDialog = ({
                                       {familyMembers.map((member) => {
                                         const originalMembers = visitFamilyMembers[visit.id] || [];
                                         const pendingMembers = pendingFamilyMemberChanges[visit.id];
-                                        const currentMembers = pendingMembers !== undefined 
-                                          ? pendingMembers 
+                                        const currentMembers = pendingMembers !== undefined
+                                          ? pendingMembers
                                           : originalMembers;
                                         const isChecked = currentMembers.includes(member.id);
-                                        
+
                                         return (
                                           <label
                                             key={member.id}

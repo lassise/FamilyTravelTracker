@@ -12,8 +12,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Replace with your Supabase URL and anon key
+import dotenv from 'dotenv';
+dotenv.config();
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -96,7 +99,7 @@ async function testVisitAssociations() {
     for (const [visitId, memberIds] of visitToMembers.entries()) {
       if (memberIds.includes(member.id)) {
         memberVisits.push(visitId);
-        
+
         const visit = visitDetails.find(v => v.id === visitId);
         if (visit) {
           let year: number | null = null;
