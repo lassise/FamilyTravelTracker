@@ -12,7 +12,7 @@ import { TripImportDialog, type ParsedFlightData } from "@/components/trips/Trip
 import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
-import { getAllCountryries, getRegionCode, getCountryCode } from "@/lib/countriesData";
+import { getAllCountries, getRegionCode, getCountryCode } from "@/lib/countriesData";
 import { cn } from "@/lib/utils";
 import CountryFlag from "./common/CountryFlag";
 import CountryFilters from "./travel/CountryFilters";
