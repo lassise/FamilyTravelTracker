@@ -12,7 +12,7 @@ import { TripImportDialog, type ParsedFlightData } from "@/components/trips/Trip
 import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
-import { getAllCountries, getRegionCode } from "@/lib/countriesData";
+import { getAllCountryries, getRegionCode, getCountryCode } from "@/lib/countriesData";
 import { cn } from "@/lib/utils";
 import CountryFlag from "./common/CountryFlag";
 import CountryFilters from "./travel/CountryFilters";
@@ -101,14 +101,13 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
         return;
       }
 
-      // Convert to Country type with empty visitedBy
-      const wishlistCountries: Country[] = (data || []).map(row => ({
-        id: row.id,
-        name: row.name,
-        flag: row.flag,
-        continent: row.continent,
-        visitedBy: [] // Wishlist-only countries have no visits
-      }));
+      // AUTO-CORRECT FLAG VALUES
+      const wishlistCountries: Country[] = (data || []).map(row => {
+        const correctCode = getCountryCode(row.name);
+        const correctedFlag = correctCode || row.flag;
+        if (correctedFlag !== row.flag) console.warn(`🔧 ${row.name}: "${row.flag}" → "${correctedFlag}"`);
+        return { id: row.id, name: row.name, flag: correctedFlag, continent: row.continent, visitedBy: [] };
+      });
 
       setWishlistOnlyCountries(wishlistCountries);
     };
