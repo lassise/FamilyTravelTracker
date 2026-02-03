@@ -239,19 +239,67 @@ const InteractiveWorldMap = ({
   );
 
   const wishlistCountries = useMemo(
-    () =>
-      countries
-        .filter((c) => wishlist.includes(c.id))
+    () => {
+      console.group('🔍 WISHLIST COUNTRIES DEBUG');
+      console.log('1️⃣ Input Data:');
+      console.log('   - wishlist IDs:', wishlist);
+      console.log('   - total countries available:', countries.length);
+
+      const filtered = countries.filter((c) => wishlist.includes(c.id));
+      console.log('2️⃣ Filtered countries (matching wishlist IDs):', filtered.length);
+      filtered.forEach((c, idx) => {
+        console.log(`   ${idx + 1}. ${c.name} (ID: ${c.id})`);
+      });
+
+      console.log('3️⃣ ISO Code Mapping Process:');
+      const mapped = filtered
         .map((c) => {
-          // First try to use the flag field (stores ISO2 code)
+          console.group(`   📍 ${c.name}`);
+
+          // Step 1: Extract ISO2 from flag field
+          const flagValue = c.flag;
+          console.log(`      flag field value: "${flagValue}" (type: ${typeof flagValue})`);
+
           const iso2FromFlag = c.flag?.toUpperCase();
-          if (iso2FromFlag && iso2ToIso3[iso2FromFlag]) {
-            return iso2ToIso3[iso2FromFlag];
+          console.log(`      iso2FromFlag (uppercase): "${iso2FromFlag}"`);
+
+          // Step 2: Check iso2ToIso3 mapping
+          const iso3FromMapping = iso2FromFlag && iso2ToIso3[iso2FromFlag];
+          console.log(`      iso2ToIso3['${iso2FromFlag}'] = "${iso3FromMapping || 'undefined'}"`);
+
+          if (iso3FromMapping) {
+            console.log(`      ✅ SUCCESS via flag field → ISO3: ${iso3FromMapping}`);
+            console.groupEnd();
+            return iso3FromMapping;
           }
-          // Fallback to name-based lookup
-          return countryToISO3[c.name];
+
+          // Step 3: Fallback to name-based lookup
+          console.log(`      ⚠️ Flag lookup failed, trying name-based fallback...`);
+          const iso3FromName = countryToISO3[c.name];
+          console.log(`      countryToISO3['${c.name}'] = "${iso3FromName || 'undefined'}"`);
+
+          if (iso3FromName) {
+            console.log(`      ✅ SUCCESS via name fallback → ISO3: ${iso3FromName}`);
+          } else {
+            console.log(`      ❌ FAILED - No ISO3 code found!`);
+          }
+
+          console.groupEnd();
+          return iso3FromName;
         })
-        .filter(Boolean),
+        .filter(Boolean);
+
+      console.log('4️⃣ Final Result:');
+      console.log('   - ISO3 codes for map coloring:', mapped);
+      console.log('   - Success rate:', `${mapped.length}/${filtered.length} countries mapped`);
+
+      if (mapped.length < filtered.length) {
+        console.warn('   ⚠️ SOME COUNTRIES FAILED TO MAP!');
+      }
+
+      console.groupEnd();
+      return mapped;
+    },
     [countries, wishlist]
   );
 
