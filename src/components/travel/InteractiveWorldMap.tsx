@@ -428,39 +428,11 @@ const InteractiveWorldMap = ({
   }, []);
 
   useEffect(() => {
-    const fetchToken = async () => {
-      const fallbackToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
-
-      try {
-        // This backend function returns a public Mapbox token and does not require auth.
-        // Using invoke keeps URLs consistent across environments.
-        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        const token = (data as any)?.token as string | undefined;
-
-        if (!error && token) {
-          setMapToken(token);
-          return;
-        }
-
-        if (error) {
-          console.warn('Mapbox token fetch failed (non-fatal):', error);
-        }
-
-        // Fall back to env token to avoid a blank map.
-        if (fallbackToken) {
-          setMapToken(fallbackToken);
-        } else {
-          console.error('No Mapbox token available (function failed and no fallback configured)');
-        }
-      } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
-        // Last-resort fallback to env token to keep map rendering
-        if (fallbackToken) {
-          setMapToken(fallbackToken);
-        }
-      }
-    };
-    fetchToken();
+    // DEFINITIVE FIX: Use the user's valid token directly
+    // The edge function was returning an invalid/expired token, causing all map failures
+    const validToken = 'pk.eyJ1IjoibGFzc2lzZSIsImEiOiJjbWswb3E5bWQ1cnVrM2tvanlndWRycmdlIn0.4N5hGkvxVaeT8mqmyM_-QQ';
+    console.log('Setting Mapbox token directly (bypassing edge function)');
+    setMapToken(validToken);
   }, []);
 
   // Store a ref to the current colors to use in map initialization
