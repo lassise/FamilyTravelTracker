@@ -71,6 +71,56 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
     }
   }, [countries, fetchLegsForCountry]);
 
+  // Fetch wishlist countries that aren't already in the visited countries array
+  const [wishlistOnlyCountries, setWishlistOnlyCountries] = useState<Country[]>([]);
+
+  useEffect(() => {
+    const fetchWishlistCountries = async () => {
+      if (wishlist.length === 0) {
+        setWishlistOnlyCountries([]);
+        return;
+      }
+
+      // Find wishlist IDs that aren't in the visited countries
+      const visitedIds = new Set(countries.map(c => c.id));
+      const wishlistOnlyIds = wishlist.filter(id => !visitedIds.has(id));
+
+      if (wishlistOnlyIds.length === 0) {
+        setWishlistOnlyCountries([]);
+        return;
+      }
+
+      // Fetch these countries from the database
+      const { data, error } = await supabase
+        .from('countries')
+        .select('*')
+        .in('id', wishlistOnlyIds);
+
+      if (error) {
+        console.error('Error fetching wishlist countries:', error);
+        return;
+      }
+
+      // Convert to Country type with empty visitedBy
+      const wishlistCountries: Country[] = (data || []).map(row => ({
+        id: row.id,
+        name: row.name,
+        flag: row.flag,
+        continent: row.continent,
+        visitedBy: [] // Wishlist-only countries have no visits
+      }));
+
+      setWishlistOnlyCountries(wishlistCountries);
+    };
+
+    fetchWishlistCountries();
+  }, [wishlist, countries]);
+
+  // Combine visited countries with wishlist-only countries for the map
+  const countriesForMap = useMemo(() => {
+    return [...countries, ...wishlistOnlyCountries];
+  }, [countries, wishlistOnlyCountries]);
+
   // Get unique continents and years from countries
   const { continents, years } = useMemo(() => {
     const continentSet = new Set<string>();
@@ -303,7 +353,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
         {/* Interactive World Map */}
         <div className="mb-6">
           <InteractiveWorldMap
-            countries={countries}
+            countries={countriesForMap}
             wishlist={wishlist}
             homeCountry={homeCountry}
             onRefetch={onUpdate}
