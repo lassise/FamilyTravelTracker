@@ -58,6 +58,16 @@ const countryToISO3: Record<string, string> = {
   'Botswana': 'BWA', 'Namibia': 'NAM', 'Madagascar': 'MDG', 'Mauritius': 'MUS',
   'Seychelles': 'SYC', 'Lebanon': 'LBN', 'Syria': 'SYR', 'Yemen': 'YEM',
   'Oman': 'OMN', 'Kuwait': 'KWT', 'Bahrain': 'BHR', 'Qatar': 'QAT',
+  // Territories and dependencies (fixes Greenland wishlist bug)
+  'Greenland': 'GRL', 'Faroe Islands': 'FRO',
+  'French Guiana': 'GUF', 'Guadeloupe': 'GLP', 'Martinique': 'MTQ',
+  'Réunion': 'REU', 'Mayotte': 'MYT', 'French Polynesia': 'PYF',
+  'New Caledonia': 'NCL', 'Saint Pierre and Miquelon': 'SPM',
+  'Aruba': 'ABW', 'Curaçao': 'CUW', 'Sint Maarten': 'SXM',
+  'Bermuda': 'BMU', 'Cayman Islands': 'CYM', 'British Virgin Islands': 'VGB',
+  'Turks and Caicos Islands': 'TCA', 'Falkland Islands': 'FLK',
+  'Gibraltar': 'GIB', 'Guam': 'GUM', 'U.S. Virgin Islands': 'VIR',
+  'American Samoa': 'ASM', 'Northern Mariana Islands': 'MNP',
 };
 
 // Reverse mapping: ISO3 to country name
