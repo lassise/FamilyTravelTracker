@@ -20,6 +20,7 @@ import DeleteConfirmDialog from "./common/DeleteConfirmDialog";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useTripLegs, type TripLeg } from "@/hooks/useTripLegs";
 import { Link } from "react-router-dom";
+import InteractiveWorldMap from "./travel/InteractiveWorldMap";
 
 interface CountryTrackerProps {
   countries: Country[];
@@ -28,9 +29,10 @@ interface CountryTrackerProps {
   selectedMemberId?: string | null;
   onMemberChange?: (memberId: string | null) => void;
   homeCountry?: string | null;
+  wishlist?: string[];
 }
 
-const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, onMemberChange, homeCountry }: CountryTrackerProps) => {
+const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, onMemberChange, homeCountry, wishlist = [] }: CountryTrackerProps) => {
   const { toast } = useToast();
   const { visitDetails, getCountrySummary, refetch: refetchVisitDetails } = useVisitDetails();
   const { fetchLegsForCountry } = useTripLegs();
@@ -296,6 +298,17 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
               }
             />
           </div>
+        </div>
+
+        {/* Interactive World Map */}
+        <div className="mb-6">
+          <InteractiveWorldMap
+            countries={countries}
+            wishlist={wishlist}
+            homeCountry={homeCountry}
+            onRefetch={onUpdate}
+            selectedMemberId={selectedMemberId}
+          />
         </div>
 
         {/* Filters */}

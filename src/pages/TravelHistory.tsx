@@ -48,7 +48,7 @@ const TravelHistory = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [visitMemberMap, setVisitMemberMap] = useState<globalThis.Map<string, string[]>>(() => new globalThis.Map());
   const [showShareDialog, setShowShareDialog] = useState(false);
-  
+
   // Read tab from URL or default to 'countries' for the Travel Tracker tab
   const tabFromUrl = searchParams.get('tab') as TabKey | null;
   const activeTab: TabKey = tabFromUrl && tabs.some(t => t.key === tabFromUrl) ? tabFromUrl : 'countries';
@@ -68,7 +68,7 @@ const TravelHistory = () => {
       const { data } = await supabase
         .from('visit_family_members')
         .select('visit_id, family_member_id');
-      
+
       if (data) {
         const map = new globalThis.Map<string, string[]>();
         data.forEach(item => {
@@ -121,7 +121,7 @@ const TravelHistory = () => {
   }, [user, authLoading, profile, needsOnboarding, navigate]);
 
   // Filter countries based on selected family member
-  const filteredCountries = useMemo(() => 
+  const filteredCountries = useMemo(() =>
     getFilteredCountries(countries),
     [countries, getFilteredCountries]
   );
@@ -133,13 +133,13 @@ const TravelHistory = () => {
   }, [familyMembers, selectedMemberId]);
 
   // Calculate filtered continents
-  const filteredContinents = useMemo(() => 
+  const filteredContinents = useMemo(() =>
     getFilteredContinents(countries),
     [countries, getFilteredContinents]
   );
 
   // Calculate filtered earliest year
-  const filteredEarliestYear = useMemo(() => 
+  const filteredEarliestYear = useMemo(() =>
     getFilteredEarliestYear(visitDetails, visitMemberMap),
     [visitDetails, visitMemberMap, getFilteredEarliestYear]
   );
@@ -158,13 +158,13 @@ const TravelHistory = () => {
   }
 
   // Count visited countries excluding home country (based on filtered data)
-  const visitedCountriesCount = filteredCountries.filter(c => 
+  const visitedCountriesCount = filteredCountries.filter(c =>
     c.visitedBy.length > 0 && !resolvedHome.isHomeCountry(c.name)
   ).length;
 
   // Get states visited count for home country
-  const statesVisitedCount = resolvedHome.iso2 && resolvedHome.hasStateTracking 
-    ? getStateVisitCount(resolvedHome.iso2) 
+  const statesVisitedCount = resolvedHome.iso2 && resolvedHome.hasStateTracking
+    ? getStateVisitCount(resolvedHome.iso2)
     : 0;
 
   const dashboardShareOptions: ShareOption[] = [
@@ -218,7 +218,7 @@ const TravelHistory = () => {
                 <span className="hidden sm:inline">Family Travel Tracker</span>
                 <span className="sm:hidden">Travel</span>
               </div>
-              
+
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
@@ -273,7 +273,7 @@ const TravelHistory = () => {
                 </Button>
               </div>
             </div>
-            
+
             {/* Tab Navigation */}
             <nav className="flex gap-1 overflow-x-auto scrollbar-hide -mb-4 pb-4">
               {tabs.map((tab) => {
@@ -318,25 +318,25 @@ const TravelHistory = () => {
             <>
               {activeTab === 'overview' && (
                 <div className="space-y-6">
-                  <HeroSummaryCard 
-                    countries={filteredCountries} 
-                    familyMembers={filteredFamilyMembers} 
-                    totalContinents={filteredContinents} 
+                  <HeroSummaryCard
+                    countries={filteredCountries}
+                    familyMembers={filteredFamilyMembers}
+                    totalContinents={filteredContinents}
                     homeCountry={homeCountry}
                     earliestYear={filteredEarliestYear}
                   />
                   <InteractiveWorldMap countries={filteredCountries} wishlist={wishlist} homeCountry={homeCountry} onRefetch={refetch} />
-                  
+
                   {/* Analytics & Achievements combined section */}
                   <div className="space-y-6">
                     <AnalyticsInsightCard countries={filteredCountries} />
-                    <EnhancedAchievements 
-                      countries={filteredCountries} 
+                    <EnhancedAchievements
+                      countries={filteredCountries}
                       familyMembers={filteredFamilyMembers}
                       totalContinents={filteredContinents}
                     />
                   </div>
-                  
+
                   <TravelMilestones countries={filteredCountries} familyMembers={filteredFamilyMembers} totalContinents={filteredContinents} />
                   <div className="grid lg:grid-cols-2 gap-6">
                     <TravelDNA countries={filteredCountries} homeCountryCode={resolvedHome.iso2 || 'US'} />
@@ -352,15 +352,16 @@ const TravelHistory = () => {
 
               {activeTab === 'countries' && (
                 <div className="space-y-8">
-                  <CountryTracker 
-                    countries={filteredCountries.filter(c => c.visitedBy.length > 0)} 
+                  <CountryTracker
+                    countries={filteredCountries.filter(c => c.visitedBy.length > 0)}
                     familyMembers={familyMembers}
                     onUpdate={refetch}
                     selectedMemberId={selectedMemberId}
                     onMemberChange={setSelectedMemberId}
                     homeCountry={homeCountry}
+                    wishlist={wishlist}
                   />
-                  <CountryWishlist 
+                  <CountryWishlist
                     countries={countries}
                     wishlist={wishlist}
                     onUpdate={refetch}

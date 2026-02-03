@@ -23,7 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import HeroSummaryCard from "@/components/travel/HeroSummaryCard";
 import DashboardMemberFilter from "@/components/travel/DashboardMemberFilter";
-import InteractiveWorldMap from "@/components/travel/InteractiveWorldMap";
+
 import TravelMilestones from "@/components/travel/TravelMilestones";
 import AnalyticsInsightCard from "@/components/travel/AnalyticsInsightCard";
 import EnhancedAchievements from "@/components/travel/EnhancedAchievements";
@@ -276,16 +276,7 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Interactive World Map */}
-          <div className="mb-8">
-            <InteractiveWorldMap
-              countries={countries}
-              wishlist={wishlist}
-              homeCountry={homeCountry}
-              onRefetch={refetchFamilyData}
-              selectedMemberId={selectedMemberId}
-            />
-          </div>
+          {/* Interactive World Map removed and moved to Travel Tracker */}
         </section>
 
         {/* Quick Actions */}
