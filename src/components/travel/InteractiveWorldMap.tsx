@@ -86,9 +86,9 @@ const validateColor = (color: string | undefined | null, fallback: string): stri
     return fallback;
   }
   // Basic validation for hsl(), rgb(), or hex colors
-  const isValidFormat = 
-    color.startsWith('hsl(') || 
-    color.startsWith('rgb(') || 
+  const isValidFormat =
+    color.startsWith('hsl(') ||
+    color.startsWith('rgb(') ||
     color.startsWith('#') ||
     color.startsWith('hsla(') ||
     color.startsWith('rgba(');
@@ -136,7 +136,7 @@ const InteractiveWorldMap = ({
   const [mapColors, setMapColors] = useState<MapColors>(loadMapColors);
   const layersInitializedRef = useRef(false);
   const initRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Quick action dialog state
   const [quickActionOpen, setQuickActionOpen] = useState(false);
   const [clickedCountryInfo, setClickedCountryInfo] = useState<{
@@ -145,7 +145,7 @@ const InteractiveWorldMap = ({
     flag: string;
     continent: string;
   } | null>(null);
-  
+
   // Visit details dialog state (for "Add Details" option)
   const [visitDetailsOpen, setVisitDetailsOpen] = useState(false);
   const [visitDetailsCountry, setVisitDetailsCountry] = useState<{
@@ -153,7 +153,7 @@ const InteractiveWorldMap = ({
     name: string;
     code: string;
   } | null>(null);
-  
+
   const { stateVisits } = useStateVisits();
   const effectiveStateVisits = useMemo(
     () => (readOnly ? (stateVisitsOverride ?? []) : stateVisits),
@@ -163,7 +163,7 @@ const InteractiveWorldMap = ({
     (cc: string) => new Set(effectiveStateVisits.filter((sv) => sv.country_code === cc).map((sv) => sv.state_code)).size,
     [effectiveStateVisits]
   );
-  
+
   // Use the home country hook for standardized handling
   const resolvedHome = useHomeCountry(homeCountry);
 
@@ -186,7 +186,7 @@ const InteractiveWorldMap = ({
 
   // Memoize country lists to prevent unnecessary recalculations
   // Use the flag field which stores the ISO2 code to get ISO3
-  const visitedCountries = useMemo(() => 
+  const visitedCountries = useMemo(() =>
     countries
       .filter(c => c.visitedBy.length > 0)
       .map(c => {
@@ -291,7 +291,7 @@ const InteractiveWorldMap = ({
         toast.error('Could not identify this country');
         return;
       }
-      
+
       // Check if this country has subdivisions
       if (!countryHasSubdivisions(iso2)) {
         // Country has no subdivisions - show a toast and don't open dialog
@@ -370,7 +370,7 @@ const InteractiveWorldMap = ({
     // Check if this country is visited or is the home country
     const isVisited = visitedCountries.includes(iso3);
     const isHome = iso3 === homeCountryISO;
-    
+
     if (isVisited || isHome) {
       // Visited countries and home country go directly to state selection
       await openStateTrackingDialogForIso3(iso3);
@@ -385,7 +385,7 @@ const InteractiveWorldMap = ({
       // Try to find by ISO2 code first, then by name
       const match = allCountriesList.find(c => c.code === iso2);
       const countryName = match?.name || iso3ToCountryName[iso3] || iso3;
-      
+
       setClickedCountryInfo({
         iso3,
         name: countryName,
@@ -508,133 +508,151 @@ const InteractiveWorldMap = ({
     const initLayers = () => {
       if (!map.current) return;
 
-      // Guard: avoid double-initializing layers/sources
-      if (layersInitializedRef.current || map.current.getSource('countries')) {
+      // Check if layers actually exist to determine if we need to initialize
+      const hasLayers = map.current.getLayer('home-country') &&
+        map.current.getLayer('visited-countries') &&
+        map.current.getLayer('wishlist-countries');
+
+      if (hasLayers) {
         setIsMapReady(true);
+        return;
+      }
+
+      // Reset initialization flag if layers are missing (e.g., after style reload)
+      layersInitializedRef.current = false;
+
+      // Guard: avoid double-initializing if we are already in progress of adding them
+      // But allow if we verified they are missing above
+      if (layersInitializedRef.current) {
         return;
       }
 
       layersInitializedRef.current = true;
 
-      map.current.setFog({
-        color: 'rgb(255, 255, 255)',
-        'high-color': 'rgb(200, 200, 225)',
-        'horizon-blend': 0.2,
-      });
-
-      map.current.addSource('countries', {
-        type: 'vector',
-        url: 'mapbox://mapbox.country-boundaries-v1',
-      });
-
-      // Use defaultMapColors for initial layer creation - colors will be updated by separate effect
-      const initialColors = colorsRef.current;
-
-      // Home country layer
-      map.current.addLayer({
-        id: 'home-country',
-        type: 'fill',
-        source: 'countries',
-        'source-layer': 'country_boundaries',
-        paint: {
-          'fill-color': validateColor(initialColors.home, defaultMapColors.home),
-          'fill-opacity': 0.5,
-        },
-        filter: ['in', 'iso_3166_1_alpha_3', ''],
-      });
-
-      // Visited countries layer
-      map.current.addLayer({
-        id: 'visited-countries',
-        type: 'fill',
-        source: 'countries',
-        'source-layer': 'country_boundaries',
-        paint: {
-          'fill-color': validateColor(initialColors.visited, defaultMapColors.visited),
-          'fill-opacity': 0.6,
-        },
-        filter: ['in', 'iso_3166_1_alpha_3', ''],
-      });
-
-      // Wishlist countries layer
-      map.current.addLayer({
-        id: 'wishlist-countries',
-        type: 'fill',
-        source: 'countries',
-        'source-layer': 'country_boundaries',
-        paint: {
-          'fill-color': validateColor(initialColors.wishlist, defaultMapColors.wishlist),
-          'fill-opacity': 0.4,
-        },
-        filter: ['in', 'iso_3166_1_alpha_3', ''],
-      });
-
-      map.current.addLayer({
-        id: 'country-borders',
-        type: 'line',
-        source: 'countries',
-        'source-layer': 'country_boundaries',
-        paint: {
-          'line-color': 'hsl(20, 14%, 50%)',
-          'line-width': 0.5,
-        },
-      });
-
-      // Click layer for ALL countries
-      map.current.addLayer({
-        id: 'clickable-countries',
-        type: 'fill',
-        source: 'countries',
-        'source-layer': 'country_boundaries',
-        paint: {
-          'fill-color': 'rgba(0,0,0,0)',
-          'fill-opacity': 0,
-        },
-        filter: ['has', 'iso_3166_1_alpha_3'],
-      });
-
-      map.current.on('click', 'clickable-countries', (e) => {
-        if (!e.features?.[0]) return;
-        const iso3 = e.features[0].properties?.iso_3166_1_alpha_3 as string | undefined;
-        if (iso3) {
-          handleCountryClick(iso3);
+      try {
+        if (!map.current.getSource('countries')) {
+          map.current.addSource('countries', {
+            type: 'vector',
+            url: 'mapbox://mapbox.country-boundaries-v1',
+          });
         }
-      });
 
-      map.current.on('mouseenter', 'clickable-countries', () => {
-        if (map.current) {
-          map.current.getCanvas().style.cursor = 'pointer';
+        // Use defaultMapColors for initial layer creation - colors will be updated by separate effect
+        const initialColors = colorsRef.current;
+
+        // Home country layer
+        if (!map.current.getLayer('home-country')) {
+          map.current.addLayer({
+            id: 'home-country',
+            type: 'fill',
+            source: 'countries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'fill-color': validateColor(initialColors.home, defaultMapColors.home),
+              'fill-opacity': 0.5,
+            },
+            filter: ['in', 'iso_3166_1_alpha_3', ''],
+          });
         }
-      });
 
-      map.current.on('mouseleave', 'clickable-countries', () => {
-        if (map.current) {
-          map.current.getCanvas().style.cursor = '';
+        // Visited countries layer
+        if (!map.current.getLayer('visited-countries')) {
+          map.current.addLayer({
+            id: 'visited-countries',
+            type: 'fill',
+            source: 'countries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'fill-color': validateColor(initialColors.visited, defaultMapColors.visited),
+              'fill-opacity': 0.6,
+            },
+            filter: ['in', 'iso_3166_1_alpha_3', ''],
+          });
         }
-      });
 
-      // Resize the map after initialization to ensure proper rendering
-      setTimeout(() => {
-        map.current?.resize();
-      }, 100);
+        // Wishlist countries layer
+        if (!map.current.getLayer('wishlist-countries')) {
+          map.current.addLayer({
+            id: 'wishlist-countries',
+            type: 'fill',
+            source: 'countries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'fill-color': validateColor(initialColors.wishlist, defaultMapColors.wishlist),
+              'fill-opacity': 0.4,
+            },
+            filter: ['in', 'iso_3166_1_alpha_3', ''],
+          });
+        }
 
-      setIsMapReady(true);
+        if (!map.current.getLayer('country-borders')) {
+          map.current.addLayer({
+            id: 'country-borders',
+            type: 'line',
+            source: 'countries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'line-color': 'hsl(20, 14%, 50%)',
+              'line-width': 0.5,
+            },
+          });
+        }
+
+        // Click layer for ALL countries
+        if (!map.current.getLayer('clickable-countries')) {
+          map.current.addLayer({
+            id: 'clickable-countries',
+            type: 'fill',
+            source: 'countries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'fill-color': 'rgba(0,0,0,0)',
+              'fill-opacity': 0,
+            },
+            filter: ['has', 'iso_3166_1_alpha_3'],
+          });
+
+          map.current.on('click', 'clickable-countries', (e) => {
+            if (!e.features?.[0]) return;
+            const iso3 = e.features[0].properties?.iso_3166_1_alpha_3 as string | undefined;
+            if (iso3) {
+              handleCountryClick(iso3);
+            }
+          });
+
+          map.current.on('mouseenter', 'clickable-countries', () => {
+            if (map.current) {
+              map.current.getCanvas().style.cursor = 'pointer';
+            }
+          });
+
+          map.current.on('mouseleave', 'clickable-countries', () => {
+            if (map.current) {
+              map.current.getCanvas().style.cursor = '';
+            }
+          });
+        }
+
+        // Resize the map after initialization to ensure proper rendering
+        setTimeout(() => {
+          map.current?.resize();
+        }, 100);
+
+        setIsMapReady(true);
+      } catch (e) {
+        console.error("Error initializing layers:", e);
+        layersInitializedRef.current = false;
+      }
     };
 
     // Handle style loading errors and retry
     let styleLoadTimeout: NodeJS.Timeout | null = null;
-    
-    const handleStyleError = () => {
-      console.warn('Mapbox style failed to load, attempting reload...');
-      if (map.current) {
-        map.current.setStyle('mapbox://styles/mapbox/light-v11');
-      }
-    };
 
     // Set a timeout to detect if style never loads
     styleLoadTimeout = setTimeout(() => {
-      if (!layersInitializedRef.current && map.current) {
-        console.warn('Mapbox style load timeout, forcing rehydration...');
+      // If layers aren't there, try to reload/rehydrate
+      if (map.current && (!map.current.getLayer('home-country') || !layersInitializedRef.current)) {
+        console.warn('Mapbox style load timeout or incomplete layers, forcing rehydration...');
         try {
           map.current.setStyle('mapbox://styles/mapbox/light-v11');
         } catch (err) {
@@ -645,10 +663,6 @@ const InteractiveWorldMap = ({
 
     map.current.on('error', (e) => {
       console.error('Mapbox error:', e.error);
-      // Only handle style-related errors
-      if (e.error?.message?.includes('style')) {
-        handleStyleError();
-      }
     });
 
     // Mapbox can fire `style.load` before listeners are attached depending on timing.
@@ -657,9 +671,11 @@ const InteractiveWorldMap = ({
       if (styleLoadTimeout) clearTimeout(styleLoadTimeout);
       initLayers();
     });
-    
+
     map.current.on('style.load', () => {
       if (styleLoadTimeout) clearTimeout(styleLoadTimeout);
+      // Reset initialization flag on style reload to ensure layers are re-added
+      layersInitializedRef.current = false;
       initLayers();
     });
 
@@ -841,12 +857,12 @@ const InteractiveWorldMap = ({
           <div ref={mapContainer} className="h-[450px] w-full" />
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-card/20 to-transparent" />
         </div>
-        
+
         {/* Countries with state tracking */}
         <div className="p-4 border-t border-border">
           <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
             <MapPin className="h-4 w-4" />
-            {countriesWithStateTracking.length > 0 
+            {countriesWithStateTracking.length > 0
               ? "Track states/regions for visited countries:"
               : "Mark a country as visited to track states/regions"
             }
@@ -860,17 +876,16 @@ const InteractiveWorldMap = ({
                 const stateCount = getStateVisitCount(code);
                 const totalStates = states ? Object.keys(states).length : 0;
                 const isUSA = country.name === 'United States';
-                
+
                 const { code: flagCode, isSubdivision } = getEffectiveFlagCode(country.name, country.flag);
                 return (
                   <Badge
                     key={country.id}
                     variant={isUSA ? "default" : "outline"}
-                    className={`cursor-pointer transition-colors ${
-                      isUSA 
-                        ? "bg-primary hover:bg-primary/90" 
+                    className={`cursor-pointer transition-colors ${isUSA
+                        ? "bg-primary hover:bg-primary/90"
                         : "hover:bg-primary/10"
-                    }`}
+                      }`}
                     onClick={() => {
                       setSelectedCountry(country);
                       setStateDialogOpen(true);
@@ -902,41 +917,41 @@ const InteractiveWorldMap = ({
           </div>
         </div>
       </CardContent>
-      
-       {readOnly ? (
-         <PublicStateMapDialog
-           open={stateDialogOpen}
-           onOpenChange={setStateDialogOpen}
-           country={selectedCountry}
-           stateVisits={effectiveStateVisits}
-         />
-       ) : (
-         <StateMapDialog
-           open={stateDialogOpen}
-           onOpenChange={setStateDialogOpen}
-           country={selectedCountry}
-           selectedMemberId={selectedMemberId}
-         />
-       )}
 
-       {!readOnly && (
-         <CountryQuickActionDialog
-           open={quickActionOpen}
-           onOpenChange={setQuickActionOpen}
-           countryInfo={clickedCountryInfo}
-           isVisited={isClickedCountryVisited}
-           isWishlisted={isClickedCountryWishlisted}
-           isHomeCountry={isClickedCountryHomeCountry}
-           onActionComplete={() => {
-             onRefetch?.();
-           }}
-           onOpenStateTracking={handleOpenStateTracking}
-           onOpenVisitDetails={handleOpenVisitDetails}
-         />
-       )}
+      {readOnly ? (
+        <PublicStateMapDialog
+          open={stateDialogOpen}
+          onOpenChange={setStateDialogOpen}
+          country={selectedCountry}
+          stateVisits={effectiveStateVisits}
+        />
+      ) : (
+        <StateMapDialog
+          open={stateDialogOpen}
+          onOpenChange={setStateDialogOpen}
+          country={selectedCountry}
+          selectedMemberId={selectedMemberId}
+        />
+      )}
+
+      {!readOnly && (
+        <CountryQuickActionDialog
+          open={quickActionOpen}
+          onOpenChange={setQuickActionOpen}
+          countryInfo={clickedCountryInfo}
+          isVisited={isClickedCountryVisited}
+          isWishlisted={isClickedCountryWishlisted}
+          isHomeCountry={isClickedCountryHomeCountry}
+          onActionComplete={() => {
+            onRefetch?.();
+          }}
+          onOpenStateTracking={handleOpenStateTracking}
+          onOpenVisitDetails={handleOpenVisitDetails}
+        />
+      )}
 
       {/* Visit Details Dialog for "Add Details" option */}
-       {!readOnly && visitDetailsCountry && (
+      {!readOnly && visitDetailsCountry && (
         <CountryVisitDetailsDialog
           countryId={visitDetailsCountry.id}
           countryName={visitDetailsCountry.name}
