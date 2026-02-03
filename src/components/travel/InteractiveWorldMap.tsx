@@ -787,20 +787,30 @@ const InteractiveWorldMap = ({
           ? ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]
           : ['in', 'iso_3166_1_alpha_3', '']; // 'match none'
 
-        // Apply filters if layers exist
-        if (map.current.getLayer('home-country')) {
-          map.current.setFilter('home-country', homeFilter);
-        }
+        // Apply filters if layers exist - with individual error handling
 
-        if (map.current.getLayer('visited-countries')) {
-          map.current.setFilter('visited-countries', visitedFilter);
-        }
+        // Home Country
+        try {
+          if (map.current.getLayer('home-country')) {
+            map.current.setFilter('home-country', homeFilter);
+          }
+        } catch (err) { console.warn('Error updating home filter:', err); }
 
-        if (map.current.getLayer('wishlist-countries')) {
-          map.current.setFilter('wishlist-countries', wishlistFilter);
-        }
+        // Visited Countries
+        try {
+          if (map.current.getLayer('visited-countries')) {
+            map.current.setFilter('visited-countries', visitedFilter);
+          }
+        } catch (err) { console.warn('Error updating visited filter:', err); }
+
+        // Wishlist Countries
+        try {
+          if (map.current.getLayer('wishlist-countries')) {
+            map.current.setFilter('wishlist-countries', wishlistFilter);
+          }
+        } catch (err) { console.warn('Error updating wishlist filter:', err); }
       } catch (err) {
-        console.warn('Failed to set map filters:', err);
+        console.warn('Unexpected error in updateFilters:', err);
       }
     };
 
