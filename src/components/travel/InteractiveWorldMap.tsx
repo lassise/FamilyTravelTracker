@@ -229,9 +229,15 @@ const InteractiveWorldMap = ({
   );
 
   const wishlistCountries = useMemo(
-    () =>
-      countries
-        .filter((c) => wishlist.includes(c.id))
+    () => {
+      console.log('🔍 WISHLIST DEBUG:');
+      console.log('  - wishlist prop (country IDs):', wishlist);
+      console.log('  - countries array length:', countries.length);
+
+      const filtered = countries.filter((c) => wishlist.includes(c.id));
+      console.log('  - countries matching wishlist:', filtered.map(c => c.name));
+
+      const mapped = filtered
         .map((c) => {
           // First try to use the flag field (stores ISO2 code)
           const iso2FromFlag = c.flag?.toUpperCase();
@@ -241,7 +247,11 @@ const InteractiveWorldMap = ({
           // Fallback to name-based lookup
           return countryToISO3[c.name];
         })
-        .filter(Boolean),
+        .filter(Boolean);
+
+      console.log('  - mapped to ISO3 codes:', mapped);
+      return mapped;
+    },
     [countries, wishlist]
   );
 
