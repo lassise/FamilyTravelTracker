@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import CountryFlag from "@/components/common/CountryFlag";
-import { getRegionCode } from "@/lib/countriesData";
+import { getCountryCode } from "@/lib/countriesData";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Heart, Plus, X, ChevronDown, Star } from "lucide-react";
@@ -29,7 +29,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
 
   // Get countries that are in the wishlist
   const wishlistCountries = countries.filter(c => wishlist.includes(c.id));
-  
+
   // Get countries that can be added (not visited and not already in wishlist)
   const availableCountries = countries
     .filter(c => c.visitedBy.length === 0 && !wishlist.includes(c.id))
@@ -112,7 +112,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
             </Badge>
           )}
         </CardTitle>
-        
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" disabled={isAdding || availableCountries.length === 0}>
@@ -131,10 +131,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                       {continent} ({continentCountries.length})
                     </DropdownMenuLabel>
                     {continentCountries.map((country) => {
-                      const regionCode = getRegionCode(country.name);
-                      const storedFlag = (country.flag || '').trim().toUpperCase();
-                      const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
-                      const effectiveCode = (regionCode || (storedFlagIsCode ? storedFlag : '')).toUpperCase();
+                      const countryCode = getCountryCode(country.name);
 
                       return (
                         <DropdownMenuItem
@@ -143,7 +140,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                           className="cursor-pointer"
                         >
                           <span className="mr-2 inline-flex items-center">
-                            <CountryFlag countryCode={effectiveCode} countryName={country.name} size="sm" />
+                            <CountryFlag countryCode={countryCode} countryName={country.name} size="sm" />
                           </span>
                           {country.name}
                         </DropdownMenuItem>
@@ -161,7 +158,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      
+
       <CardContent>
         {wishlistCountries.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
@@ -174,10 +171,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
             {wishlistCountries
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((country) => {
-                const regionCode = getRegionCode(country.name);
-                const storedFlag = (country.flag || '').trim().toUpperCase();
-                const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
-                const effectiveCode = (regionCode || (storedFlagIsCode ? storedFlag : '')).toUpperCase();
+                const countryCode = getCountryCode(country.name);
 
                 return (
                   <div
@@ -185,7 +179,7 @@ const CountryWishlist = ({ countries, wishlist, onUpdate }: CountryWishlistProps
                     className="flex items-center gap-2 p-2 rounded-lg bg-background/50 border border-border/50 group hover:border-primary/50 transition-colors min-w-0"
                   >
                     <span className="flex-shrink-0 inline-flex items-center">
-                      <CountryFlag countryCode={effectiveCode} countryName={country.name} size="md" />
+                      <CountryFlag countryCode={countryCode} countryName={country.name} size="md" />
                     </span>
                     <span className="text-sm truncate flex-1 min-w-0">{country.name}</span>
                     <Button
