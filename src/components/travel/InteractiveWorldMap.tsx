@@ -730,12 +730,16 @@ const InteractiveWorldMap = ({
     if (!map.current || !isMapReady) return;
 
     const reapply = () => {
+      // Home Country
       try {
         if (map.current?.getLayer('home-country')) {
           map.current.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
           map.current.setPaintProperty('home-country', 'fill-color', validateColor(mapColors.home, defaultMapColors.home));
         }
+      } catch (err) { console.warn('Error updating home layer:', err); }
 
+      // Visited Countries
+      try {
         if (map.current?.getLayer('visited-countries')) {
           const visitedFilter = visitedCountries.length > 0
             ? ['in', 'iso_3166_1_alpha_3', ...visitedCountries]
@@ -743,7 +747,10 @@ const InteractiveWorldMap = ({
           map.current.setFilter('visited-countries', visitedFilter);
           map.current.setPaintProperty('visited-countries', 'fill-color', validateColor(mapColors.visited, defaultMapColors.visited));
         }
+      } catch (err) { console.warn('Error updating visited layer:', err); }
 
+      // Wishlist Countries
+      try {
         if (map.current?.getLayer('wishlist-countries')) {
           const wishlistFilter = wishlistCountries.length > 0
             ? ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]
@@ -751,9 +758,7 @@ const InteractiveWorldMap = ({
           map.current.setFilter('wishlist-countries', wishlistFilter);
           map.current.setPaintProperty('wishlist-countries', 'fill-color', validateColor(mapColors.wishlist, defaultMapColors.wishlist));
         }
-      } catch (err) {
-        console.warn('Failed to reapply map styles after styledata event:', err);
-      }
+      } catch (err) { console.warn('Error updating wishlist layer:', err); }
     };
 
     map.current.on('styledata', reapply);
