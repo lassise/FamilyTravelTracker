@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { MapPin, Heart, X, Loader2, Check, Map, FileText, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -290,83 +290,86 @@ const CountryQuickActionDialog = ({
     }
   };
   return <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <span className="text-3xl">{countryInfo.flag}</span>
-            {countryInfo.name}
-          </DialogTitle>
-        </DialogHeader>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2 text-xl">
+          <span className="text-3xl">{countryInfo.flag}</span>
+          {countryInfo.name}
+        </DialogTitle>
+        <DialogDescription>
+          Select actions for {countryInfo.name}
+        </DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-3 py-4">
-          {/* Status badges */}
-          <div className="flex gap-2 flex-wrap">
-            {isHomeCountry && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/20 text-primary text-sm">
-                <Home className="h-3 w-3" /> Home Country
-              </span>}
-            {isVisited && !isHomeCountry && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/20 text-accent text-sm">
-                <Check className="h-3 w-3" /> Visited
-              </span>}
-            {isWishlisted && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/20 text-secondary text-sm">
-                <Heart className="h-3 w-3" /> On Wishlist
-              </span>}
-          </div>
-
-          {/* Action buttons */}
-          <div className="grid gap-2">
-            {/* Home country special handling - show state tracking prominently */}
-            {isHomeCountry && hasStateTracking && onOpenStateTracking && <Button onClick={handleOpenStateTracking} disabled={loading !== null} className="w-full justify-start gap-2" variant="default">
-                <Map className="h-4 w-4" />
-                Track States/Regions
-              </Button>}
-
-            {/* For non-home countries that haven't been visited */}
-            {!isVisited && !isHomeCountry ? <>
-                {/* Visited Quick */}
-                <Button onClick={handleAddVisitedQuick} disabled={loading !== null} className="w-full justify-start gap-2" variant="default">
-                  {loading === 'visited-quick' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-                  Add to Visited (Quick)
-                </Button>
-
-                {/* Visited with Details */}
-                <Button onClick={handleAddVisitedWithDetails} disabled={loading !== null} className="w-full justify-start gap-2 bg-green-600 hover:bg-green-700 text-white border-0" variant="outline">
-                  {loading === 'visited-details' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                  Add to Visited (Add Details)
-                </Button>
-
-                {/* Wishlist - only show if not visited and not already wishlisted */}
-                {!isWishlisted && <Button onClick={handleAddWishlist} disabled={loading !== null} className="w-full justify-start gap-2" variant="secondary">
-                    {loading === 'wishlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
-                    Add to Wish List
-                  </Button>}
-              </> : isVisited && !isHomeCountry ? <>
-                {/* State tracking - show first for visited countries with state tracking */}
-                {hasStateTracking && onOpenStateTracking && <Button onClick={handleOpenStateTracking} disabled={loading !== null} className="w-full justify-start gap-2" variant="default">
-                    <Map className="h-4 w-4" />
-                    Track States/Regions
-                  </Button>}
-
-                {/* Remove from Visited - at the bottom with red styling */}
-                <Button onClick={handleRemoveVisited} disabled={loading !== null} className="w-full justify-start gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90" variant="destructive">
-                  {loading === 'remove-visited' ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                  Remove from Visited
-                </Button>
-              </> : null}
-
-            {/* Remove from wishlist */}
-            {isWishlisted && <Button onClick={handleRemoveWishlist} disabled={loading !== null} className="w-full justify-start gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90" variant="destructive">
-                {loading === 'remove-wishlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                Remove from Wishlist
-              </Button>}
-          </div>
+      <div className="space-y-3 py-4">
+        {/* Status badges */}
+        <div className="flex gap-2 flex-wrap">
+          {isHomeCountry && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/20 text-primary text-sm">
+            <Home className="h-3 w-3" /> Home Country
+          </span>}
+          {isVisited && !isHomeCountry && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent/20 text-accent text-sm">
+            <Check className="h-3 w-3" /> Visited
+          </span>}
+          {isWishlisted && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/20 text-secondary text-sm">
+            <Heart className="h-3 w-3" /> On Wishlist
+          </span>}
         </div>
 
-        <div className="flex justify-end">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
+        {/* Action buttons */}
+        <div className="grid gap-2">
+          {/* Home country special handling - show state tracking prominently */}
+          {isHomeCountry && hasStateTracking && onOpenStateTracking && <Button onClick={handleOpenStateTracking} disabled={loading !== null} className="w-full justify-start gap-2" variant="default">
+            <Map className="h-4 w-4" />
+            Track States/Regions
+          </Button>}
+
+          {/* For non-home countries that haven't been visited */}
+          {!isVisited && !isHomeCountry ? <>
+            {/* Visited Quick */}
+            <Button onClick={handleAddVisitedQuick} disabled={loading !== null} className="w-full justify-start gap-2" variant="default">
+              {loading === 'visited-quick' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+              Add to Visited (Quick)
+            </Button>
+
+            {/* Visited with Details */}
+            <Button onClick={handleAddVisitedWithDetails} disabled={loading !== null} className="w-full justify-start gap-2 bg-green-600 hover:bg-green-700 text-white border-0" variant="outline">
+              {loading === 'visited-details' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              Add to Visited (Add Details)
+            </Button>
+
+            {/* Wishlist - only show if not visited and not already wishlisted */}
+            {!isWishlisted && <Button onClick={handleAddWishlist} disabled={loading !== null} className="w-full justify-start gap-2" variant="secondary">
+              {loading === 'wishlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
+              Add to Wish List
+            </Button>}
+          </> : isVisited && !isHomeCountry ? <>
+            {/* State tracking - show first for visited countries with state tracking */}
+            {hasStateTracking && onOpenStateTracking && <Button onClick={handleOpenStateTracking} disabled={loading !== null} className="w-full justify-start gap-2" variant="default">
+              <Map className="h-4 w-4" />
+              Track States/Regions
+            </Button>}
+
+            {/* Remove from Visited - at the bottom with red styling */}
+            <Button onClick={handleRemoveVisited} disabled={loading !== null} className="w-full justify-start gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90" variant="destructive">
+              {loading === 'remove-visited' ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+              Remove from Visited
+            </Button>
+          </> : null}
+
+          {/* Remove from wishlist */}
+          {isWishlisted && <Button onClick={handleRemoveWishlist} disabled={loading !== null} className="w-full justify-start gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90" variant="destructive">
+            {loading === 'remove-wishlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+            Remove from Wishlist
+          </Button>}
         </div>
-      </DialogContent>
-    </Dialog>;
+      </div>
+
+      <div className="flex justify-end">
+        <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>;
 };
 export default CountryQuickActionDialog;

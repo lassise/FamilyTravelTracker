@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
   const [selectedStateName, setSelectedStateName] = useState<string | null>(null);
 
   const { familyMembers } = useFamilyData();
-  
+
   // Get country code from countries-list
   const countryCode = useMemo(() => {
     if (!country) return null;
@@ -35,7 +35,7 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
     const match = allCountries.find(c => c.name === country.name);
     return match?.code || null;
   }, [country]);
-  
+
   const { stateVisits, refetch } = useStateVisits(countryCode || undefined);
 
   // List of 50 US states (excluding DC and territories)
@@ -56,7 +56,7 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
     if (!countryCode) return null;
     const allStates = getSubdivisionsForCountry(countryCode);
     if (!allStates) return null;
-    
+
     // For US, filter to only 50 states (exclude DC and territories)
     if (countryCode === 'US') {
       const filtered: Record<string, string> = {};
@@ -65,17 +65,17 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
           filtered[code] = name;
         }
       });
-      
+
       // Sort alphabetically by state name
-      const sortedEntries = Object.entries(filtered).sort(([, nameA], [, nameB]) => 
+      const sortedEntries = Object.entries(filtered).sort(([, nameA], [, nameB]) =>
         nameA.localeCompare(nameB)
       );
-      
+
       return Object.fromEntries(sortedEntries);
     }
-    
+
     // For other countries, return all subdivisions sorted alphabetically
-    const sortedEntries = Object.entries(allStates).sort(([, nameA], [, nameB]) => 
+    const sortedEntries = Object.entries(allStates).sort(([, nameA], [, nameB]) =>
       nameA.localeCompare(nameB)
     );
     return Object.fromEntries(sortedEntries);
@@ -84,7 +84,7 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
   const filteredStates = useMemo(() => {
     if (!states) return null;
     if (!searchQuery.trim()) return states;
-    
+
     const query = searchQuery.toLowerCase();
     const filtered: Record<string, string> = {};
     Object.entries(states).forEach(([code, name]) => {
@@ -92,9 +92,9 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
         filtered[code] = name;
       }
     });
-    
+
     // Maintain alphabetical order after filtering
-    const sortedEntries = Object.entries(filtered).sort(([, nameA], [, nameB]) => 
+    const sortedEntries = Object.entries(filtered).sort(([, nameA], [, nameB]) =>
       nameA.localeCompare(nameB)
     );
     return Object.fromEntries(sortedEntries);
@@ -176,9 +176,9 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
                   })()}
                   <span>{country.name}</span>
                 </div>
-                <p className="text-sm text-muted-foreground font-normal mt-0.5">
+                <DialogDescription className="text-sm text-muted-foreground font-normal mt-0.5">
                   Click a {regionLabel.toLowerCase().replace(/s$/, '')} to select which family members have visited
-                </p>
+                </DialogDescription>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -199,18 +199,18 @@ const StateMapDialog = ({ open, onOpenChange, country, selectedMemberId }: State
 
               <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
                 <div className="flex items-center gap-4">
-                  <Badge 
-                    variant="default" 
+                  <Badge
+                    variant="default"
                     className="text-sm px-3 py-1 bg-emerald-500 hover:bg-emerald-600"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                     {visitedCount} / {totalCount}
                   </Badge>
-                  
+
                   {/* Progress Bar */}
                   <div className="hidden md:flex items-center gap-2 min-w-[120px]">
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-300"
                         style={{ width: `${progressPercent}%` }}
                       />

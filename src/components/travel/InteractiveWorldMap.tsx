@@ -731,12 +731,26 @@ const InteractiveWorldMap = ({
 
     const reapply = () => {
       try {
-        map.current?.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
-        map.current?.setFilter('visited-countries', ['in', 'iso_3166_1_alpha_3', ...visitedCountries]);
-        map.current?.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
-        map.current?.setPaintProperty('home-country', 'fill-color', validateColor(mapColors.home, defaultMapColors.home));
-        map.current?.setPaintProperty('visited-countries', 'fill-color', validateColor(mapColors.visited, defaultMapColors.visited));
-        map.current?.setPaintProperty('wishlist-countries', 'fill-color', validateColor(mapColors.wishlist, defaultMapColors.wishlist));
+        if (map.current?.getLayer('home-country')) {
+          map.current.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
+          map.current.setPaintProperty('home-country', 'fill-color', validateColor(mapColors.home, defaultMapColors.home));
+        }
+
+        if (map.current?.getLayer('visited-countries')) {
+          const visitedFilter = visitedCountries.length > 0
+            ? ['in', 'iso_3166_1_alpha_3', ...visitedCountries]
+            : ['in', 'iso_3166_1_alpha_3', ''];
+          map.current.setFilter('visited-countries', visitedFilter);
+          map.current.setPaintProperty('visited-countries', 'fill-color', validateColor(mapColors.visited, defaultMapColors.visited));
+        }
+
+        if (map.current?.getLayer('wishlist-countries')) {
+          const wishlistFilter = wishlistCountries.length > 0
+            ? ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]
+            : ['in', 'iso_3166_1_alpha_3', ''];
+          map.current.setFilter('wishlist-countries', wishlistFilter);
+          map.current.setPaintProperty('wishlist-countries', 'fill-color', validateColor(mapColors.wishlist, defaultMapColors.wishlist));
+        }
       } catch (err) {
         console.warn('Failed to reapply map styles after styledata event:', err);
       }
