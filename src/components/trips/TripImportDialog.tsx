@@ -284,11 +284,9 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                 }
             }
 
-            console.log("[TripImportDialog] Analyzing text:", textToAnalyze.substring(0, 500));
 
             // Try to detect airports first (boarding pass)
             const detectedAirports = extractAirportCodes(textToAnalyze);
-            console.log("[TripImportDialog] Detected airports:", detectedAirports);
 
             let parsedData: ParsedTravelData | null = null;
 
@@ -321,7 +319,6 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
             // If no flight detected, try to find country name (hotel reservation, etc.)
             if (!parsedData) {
                 const countryInfo = findCountryInText(textToAnalyze);
-                console.log("[TripImportDialog] Detected country:", countryInfo);
 
                 if (countryInfo) {
                     const dates = extractDates(textToAnalyze);
@@ -344,7 +341,6 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                 throw new Error("Could not detect any travel information. Please ensure the text contains airport codes, country names, or addresses.");
             }
 
-            console.log("[TripImportDialog] Parsed data:", parsedData);
 
             // Check if this is the home country
             if (homeCountry && parsedData.country.toLowerCase() === homeCountry.toLowerCase()) {

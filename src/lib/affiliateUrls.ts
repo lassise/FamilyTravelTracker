@@ -10,7 +10,7 @@
  * - Future-proofing for additional affiliate partners
  */
 
-export type AffiliateProvider = 
+export type AffiliateProvider =
   | 'booking.com'
   | 'viator'
   | 'getyourguide'
@@ -46,12 +46,12 @@ export interface AffiliateUrlParams {
  */
 export const buildAffiliateUrl = (params: AffiliateUrlParams): string => {
   const { baseUrl, affiliateId, trackingParams, campaign, userId } = params;
-  
+
   if (!baseUrl) return '';
-  
+
   try {
     const url = new URL(baseUrl);
-    
+
     // Add affiliate ID based on provider
     if (affiliateId) {
       switch (params.provider) {
@@ -83,18 +83,18 @@ export const buildAffiliateUrl = (params: AffiliateUrlParams): string => {
           break;
       }
     }
-    
+
     // Add campaign tracking if provided
     if (campaign) {
       url.searchParams.set('utm_campaign', campaign);
     }
-    
+
     // Add user tracking if provided (for analytics)
     if (userId) {
       url.searchParams.set('utm_source', 'app');
       url.searchParams.set('user_id', userId);
     }
-    
+
     // Add any additional tracking parameters
     if (trackingParams) {
       Object.entries(trackingParams).forEach(([key, value]) => {
@@ -103,7 +103,7 @@ export const buildAffiliateUrl = (params: AffiliateUrlParams): string => {
         }
       });
     }
-    
+
     return url.toString();
   } catch (error) {
     // If URL parsing fails, return original URL
@@ -121,14 +121,11 @@ export const buildAffiliateUrl = (params: AffiliateUrlParams): string => {
  */
 export const openAffiliateUrl = (url: string, provider?: AffiliateProvider): void => {
   if (!url) return;
-  
+
   // Track affiliate click (can be extended with analytics service)
-  if (provider) {
-    console.log(`[Affiliate] Opening ${provider} URL:`, url);
-    // Future: Add analytics tracking here
-    // Example: analytics.track('affiliate_click', { provider, url });
-  }
-  
+  // Future: Add analytics tracking here
+  // Example: analytics.track('affiliate_click', { provider, url });
+
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
@@ -138,7 +135,7 @@ export const openAffiliateUrl = (url: string, provider?: AffiliateProvider): voi
  */
 export const isAffiliateUrl = (url: string): boolean => {
   if (!url) return false;
-  
+
   try {
     const urlObj = new URL(url);
     const affiliateParams = ['aid', 'pid', 'partner_id', 'ref', 'affcid', 'utm_campaign'];
@@ -165,16 +162,16 @@ export interface HotelAffiliateParams {
 
 export const buildHotelAffiliateUrl = (params: HotelAffiliateParams): string => {
   const { checkIn, checkOut, guests, rooms, ...rest } = params;
-  
+
   const trackingParams: Record<string, string> = {
     ...params.trackingParams,
   };
-  
+
   if (checkIn) trackingParams.checkin = checkIn;
   if (checkOut) trackingParams.checkout = checkOut;
   if (guests) trackingParams.group_adults = guests.toString();
   if (rooms) trackingParams.no_rooms = rooms.toString();
-  
+
   return buildAffiliateUrl({
     ...rest,
     trackingParams,
@@ -196,14 +193,14 @@ export interface ExperienceAffiliateParams {
 
 export const buildExperienceAffiliateUrl = (params: ExperienceAffiliateParams): string => {
   const { date, participants, ...rest } = params;
-  
+
   const trackingParams: Record<string, string> = {
     ...params.trackingParams,
   };
-  
+
   if (date) trackingParams.date = date;
   if (participants) trackingParams.participants = participants.toString();
-  
+
   return buildAffiliateUrl({
     ...rest,
     trackingParams,

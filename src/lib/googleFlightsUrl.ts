@@ -29,7 +29,7 @@ const CABIN_MAP: Record<string, string> = {
 // Helper to get airline name from code
 const getAirlineName = (airlineCode: string): string | undefined => {
   const normalized = airlineCode.trim().toUpperCase();
-  const airline = AIRLINES.find((a) => 
+  const airline = AIRLINES.find((a) =>
     normalized === a.code || normalized.startsWith(a.code)
   );
   return airline?.name;
@@ -209,7 +209,7 @@ export const buildMultiCityUrl = (
 // Helper to extract and validate airline code from flight data
 const extractAirlineCode = (airlineInput: string | null | undefined): string | undefined => {
   if (!airlineInput) return undefined;
-  
+
   // Extract IATA code (first 2 characters, e.g., "B6" from "B61707")
   const trimmed = airlineInput.trim().toUpperCase();
   if (trimmed.length >= 2) {
@@ -223,7 +223,7 @@ const extractAirlineCode = (airlineInput: string | null | undefined): string | u
       }
     }
   }
-  
+
   return undefined;
 };
 
@@ -308,8 +308,6 @@ export const logBookingEvent = (
   eventType: "oneway" | "roundtrip" | "multicity",
   details: Record<string, any>
 ): void => {
-  console.log(`[Flight Booking] ${eventType}`, details);
-  
   // In a real app, you'd send this to an analytics service
   // Example: analytics.track(`flight_booking_${eventType}_clicked`, details);
 };

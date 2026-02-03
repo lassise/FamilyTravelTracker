@@ -10,8 +10,6 @@ export class PhotoScanner {
     // For web demo, we return mock data
 
     async scanPhotos(onProgress?: (count: number) => void): Promise<ScannedPhoto[]> {
-        console.log("Starting photo scan...");
-
         // Simulate finding photos one by one
         const results: ScannedPhoto[] = [];
         const total = MOCK_PHOTOS.length;
@@ -24,7 +22,6 @@ export class PhotoScanner {
             }
         }
 
-        console.log(`Scan complete. Found ${results.length} photos.`);
         return results;
     }
 
