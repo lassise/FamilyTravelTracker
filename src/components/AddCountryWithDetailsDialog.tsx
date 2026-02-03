@@ -68,6 +68,7 @@ interface AddCountryWithDetailsDialogProps {
   prefillData?: PrefillData | null;
   externalOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  visitedCountryCodes?: string[];  // Codes of countries already in user's list
 }
 
 const allCountries = getAllCountries();
@@ -80,7 +81,7 @@ const months = [
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
-const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, externalOpen, onOpenChange }: AddCountryWithDetailsDialogProps) => {
+const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, externalOpen, onOpenChange, visitedCountryCodes = [] }: AddCountryWithDetailsDialogProps) => {
   // Use external open state if provided, otherwise internal
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
@@ -304,14 +305,29 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, ex
                   <CommandList>
                     <CommandEmpty>No country found.</CommandEmpty>
                     <CommandGroup>
-                      {allCountries.map((opt) => (
-                        <CommandItem key={opt.code} value={opt.name} onSelect={() => handleCountrySelect(opt)}>
-                          <Check className={cn("mr-2 h-4 w-4", selectedCountry?.name === opt.name ? "opacity-100" : "opacity-0")} />
-                          <CountryFlag countryCode={opt.code} countryName={opt.name} size="sm" className="mr-2" />
-                          <span>{opt.name}</span>
-                          <span className="ml-auto text-muted-foreground text-xs">{opt.continent}</span>
-                        </CommandItem>
-                      ))}
+                      {allCountries.map((opt) => {
+                        const isAlreadyAdded = visitedCountryCodes.includes(opt.code) ||
+                          visitedCountryCodes.includes(opt.name.toLowerCase());
+                        return (
+                          <CommandItem
+                            key={opt.code}
+                            value={opt.name}
+                            onSelect={() => !isAlreadyAdded && handleCountrySelect(opt)}
+                            className={cn(
+                              isAlreadyAdded && "opacity-40 cursor-not-allowed"
+                            )}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", selectedCountry?.name === opt.name ? "opacity-100" : "opacity-0")} />
+                            <CountryFlag countryCode={opt.code} countryName={opt.name} size="sm" className="mr-2" />
+                            <span>{opt.name}</span>
+                            {isAlreadyAdded ? (
+                              <span className="ml-auto text-xs text-muted-foreground italic">Already added</span>
+                            ) : (
+                              <span className="ml-auto text-muted-foreground text-xs">{opt.continent}</span>
+                            )}
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>

@@ -252,6 +252,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
               familyMembers={familyMembers}
               prefillData={boardingPassPrefill}
               externalOpen={addCountryDialogOpen}
+              visitedCountryCodes={countries.flatMap(c => [c.flag, c.name.toLowerCase()])}
               onOpenChange={(open) => {
                 setAddCountryDialogOpen(open);
                 if (!open) setBoardingPassPrefill(null);

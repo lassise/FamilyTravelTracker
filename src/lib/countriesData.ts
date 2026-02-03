@@ -24,14 +24,26 @@ let cachedCountries: CountryOption[] | null = null;
 // Get all countries as options (memoized)
 export const getAllCountries = (): CountryOption[] => {
   if (cachedCountries) return cachedCountries;
-  
-  cachedCountries = Object.entries(countries).map(([code, data]) => ({
-    name: data.name,
-    flag: getEmojiFlag(code as TCountryCode),
-    continent: continentNames[data.continent] || data.continent,
-    code,
-  })).sort((a, b) => a.name.localeCompare(b.name));
-  
+
+  // Add UK nations as separate entries
+  const ukNations: CountryOption[] = [
+    { name: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', continent: 'Europe', code: 'GB-ENG' },
+    { name: 'Scotland', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', continent: 'Europe', code: 'GB-SCT' },  // Saltire
+    { name: 'Wales', flag: '🏴󠁧󠁢󠁷󠁬󠁳󠁿', continent: 'Europe', code: 'GB-WLS' },
+  ];
+
+  const standardCountries = Object.entries(countries)
+    .filter(([code]) => code !== 'GB')  // Remove unified UK, we're using separate nations
+    .map(([code, data]) => ({
+      name: data.name,
+      flag: getEmojiFlag(code as TCountryCode),
+      continent: continentNames[data.continent] || data.continent,
+      code,
+    }));
+
+  cachedCountries = [...standardCountries, ...ukNations]
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return cachedCountries;
 };
 
@@ -118,9 +130,9 @@ export const getCountryCode = (name: string): string => {
 export const searchCountries = (query: string): CountryOption[] => {
   const lowercaseQuery = query.toLowerCase().trim();
   if (!lowercaseQuery) return [];
-  
+
   const allCountries = getAllCountries();
-  
+
   return allCountries.filter(country => {
     // Check if the country name matches
     if (country.name.toLowerCase().includes(lowercaseQuery)) {

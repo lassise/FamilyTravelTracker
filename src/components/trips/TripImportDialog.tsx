@@ -83,14 +83,48 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
 
     // Extract dates in various formats
     const extractDates = (text: string): { startDate: string | null; endDate: string | null } => {
-        // Check-in / Check-out pattern (e.g., "Sep 7, 2022" / "Sep 11, 2022")
-        const checkInMatch = text.match(/check\s*in[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
-        const checkOutMatch = text.match(/check\s*out[:\s]+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
+        // Helper to parse various date formats
+        const parseDateFromMatch = (dateText: string): string | null => {
+            // Remove day names (Monday, Tuesday, etc.)
+            const cleanedText = dateText.replace(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s*/i, '').trim();
+
+            // Try "Month Day, Year" (e.g., "March 25, 2025")
+            const monthDayYear = cleanedText.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+            if (monthDayYear) {
+                const monthNum = parseMonth(monthDayYear[1]);
+                if (monthNum) {
+                    return `${monthDayYear[3]}-${monthNum}-${monthDayYear[2].padStart(2, '0')}`;
+                }
+            }
+
+            // Try "M/D/YYYY" or "MM/DD/YYYY" (e.g., "3/25/2025")
+            const slashDate = cleanedText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (slashDate) {
+                return `${slashDate[3]}-${slashDate[1].padStart(2, '0')}-${slashDate[2].padStart(2, '0')}`;
+            }
+
+            return null;
+        };
+
+        // ARRIVAL / DEPARTURE pattern (e.g., "ARRIVAL Tuesday, March 25, 2025")
+        const arrivalMatch = text.match(/arrival[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
+        const departureMatch = text.match(/departure[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
+
+        if (arrivalMatch || departureMatch) {
+            return {
+                startDate: arrivalMatch ? parseDateFromMatch(arrivalMatch[1]) : null,
+                endDate: departureMatch ? parseDateFromMatch(departureMatch[1]) : null,
+            };
+        }
+
+        // Check-in / Check-out pattern (e.g., "Check in Sep 7, 2022")
+        const checkInMatch = text.match(/check\s*-?\s*in[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
+        const checkOutMatch = text.match(/check\s*-?\s*out[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
 
         if (checkInMatch || checkOutMatch) {
             return {
-                startDate: checkInMatch ? parseDateString(checkInMatch[1]) : null,
-                endDate: checkOutMatch ? parseDateString(checkOutMatch[1]) : null,
+                startDate: checkInMatch ? parseDateFromMatch(checkInMatch[1]) : null,
+                endDate: checkOutMatch ? parseDateFromMatch(checkOutMatch[1]) : null,
             };
         }
 
@@ -117,7 +151,7 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
             };
         }
 
-        // Month Day, Year format (e.g., "Jan 29, 2026")
+        // Single Month Day, Year format anywhere in text (e.g., "Jan 29, 2026")
         const monthDayMatch = text.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i);
         if (monthDayMatch) {
             const [, month, day, year] = monthDayMatch;

@@ -63,14 +63,26 @@ export const airportData: Record<string, AirportInfo> = {
     "SJD": { code: "SJD", city: "Los Cabos", country: "Mexico", countryCode: "MX" },
     "PVR": { code: "PVR", city: "Puerto Vallarta", country: "Mexico", countryCode: "MX" },
 
-    // United Kingdom
-    "LHR": { code: "LHR", city: "London", country: "United Kingdom", countryCode: "GB" },
-    "LGW": { code: "LGW", city: "London", country: "United Kingdom", countryCode: "GB" },
-    "STN": { code: "STN", city: "London", country: "United Kingdom", countryCode: "GB" },
-    "MAN": { code: "MAN", city: "Manchester", country: "United Kingdom", countryCode: "GB" },
-    "EDI": { code: "EDI", city: "Edinburgh", country: "United Kingdom", countryCode: "GB" },
-    "BHX": { code: "BHX", city: "Birmingham", country: "United Kingdom", countryCode: "GB" },
-    "GLA": { code: "GLA", city: "Glasgow", country: "United Kingdom", countryCode: "GB" },
+    // England
+    "LHR": { code: "LHR", city: "London", country: "England", countryCode: "GB-ENG" },
+    "LGW": { code: "LGW", city: "London", country: "England", countryCode: "GB-ENG" },
+    "STN": { code: "STN", city: "London", country: "England", countryCode: "GB-ENG" },
+    "MAN": { code: "MAN", city: "Manchester", country: "England", countryCode: "GB-ENG" },
+    "BHX": { code: "BHX", city: "Birmingham", country: "England", countryCode: "GB-ENG" },
+    "LTN": { code: "LTN", city: "London", country: "England", countryCode: "GB-ENG" },
+    "BRS": { code: "BRS", city: "Bristol", country: "England", countryCode: "GB-ENG" },
+    "NCL": { code: "NCL", city: "Newcastle", country: "England", countryCode: "GB-ENG" },
+    "LBA": { code: "LBA", city: "Leeds", country: "England", countryCode: "GB-ENG" },
+    "LPL": { code: "LPL", city: "Liverpool", country: "England", countryCode: "GB-ENG" },
+
+    // Scotland
+    "EDI": { code: "EDI", city: "Edinburgh", country: "Scotland", countryCode: "GB-SCT" },
+    "GLA": { code: "GLA", city: "Glasgow", country: "Scotland", countryCode: "GB-SCT" },
+    "ABZ": { code: "ABZ", city: "Aberdeen", country: "Scotland", countryCode: "GB-SCT" },
+    "INV": { code: "INV", city: "Inverness", country: "Scotland", countryCode: "GB-SCT" },
+
+    // Wales
+    "CWL": { code: "CWL", city: "Cardiff", country: "Wales", countryCode: "GB-WLS" },
 
     // France
     "CDG": { code: "CDG", city: "Paris", country: "France", countryCode: "FR" },
