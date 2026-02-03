@@ -29,7 +29,7 @@ const checkRateLimit = async (
   windowMinutes: number
 ): Promise<{ allowed: boolean; retryAfter?: number; remaining?: number }> => {
   const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
-  
+
   try {
     // Check for existing rate limit record
     const { data, error } = await supabase
@@ -44,9 +44,9 @@ const checkRateLimit = async (
       // Allow request on error to prevent blocking users
       return { allowed: true };
     }
-    
+
     const record = data as RateLimitRecord | null;
-    
+
     if (!record) {
       // First request - create new record
       await supabase.from('api_rate_limits').insert({
@@ -57,21 +57,21 @@ const checkRateLimit = async (
       } as RateLimitRecord);
       return { allowed: true, remaining: maxRequests - 1 };
     }
-    
+
     // Check if window has expired
     const recordWindowStart = new Date(record.window_start);
     if (recordWindowStart < windowStart) {
       // Window expired - reset counter
       await supabase
         .from('api_rate_limits')
-        .update({ 
-          request_count: 1, 
-          window_start: new Date().toISOString() 
+        .update({
+          request_count: 1,
+          window_start: new Date().toISOString()
         } as Partial<RateLimitRecord>)
         .eq('id', record.id);
       return { allowed: true, remaining: maxRequests - 1 };
     }
-    
+
     // Check if limit exceeded
     if (record.request_count >= maxRequests) {
       const resetTime = new Date(record.window_start).getTime() + windowMinutes * 60 * 1000;
@@ -79,13 +79,13 @@ const checkRateLimit = async (
       console.log(`Rate limit exceeded for user ${userId} on ${functionName}. Retry after ${retryAfter}s`);
       return { allowed: false, retryAfter, remaining: 0 };
     }
-    
+
     // Increment counter
     await supabase
       .from('api_rate_limits')
       .update({ request_count: record.request_count + 1 } as Partial<RateLimitRecord>)
       .eq('id', record.id);
-      
+
     return { allowed: true, remaining: maxRequests - record.request_count - 1 };
   } catch (err) {
     console.error('Rate limit error:', err);
@@ -134,23 +134,23 @@ serve(async (req) => {
 
     // Check rate limit
     const rateLimit = await checkRateLimit(
-      serviceClient, 
-      user.id, 
-      'generate-trip-suggestions', 
-      RATE_LIMIT_MAX_REQUESTS, 
+      serviceClient,
+      user.id,
+      'generate-trip-suggestions',
+      RATE_LIMIT_MAX_REQUESTS,
       RATE_LIMIT_WINDOW_MINUTES
     );
-    
+
     if (!rateLimit.allowed) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Rate limit exceeded. Please try again later.',
         retryAfter: rateLimit.retryAfter,
         suggestions: [],
         recommendations: []
       }), {
         status: 429,
-        headers: { 
-          ...corsHeaders, 
+        headers: {
+          ...corsHeaders,
           'Content-Type': 'application/json',
           'Retry-After': rateLimit.retryAfter?.toString() || '3600'
         },
@@ -161,7 +161,7 @@ serve(async (req) => {
     const { request_type, preferences, visited_countries, wishlistCountries, visitedContinents, visitedCountries } = body;
 
     // Validate request_type
-    const validRequestTypes = ['recommendations', 'quick_itinerary', 'suggestions', undefined];
+    const validRequestTypes = ['recommendations', 'quick_itinerary', 'suggestions', 'parse_documents', undefined];
     if (request_type && !validRequestTypes.includes(request_type)) {
       return new Response(
         JSON.stringify({ error: 'Invalid request_type', suggestions: [], recommendations: [] }),
@@ -214,7 +214,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '{}';
-      
+
       let result;
       try {
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -232,7 +232,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
     // Handle quick itinerary request
     if (request_type === "quick_itinerary") {
       const { destination, days, preferences: userPrefs } = body;
-      
+
       // Validate inputs
       if (!destination || typeof destination !== 'string' || destination.length > 100) {
         return new Response(
@@ -240,7 +240,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
+
       if (!days || typeof days !== 'number' || days < 1 || days > 30) {
         return new Response(
           JSON.stringify({ error: 'Invalid days (must be 1-30)' }),
@@ -250,7 +250,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
       // Sanitize destination
       const sanitizedDestination = destination.replace(/[<>]/g, '').substring(0, 100).trim();
-      
+
       const prompt = `Create a ${days}-day travel itinerary for ${sanitizedDestination}.
 
 Traveler Preferences:
@@ -292,7 +292,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '{}';
-      
+
       let result;
       try {
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -303,6 +303,97 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
       return new Response(
         JSON.stringify(result),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Handle document parsing request (Batch Import)
+    if (request_type === "parse_documents") {
+      const { content } = body;
+
+      if (!content || typeof content !== 'string') {
+        return new Response(
+          JSON.stringify({ error: 'Invalid content' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // SIMPLIFIED PROMPT: Only extract raw flight data
+      const prompt = `Extract flight information from this text. Look for airport codes, dates, airlines, and flight numbers.
+
+TEXT:
+${content.substring(0, 5000)}
+
+Return JSON with this EXACT structure:
+{
+  "flights": [
+    {
+      "departure_airport": "3-letter code like LAS",
+      "arrival_airport": "3-letter code like FLL",
+      "date": "YYYY-MM-DD format",
+      "airline": "airline name if found",
+      "flight_number": "flight number if found"
+    }
+  ]
+}
+
+RULES:
+- If year is missing, use 2026 for dates in Jan-Jun, use 2025 for dates in Jul-Dec
+- "Las Vegas" = LAS, "Fort Lauderdale" = FLL, etc.
+- Always return valid JSON even if no flights found (return empty array)
+
+Return ONLY the JSON, nothing else.`;
+
+      console.log("[parse_documents] Sending to AI:", content.substring(0, 200) + "...");
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: "You extract structured data from text. Always respond with valid JSON only. Be lenient - if you see anything that looks like travel info, extract it." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.1,
+        }),
+      });
+
+      const data = await response.json();
+      const responseContent = data.choices?.[0]?.message?.content || '{}';
+
+      console.log("[parse_documents] AI response:", responseContent);
+
+      let result;
+      try {
+        // Try to extract JSON from the response
+        const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
+        result = jsonMatch ? JSON.parse(jsonMatch[0]) : { flights: [] };
+      } catch (parseError) {
+        console.error("[parse_documents] JSON parse error:", parseError);
+        result = { flights: [], raw_response: responseContent };
+      }
+
+      // Convert flights to trips format for backwards compatibility
+      const trips = (result.flights || []).map((flight: any) => ({
+        title: `Flight to ${flight.arrival_airport || 'Unknown'}`,
+        destination: flight.arrival_airport,
+        departure_airport: flight.departure_airport,
+        arrival_airport: flight.arrival_airport,
+        start_date: flight.date,
+        end_date: flight.date,
+        airline: flight.airline,
+        flight_number: flight.flight_number,
+        summary: `${flight.airline || 'Flight'} ${flight.flight_number || ''} ${flight.departure_airport} → ${flight.arrival_airport}`.trim()
+      }));
+
+      console.log("[parse_documents] Extracted trips:", trips);
+
+      return new Response(
+        JSON.stringify({ trips, flights: result.flights, raw_response: responseContent }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -339,7 +430,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '[]';
-    
+
     let suggestions;
     try {
       const jsonMatch = content.match(/\[[\s\S]*\]/);

@@ -54,9 +54,20 @@ function calculateDays(startDate: string | null, endDate: string | null): number
   return differenceInDays(end, start) + 1;
 }
 
+interface PrefillData {
+  countryName?: string;
+  countryCode?: string;
+  visitDate?: string;
+  endDate?: string;
+  tripName?: string;
+}
+
 interface AddCountryWithDetailsDialogProps {
   familyMembers: Array<{ id: string; name: string }>;
   onSuccess: (newCountryId?: string) => void;
+  prefillData?: PrefillData | null;
+  externalOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const allCountries = getAllCountries();
@@ -69,8 +80,12 @@ const months = [
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
-const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess }: AddCountryWithDetailsDialogProps) => {
-  const [open, setOpen] = useState(false);
+const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, externalOpen, onOpenChange }: AddCountryWithDetailsDialogProps) => {
+  // Use external open state if provided, otherwise internal
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -84,6 +99,38 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess }: AddCountryWit
   const [tripMemberIds, setTripMemberIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Handle prefill data when dialog opens
+  useEffect(() => {
+    if (open && prefillData) {
+      // Find matching country from prefillData
+      if (prefillData.countryName) {
+        const matchedCountry = allCountries.find(
+          c => c.name.toLowerCase() === prefillData.countryName?.toLowerCase() ||
+            c.code.toLowerCase() === prefillData.countryCode?.toLowerCase()
+        );
+        if (matchedCountry) {
+          setSelectedCountry(matchedCountry);
+        }
+      }
+
+      // Set visit date if provided
+      if (prefillData.visitDate) {
+        setVisitDate(prefillData.visitDate);
+        setIsApproximate(false);
+      }
+
+      // Set end date if provided
+      if (prefillData.endDate) {
+        setEndDate(prefillData.endDate);
+      }
+
+      // Set trip name if provided
+      if (prefillData.tripName) {
+        setTripName(prefillData.tripName);
+      }
+    }
+  }, [open, prefillData]);
 
   useEffect(() => {
     if (open) {
@@ -366,28 +413,7 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess }: AddCountryWit
               />
             </div>
 
-            {familyMembers.length > 1 && (
-              <div>
-                <Label className="text-xs flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  Who went on this trip?
-                </Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {familyMembers.map((member) => (
-                    <label key={member.id} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                      <Checkbox
-                        checked={tripMemberIds.includes(member.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) setTripMemberIds([...tripMemberIds, member.id]);
-                          else setTripMemberIds(tripMemberIds.filter((id) => id !== member.id));
-                        }}
-                      />
-                      <span>{member.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
+
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

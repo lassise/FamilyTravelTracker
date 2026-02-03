@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Plus, 
-  Plane, 
-  Calendar, 
-  MapPin, 
+import {
+  Plus,
+  Plane,
+  Calendar,
+  MapPin,
   Loader2,
   MoreHorizontal,
   Trash2,
@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import PendingInvitesCard from "@/components/trips/PendingInvitesCard";
+
+import { TripImportDialog } from "@/components/trips/TripImportDialog";
 
 const Trips = () => {
   const { user, loading: authLoading } = useAuth();
@@ -53,10 +55,10 @@ const Trips = () => {
   const longestOfSelected =
     selectedTrips.length >= 2
       ? selectedTrips.reduce<{ trip: (typeof trips)[0]; days: number } | null>((best, trip) => {
-          const days = getTripDays(trip) ?? 0;
-          if (!best || days > best.days) return { trip, days };
-          return best;
-        }, null)
+        const days = getTripDays(trip) ?? 0;
+        if (!best || days > best.days) return { trip, days };
+        return best;
+      }, null)
       : null;
 
   useEffect(() => {
@@ -119,17 +121,19 @@ const Trips = () => {
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold">My Trips</h1>
+            <h1 className="text-3xl font-bold mb-2">My Trips</h1>
             <p className="text-muted-foreground">
               Manage and view all your family adventures
             </p>
           </div>
-          <Button onClick={() => navigate("/trips/add")}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Trip
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => navigate("/trips/new")}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Trip
+            </Button>
+          </div>
         </div>
 
         {/* Pending Invites */}

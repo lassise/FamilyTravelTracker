@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CountryDialog from "./CountryDialog";
 import AddCountryWithDetailsDialog from "./AddCountryWithDetailsDialog";
-import AIFindOnMyPhoneDialog from "./travel/AIFindOnMyPhoneDialog";
+import { TripImportDialog, type ParsedFlightData } from "@/components/trips/TripImportDialog";
 import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
@@ -46,23 +46,24 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
   const [isDeleting, setIsDeleting] = useState(false);
   const [visitDetailsDialogOpen, setVisitDetailsDialogOpen] = useState<Record<string, boolean>>({});
   const [tripLegsByCountry, setTripLegsByCountry] = useState<Record<string, TripLeg[]>>({});
-  const [aiFindDialogOpen, setAiFindDialogOpen] = useState(false);
+  const [boardingPassPrefill, setBoardingPassPrefill] = useState<{ countryName?: string; visitDate?: string; endDate?: string; tripName?: string } | null>(null);
+  const [addCountryDialogOpen, setAddCountryDialogOpen] = useState(false);
 
   // Fetch trip legs for all countries on mount
   useEffect(() => {
     const fetchAllTripLegs = async () => {
       const legsByCountry: Record<string, TripLeg[]> = {};
-      
+
       for (const country of countries) {
         const { data } = await fetchLegsForCountry(country.id, country.name);
         if (data && data.length > 0) {
           legsByCountry[country.id] = data;
         }
       }
-      
+
       setTripLegsByCountry(legsByCountry);
     };
-    
+
     if (countries.length > 0) {
       fetchAllTripLegs();
     }
@@ -72,9 +73,9 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
   const { continents, years } = useMemo(() => {
     const continentSet = new Set<string>();
     const yearSet = new Set<number>();
-    
+
     countries.forEach(c => continentSet.add(c.continent));
-    
+
     visitDetails.forEach(v => {
       if (v.visit_date) {
         try {
@@ -89,7 +90,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
         yearSet.add(v.approximate_year);
       }
     });
-    
+
     return {
       continents: Array.from(continentSet).sort(),
       years: Array.from(yearSet).sort((a, b) => b - a)
@@ -99,7 +100,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
   // Filter countries based on selected filters
   const filteredCountries = useMemo(() => {
     let result = countries;
-    
+
     // Filter by selected member
     if (selectedMemberId) {
       const selectedMember = familyMembers.find(m => m.id === selectedMemberId);
@@ -107,11 +108,11 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
         result = result.filter(c => c.visitedBy.includes(selectedMember.name));
       }
     }
-    
+
     if (selectedContinent !== 'all') {
       result = result.filter(c => c.continent === selectedContinent);
     }
-    
+
     if (selectedYear !== 'all') {
       const year = parseInt(selectedYear);
       const countryIdsForYear = new Set(
@@ -131,7 +132,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
       );
       result = result.filter(c => countryIdsForYear.has(c.id));
     }
-    
+
     return result;
   }, [countries, selectedContinent, selectedYear, selectedMemberId, familyMembers, visitDetails]);
 
@@ -196,7 +197,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
         return;
       }
     }
-    
+
     // Update the UI after successful toggle
     handleUpdate();
   };
@@ -249,27 +250,51 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
             />
             <AddCountryWithDetailsDialog
               familyMembers={familyMembers}
+              prefillData={boardingPassPrefill}
+              externalOpen={addCountryDialogOpen}
+              onOpenChange={(open) => {
+                setAddCountryDialogOpen(open);
+                if (!open) setBoardingPassPrefill(null);
+              }}
               onSuccess={(newCountryId) => {
                 handleUpdate();
+                setBoardingPassPrefill(null);
+                setAddCountryDialogOpen(false);
                 if (newCountryId) {
                   setExpandedCountries((prev) => new Set([...prev, newCountryId]));
                   setVisitDetailsDialogOpen((prev) => ({ ...prev, [newCountryId]: true }));
                 }
               }}
             />
-            <Button variant="outline" onClick={() => setAiFindDialogOpen(true)}>
-              <Smartphone className="w-4 h-4 mr-2" />
-              AI Find On My Phone
-            </Button>
+            <div className="hidden">
+              {/* Creating a hidden TripImportDialog to trigger refetch, 
+                 but actually we want the button to trigger it. 
+                 The TripImportDialog component renders a button by default.
+                 We need to customize it or wrap it. 
+                 Let's fix the imports first.
+             */}
+            </div>
+            <TripImportDialog
+              onTripCreated={handleUpdate}
+              homeCountry={homeCountry}
+              onCountryDetected={(data) => {
+                // Set prefill data and open the Add Country dialog
+                setBoardingPassPrefill({
+                  countryName: data.country,
+                  visitDate: data.startDate || undefined,
+                  endDate: data.endDate || undefined,
+                  tripName: data.tripName,
+                });
+                setAddCountryDialogOpen(true);
+              }}
+              trigger={
+                <Button className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                  <Smartphone className="w-4 h-4 mr-2" />
+                  AI Travel Scan
+                </Button>
+              }
+            />
           </div>
-          <AIFindOnMyPhoneDialog
-            open={aiFindDialogOpen}
-            onOpenChange={setAiFindDialogOpen}
-            familyMembers={familyMembers}
-            countries={countries}
-            homeCountry={homeCountry}
-            onSuccess={handleUpdate}
-          />
         </div>
 
         {/* Filters */}
@@ -319,11 +344,11 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
             const regionCode = getRegionCode(displayName) || getRegionCode(country.name);
             const countryCode = (
               (isScotlandEmoji ? "GB-SCT" : "") ||
-              (isStoredFlagACode ? storedFlag : "") || 
+              (isStoredFlagACode ? storedFlag : "") ||
               regionCode ||
-              codeFromName || 
-              getCountryCode(displayName) || 
-              getCountryCode(country.name) || 
+              codeFromName ||
+              getCountryCode(displayName) ||
+              getCountryCode(country.name) ||
               ""
             ).toUpperCase();
 
@@ -389,16 +414,16 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                           </Button>
                         )}
                         <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                        <ChevronDown 
+                        <ChevronDown
                           className={cn(
                             "w-5 h-5 text-muted-foreground transition-transform duration-200",
                             isExpanded && "rotate-180"
-                          )} 
+                          )}
                         />
                       </div>
                     </button>
                   </CollapsibleTrigger>
-                  
+
                   <CollapsibleContent>
                     <div className="border-t p-4 space-y-4 bg-muted/20">
                       {/* Logged Trips Section */}
@@ -450,7 +475,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                 // Build date display - prioritize exact dates
                                 let dateDisplay = "";
                                 let hasExactDate = false;
-                                
+
                                 if (trip.visit_date) {
                                   try {
                                     const startDate = format(parseISO(trip.visit_date), "MMM d, yyyy");
@@ -477,10 +502,10 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                     : "";
                                   dateDisplay = [monthName, trip.approximate_year].filter(Boolean).join(" ") || `${trip.approximate_year}`;
                                 }
-                                
+
                                 const daysText = trip.number_of_days ? `${trip.number_of_days} day${trip.number_of_days !== 1 ? "s" : ""}` : "";
                                 const tripTitle = trip.trip_name?.trim() || null;
-                                
+
                                 return (
                                   <button
                                     key={trip.id}
@@ -542,13 +567,13 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                                 const legDays = leg.start_date && leg.end_date
                                   ? differenceInDays(parseISO(leg.end_date), parseISO(leg.start_date)) + 1
                                   : leg.number_of_days;
-                                
+
                                 const dateDisplay = leg.start_date && leg.end_date
                                   ? `${format(parseISO(leg.start_date), "MMM d")} - ${format(parseISO(leg.end_date), "MMM d, yyyy")}`
                                   : leg.start_date
                                     ? format(parseISO(leg.start_date), "MMM d, yyyy")
                                     : "";
-                                
+
                                 return (
                                   <Link
                                     key={leg.id}
@@ -599,7 +624,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                           </div>
                         </div>
                       )}
-                      
+
                       <div>
                         <p className="text-xs font-medium text-muted-foreground mb-2">Visited by:</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
