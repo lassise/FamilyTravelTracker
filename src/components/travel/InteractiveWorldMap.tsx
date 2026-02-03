@@ -555,21 +555,6 @@ const InteractiveWorldMap = ({
           });
         }
 
-        // Visited countries layer
-        if (!map.current.getLayer('visited-countries')) {
-          map.current.addLayer({
-            id: 'visited-countries',
-            type: 'fill',
-            source: 'countries',
-            'source-layer': 'country_boundaries',
-            paint: {
-              'fill-color': validateColor(initialColors.visited, defaultMapColors.visited),
-              'fill-opacity': 0.6,
-            },
-            filter: ['in', 'iso_3166_1_alpha_3', ''],
-          });
-        }
-
         // Wishlist countries layer
         if (!map.current.getLayer('wishlist-countries')) {
           map.current.addLayer({
@@ -580,6 +565,21 @@ const InteractiveWorldMap = ({
             paint: {
               'fill-color': validateColor(initialColors.wishlist, defaultMapColors.wishlist),
               'fill-opacity': 0.4,
+            },
+            filter: ['in', 'iso_3166_1_alpha_3', ''],
+          });
+        }
+
+        // Visited countries layer
+        if (!map.current.getLayer('visited-countries')) {
+          map.current.addLayer({
+            id: 'visited-countries',
+            type: 'fill',
+            source: 'countries',
+            'source-layer': 'country_boundaries',
+            paint: {
+              'fill-color': validateColor(initialColors.visited, defaultMapColors.visited),
+              'fill-opacity': 0.6,
             },
             filter: ['in', 'iso_3166_1_alpha_3', ''],
           });
@@ -756,9 +756,30 @@ const InteractiveWorldMap = ({
     const updateFilters = () => {
       if (!map.current) return;
       try {
-        map.current.setFilter('home-country', homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', '']);
-        map.current.setFilter('visited-countries', ['in', 'iso_3166_1_alpha_3', ...visitedCountries]);
-        map.current.setFilter('wishlist-countries', ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]);
+        // Prepare filters
+        const homeFilter = homeCountryISO ? ['==', 'iso_3166_1_alpha_3', homeCountryISO] : ['in', 'iso_3166_1_alpha_3', ''];
+
+        // Ensure arrays are valid for Mapbox 'in' filter
+        const visitedFilter = visitedCountries.length > 0
+          ? ['in', 'iso_3166_1_alpha_3', ...visitedCountries]
+          : ['in', 'iso_3166_1_alpha_3', '']; // 'match none'
+
+        const wishlistFilter = wishlistCountries.length > 0
+          ? ['in', 'iso_3166_1_alpha_3', ...wishlistCountries]
+          : ['in', 'iso_3166_1_alpha_3', '']; // 'match none'
+
+        // Apply filters if layers exist
+        if (map.current.getLayer('home-country')) {
+          map.current.setFilter('home-country', homeFilter);
+        }
+
+        if (map.current.getLayer('visited-countries')) {
+          map.current.setFilter('visited-countries', visitedFilter);
+        }
+
+        if (map.current.getLayer('wishlist-countries')) {
+          map.current.setFilter('wishlist-countries', wishlistFilter);
+        }
       } catch (err) {
         console.warn('Failed to set map filters:', err);
       }
@@ -883,8 +904,8 @@ const InteractiveWorldMap = ({
                     key={country.id}
                     variant={isUSA ? "default" : "outline"}
                     className={`cursor-pointer transition-colors ${isUSA
-                        ? "bg-primary hover:bg-primary/90"
-                        : "hover:bg-primary/10"
+                      ? "bg-primary hover:bg-primary/90"
+                      : "hover:bg-primary/10"
                       }`}
                     onClick={() => {
                       setSelectedCountry(country);
