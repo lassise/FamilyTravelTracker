@@ -28,6 +28,8 @@ const Flights = lazy(() => import("./pages/Flights"));
 const SavedFlights = lazy(() => import("./pages/SavedFlights"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DiagnosticShare = lazy(() => import("./pages/DiagnosticShare"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 
 const queryClient = new QueryClient();
 
@@ -55,6 +57,8 @@ const App = () => (
               <Route path="/dashboard/:token" element={<PublicDashboard />} />
               <Route path="/share/dashboard/:token" element={<PublicDashboard />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/trips" element={<Trips />} />
