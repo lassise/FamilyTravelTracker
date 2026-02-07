@@ -998,6 +998,7 @@ const InteractiveWorldMap = ({
             if (!open) setVisitDetailsCountry(null);
           }}
           buttonLabel="View Details"
+          showTrigger={false}
         />
       )}
     </Card>

@@ -441,19 +441,17 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                     </CollapsibleTrigger>
 
                     <div className="flex items-center gap-2 ml-4">
-                      {!hasAtLeastOneTrip && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
-                          }}
-                        >
-                          Add Details
-                        </Button>
-                      )}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
+                        }}
+                      >
+                        Add Details
+                      </Button>
 
                       <CollapsibleTrigger asChild>
                         <button className="flex items-center gap-2">
@@ -486,6 +484,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                     onOpenChange={(open) => {
                       setVisitDetailsDialogOpen(prev => ({ ...prev, [country.id]: open }));
                     }}
+                    showTrigger={false}
                   />
 
                   <CollapsibleContent>

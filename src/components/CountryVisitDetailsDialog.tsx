@@ -64,6 +64,7 @@ const CountryVisitDetailsDialog = ({
   initialFamilyMemberIds = [],
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
+  showTrigger = true,
 }: CountryVisitDetailsDialogProps) => {
   const [internalOpen, setInternalOpen] = useState<boolean | 'add'>(false);
 
@@ -75,6 +76,13 @@ const CountryVisitDetailsDialog = ({
       controlledOnOpenChange(value);
     } else {
       setInternalOpen(value);
+    }
+  };
+
+  const handleDialogChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (!isOpen) {
+      onUpdate();
     }
   };
 
@@ -146,35 +154,6 @@ const CountryVisitDetailsDialog = ({
     }
   }, [countryId]);
 
-  // Reset state when dialog opens and fetch data
-  useEffect(() => {
-    if (open) {
-      fetchData();
-      setNewVisits([]);
-      setPendingChanges({});
-      setPendingCityAdditions([]);
-      setPendingCityDeletions([]);
-      setPendingFamilyMemberChanges({});
-    }
-  }, [open, fetchData]);
-
-  // Handle auto-adding drafts based on mode
-  useEffect(() => {
-    if (!open || loading) return;
-
-    if (open === 'add') {
-      // triggered by "Add Details" orange button - always add a draft
-      if (newVisits.length === 0) {
-        handleAddNewVisitDraft();
-      }
-    } else if (open === true) {
-      // triggered by "View Details" button - only add if no existing visits
-      if (visitDetails.length === 0 && newVisits.length === 0) {
-        handleAddNewVisitDraft();
-      }
-    }
-  }, [open, loading, visitDetails.length, newVisits.length, handleAddNewVisitDraft]);
-
   /**
    * Creates a new visit draft. Pre-fills familyMemberIds from initialFamilyMemberIds
    * (who already visited this country via quick add) so trip details form has smart defaults.
@@ -197,6 +176,8 @@ const CountryVisitDetailsDialog = ({
   const handleAddNewVisitDraft = useCallback(() => {
     setNewVisits((prev) => [...prev, createNewVisitDraft(initialFamilyMemberIds)]);
   }, [createNewVisitDraft, initialFamilyMemberIds]);
+
+
 
   const handleUpdateNewVisitDraft = (id: string, updates: Partial<NewVisitDraft>) => {
     setNewVisits((prev) =>
@@ -622,12 +603,6 @@ const CountryVisitDetailsDialog = ({
   const totalDays = visitDetails.reduce((sum, v) => sum + (v.number_of_days || 0), 0);
   const timesVisited = visitDetails.length;
 
-  const handleDialogChange = (isOpen: boolean) => {
-    setOpen(isOpen);
-    if (!isOpen) {
-      onUpdate();
-    }
-  };
 
   const toggleVisitExpanded = (visitId: string) => {
     setExpandedVisits((prev) => {
@@ -641,14 +616,45 @@ const CountryVisitDetailsDialog = ({
     });
   };
 
+  // Reset state when dialog opens and fetch data
+  useEffect(() => {
+    if (open) {
+      fetchData();
+      setNewVisits([]);
+      setPendingChanges({});
+      setPendingCityAdditions([]);
+      setPendingCityDeletions([]);
+      setPendingFamilyMemberChanges({});
+    }
+  }, [open, fetchData]);
+
+  // Handle auto-adding drafts based on mode
+  useEffect(() => {
+    if (!open || loading) return;
+
+    if (open === 'add') {
+      // triggered by "Add Details" orange button - always add a draft
+      if (newVisits.length === 0) {
+        handleAddNewVisitDraft();
+      }
+    } else if (open === true) {
+      // triggered by "View Details" button - only add if no existing visits
+      if (visitDetails.length === 0 && newVisits.length === 0) {
+        handleAddNewVisitDraft();
+      }
+    }
+  }, [open, loading, visitDetails.length, newVisits.length, handleAddNewVisitDraft]);
+
   return (
-    <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-xs">
-          <Calendar className="w-3 h-3 mr-1" />
-          {buttonLabel}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={!!open} onOpenChange={handleDialogChange}>
+      {showTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="sm" className="text-xs">
+            <Calendar className="w-3 h-3 mr-1" />
+            {buttonLabel}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[85vh]" aria-describedby="country-visit-dialog-description">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">

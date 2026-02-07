@@ -67,4 +67,5 @@ export interface CountryVisitDetailsDialogProps {
     // Optional controlled props
     open?: boolean | 'add';
     onOpenChange?: (open: boolean) => void;
+    showTrigger?: boolean;
 }
