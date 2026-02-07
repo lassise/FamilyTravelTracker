@@ -83,6 +83,12 @@ const TripDetailsSchema = z.object({
     maxStops: z.number().optional(),
   }).nullable().optional(),
   regenerateDayNumber: z.number().int().min(1).max(30).optional(),
+  // Phase 1: Critical family needs
+  foodAllergies: z.array(z.string()).optional().default([]),
+  sensorySensitivities: z.array(z.string()).optional().default([]),
+  bedtime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  maxWalkingMinutes: z.number().int().min(0).max(180).optional(),
+  maxActivityMinutes: z.number().int().min(0).max(480).optional(),
 });
 
 // Enhanced activity schema with booking, seasonal, and accessibility info
@@ -251,7 +257,7 @@ const checkRateLimit = async (
   windowMinutes: number
 ): Promise<{ allowed: boolean; retryAfter?: number; remaining?: number }> => {
   const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
-  
+
   try {
     const { data, error } = await supabase
       .from('api_rate_limits')
@@ -263,9 +269,9 @@ const checkRateLimit = async (
     if (error && error.code !== 'PGRST116') {
       return { allowed: true };
     }
-    
+
     const record = data as RateLimitRecord | null;
-    
+
     if (!record) {
       await supabase.from('api_rate_limits').insert({
         user_id: userId,
@@ -275,30 +281,30 @@ const checkRateLimit = async (
       } as RateLimitRecord);
       return { allowed: true, remaining: maxRequests - 1 };
     }
-    
+
     const recordWindowStart = new Date(record.window_start);
     if (recordWindowStart < windowStart) {
       await supabase
         .from('api_rate_limits')
-        .update({ 
-          request_count: 1, 
-          window_start: new Date().toISOString() 
+        .update({
+          request_count: 1,
+          window_start: new Date().toISOString()
         } as Partial<RateLimitRecord>)
         .eq('id', record.id);
       return { allowed: true, remaining: maxRequests - 1 };
     }
-    
+
     if (record.request_count >= maxRequests) {
       const resetTime = new Date(record.window_start).getTime() + windowMinutes * 60 * 1000;
       const retryAfter = Math.ceil((resetTime - Date.now()) / 1000);
       return { allowed: false, retryAfter, remaining: 0 };
     }
-    
+
     await supabase
       .from('api_rate_limits')
       .update({ request_count: record.request_count + 1 } as Partial<RateLimitRecord>)
       .eq('id', record.id);
-      
+
     return { allowed: true, remaining: maxRequests - record.request_count - 1 };
   } catch {
     return { allowed: true };
@@ -307,45 +313,45 @@ const checkRateLimit = async (
 
 // Retry with exponential backoff
 const fetchWithRetry = async (
-  url: string, 
-  options: RequestInit, 
+  url: string,
+  options: RequestInit,
   logCtx: LogContext,
   maxRetries = MAX_RETRIES
 ): Promise<Response> => {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
-      
+
       if (response.status >= 400 && response.status < 500 && response.status !== 429) {
         return response;
       }
-      
+
       if (response.status === 429 || response.status >= 500) {
         if (attempt < maxRetries) {
           const backoffMs = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-          log('warn', `Retrying after ${backoffMs}ms (attempt ${attempt + 1})`, logCtx, { 
-            status: response.status 
+          log('warn', `Retrying after ${backoffMs}ms (attempt ${attempt + 1})`, logCtx, {
+            status: response.status
           });
           await new Promise(resolve => setTimeout(resolve, backoffMs));
           continue;
         }
       }
-      
+
       return response;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < maxRetries) {
         const backoffMs = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
-        log('warn', `Network error, retrying after ${backoffMs}ms`, logCtx, { 
-          error: lastError.message 
+        log('warn', `Network error, retrying after ${backoffMs}ms`, logCtx, {
+          error: lastError.message
         });
         await new Promise(resolve => setTimeout(resolve, backoffMs));
       }
     }
   }
-  
+
   throw lastError || new Error('Request failed after retries');
 };
 
@@ -353,13 +359,13 @@ const fetchWithRetry = async (
 const calculateDayDates = (startDate: string, numDays: number): string[] => {
   const dates: string[] = [];
   const start = new Date(startDate);
-  
+
   for (let i = 0; i < numDays; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
     dates.push(date.toISOString().split('T')[0]);
   }
-  
+
   return dates;
 };
 
@@ -367,16 +373,16 @@ const calculateDayDates = (startDate: string, numDays: number): string[] => {
 const detectItalyStationWarnings = (destination: string): { city: string; info: typeof ITALY_MULTI_STATION_CITIES[string] }[] => {
   const warnings: { city: string; info: typeof ITALY_MULTI_STATION_CITIES[string] }[] = [];
   const destLower = destination.toLowerCase();
-  
+
   // Check if destination is in Italy or mentions Italian cities
   const isItaly = destLower.includes('italy') || destLower.includes('italia');
-  
+
   for (const [city, info] of Object.entries(ITALY_MULTI_STATION_CITIES)) {
     if (destLower.includes(city) || isItaly) {
       warnings.push({ city: city.charAt(0).toUpperCase() + city.slice(1), info });
     }
   }
-  
+
   return warnings;
 };
 
@@ -385,7 +391,7 @@ const generateBookingUrl = (type: string, name: string, destination: string, dat
   const encodedName = encodeURIComponent(name);
   const encodedDest = encodeURIComponent(destination);
   const dateParam = date ? `&date=${date}` : '';
-  
+
   switch (type) {
     case 'local_tour':
     case 'viator':
@@ -414,7 +420,7 @@ const validateAndRepairItinerary = async (
   logCtx: LogContext,
   apiKey: string
 ): Promise<{ itinerary: z.infer<typeof ItinerarySchema>; wasRepaired: boolean }> => {
-  
+
   // First, enforce date integrity - ALWAYS use user's dates
   if (itinerary && typeof itinerary === 'object' && 'days' in itinerary) {
     const it = itinerary as { days: Array<{ dayNumber: number; date?: string; activities?: Array<any> }> };
@@ -423,7 +429,7 @@ const validateAndRepairItinerary = async (
       if (dayIndex >= 0 && dayIndex < dayDates.length) {
         day.date = dayDates[dayIndex];
       }
-      
+
       // Add booking URLs to activities if missing
       if (day.activities) {
         for (const activity of day.activities) {
@@ -435,18 +441,18 @@ const validateAndRepairItinerary = async (
       }
     }
   }
-  
+
   const validationResult = ItinerarySchema.safeParse(itinerary);
-  
+
   if (validationResult.success) {
     log('info', 'Itinerary validated successfully', logCtx);
     return { itinerary: validationResult.data, wasRepaired: false };
   }
-  
+
   log('warn', 'Itinerary validation failed, attempting repair', logCtx, {
     errors: validationResult.error.errors.slice(0, 5).map(e => e.message)
   });
-  
+
   // Attempt repair via AI
   const repairPrompt = `The following JSON itinerary has validation errors. Please fix it to match this exact schema:
 
@@ -494,19 +500,19 @@ Return ONLY the repaired valid JSON, no explanation.`;
     if (repairResponse.ok) {
       const repairData = await repairResponse.json();
       const repairedContent = repairData.choices?.[0]?.message?.content;
-      
+
       if (repairedContent) {
         const cleanedRepair = repairedContent
           .replace(/```json\s*/gi, '')
           .replace(/```\s*/g, '')
           .trim();
-        
+
         const jsonStart = cleanedRepair.indexOf('{');
         const jsonEnd = cleanedRepair.lastIndexOf('}');
-        
+
         if (jsonStart !== -1 && jsonEnd > jsonStart) {
           const repairedJson = JSON.parse(cleanedRepair.substring(jsonStart, jsonEnd + 1));
-          
+
           // Enforce dates again on repaired version
           if (repairedJson.days) {
             for (const day of repairedJson.days) {
@@ -516,7 +522,7 @@ Return ONLY the repaired valid JSON, no explanation.`;
               }
             }
           }
-          
+
           const repairedValidation = ItinerarySchema.safeParse(repairedJson);
           if (repairedValidation.success) {
             log('info', 'Itinerary repaired successfully', logCtx);
@@ -526,14 +532,14 @@ Return ONLY the repaired valid JSON, no explanation.`;
       }
     }
   } catch (repairError) {
-    log('error', 'Repair attempt failed', logCtx, { 
-      error: repairError instanceof Error ? repairError.message : 'Unknown' 
+    log('error', 'Repair attempt failed', logCtx, {
+      error: repairError instanceof Error ? repairError.message : 'Unknown'
     });
   }
-  
+
   // If repair fails, try to build a minimal valid structure
   log('warn', 'Building minimal fallback itinerary', logCtx);
-  
+
   const fallbackDays = dayDates.map((date, index) => ({
     dayNumber: index + 1,
     date,
@@ -547,7 +553,7 @@ Return ONLY the repaired valid JSON, no explanation.`;
     }],
     notes: "This day needs to be regenerated - tap the button below.",
   }));
-  
+
   return {
     itinerary: {
       tripSummary: `Trip to ${tripDetails.destination}`,
@@ -591,12 +597,12 @@ CRITICAL RULES:
     }).join(', ');
     systemPrompt += `\n\nPRIORITIZE activities from: ${providerNames}`;
   }
-  
+
   // Lodging suggestions if not booked
   if (needsLodging) {
     systemPrompt += `\n\nINCLUDE "lodgingSuggestions" array with 3-5 hotel/rental options because user hasn't booked lodging yet.`;
   }
-  
+
   if (isPlannerMode && clientInfo) {
     systemPrompt += `\n\nYou are helping a travel professional plan trips for clients.
 - Party: ${clientInfo.numAdults} adult(s)${clientInfo.numKids > 0 ? `, ${clientInfo.numKids} child(ren)` : ''}
@@ -650,6 +656,47 @@ ${hasKids ? '- Include family activities during leisure time' : ''}`;
 - Recommend transit options that accommodate strollers`;
   }
 
+  // Phase 1: Critical family needs
+  if (tripDetails.foodAllergies && tripDetails.foodAllergies.length > 0) {
+    const allergyList = tripDetails.foodAllergies.map((a: string) => a.startsWith('custom:') ? a.replace('custom:', '') : a).join(', ');
+    systemPrompt += `\n\n⚠️ FOOD ALLERGIES - SAFETY CRITICAL:
+- The family has these allergies: ${allergyList}
+- ONLY suggest restaurants/venues that can accommodate these allergies
+- Include "allergyNotes" for each meal suggestion
+- Flag any activities involving food (cooking classes, food tours) that may be problematic`;
+  }
+
+  if (tripDetails.sensorySensitivities && tripDetails.sensorySensitivities.length > 0) {
+    systemPrompt += `\n\n🧠 SENSORY SENSITIVITIES:`;
+    if (tripDetails.sensorySensitivities.includes('avoid_crowds')) {
+      systemPrompt += `\n- AVOID crowded attractions/peak times. Suggest quiet alternatives.`;
+    }
+    if (tripDetails.sensorySensitivities.includes('avoid_loud')) {
+      systemPrompt += `\n- AVOID loud environments (concerts, fireworks, busy markets).`;
+    }
+    if (tripDetails.sensorySensitivities.includes('need_routine')) {
+      systemPrompt += `\n- Structure the day with a predictable routine.`;
+    }
+    if (tripDetails.sensorySensitivities.includes('need_quiet_spaces')) {
+      systemPrompt += `\n- Identify quiet break spaces near major attractions.`;
+    }
+  }
+
+  if (tripDetails.bedtime) {
+    systemPrompt += `\n\n🌙 BEDTIME CONSTRAINT: ${tripDetails.bedtime}
+- All evening activities MUST end at least 30 mins before this time allowed for travel back.
+- Dinner should be scheduled accordingly.`;
+  }
+
+  if (tripDetails.maxWalkingMinutes && tripDetails.maxWalkingMinutes > 0) {
+    systemPrompt += `\n\n🚶 WALKING LIMIT: Max ${tripDetails.maxWalkingMinutes} minutes walking between valid activities.
+- Suggest transport for anything longer.`;
+  }
+
+  if (tripDetails.maxActivityMinutes && tripDetails.maxActivityMinutes > 0) {
+    systemPrompt += `\n\n⏱️ ACTIVITY DURATION LIMIT: Max ${tripDetails.maxActivityMinutes} minutes per single activity.`;
+  }
+
   // Distance and transit requirements
   systemPrompt += `\n\nDISTANCE AND TRANSIT REQUIREMENTS:
 For EVERY activity, include:
@@ -672,9 +719,9 @@ For EVERY activity, include:
 
 // Build user prompt for itinerary generation
 const buildUserPrompt = (
-  tripDetails: TripDetails, 
-  tripDays: number, 
-  dayDates: string[], 
+  tripDetails: TripDetails,
+  tripDays: number,
+  dayDates: string[],
   hasKids: boolean,
   italyWarnings: { city: string; info: typeof ITALY_MULTI_STATION_CITIES[string] }[]
 ): string => {
@@ -682,9 +729,9 @@ const buildUserPrompt = (
   const isPlannerMode = tripDetails.plannerMode === "planner";
   const clientInfo = tripDetails.clientInfo;
   const needsLodging = !tripDetails.hasLodgingBooked;
-  const hasTrainTravel = tripDetails.destination.toLowerCase().includes('italy') || 
-                         tripDetails.destination.toLowerCase().includes('europe') ||
-                         tripDetails.extraContext?.toLowerCase().includes('train');
+  const hasTrainTravel = tripDetails.destination.toLowerCase().includes('italy') ||
+    tripDetails.destination.toLowerCase().includes('europe') ||
+    tripDetails.extraContext?.toLowerCase().includes('train');
 
   const safeDestination = sanitizeForPrompt(tripDetails.destination);
   const allInterests = tripDetails.interests
@@ -713,7 +760,12 @@ ${safeLodging ? `- Staying near: ${safeLodging}` : ''}
 ${hasKids && safeNapSchedule ? `- Nap schedule: ${safeNapSchedule}` : ''}
 ${hasKids && tripDetails.strollerNeeds ? '- Need stroller-friendly options' : ''}
 ${tripDetails.needsWheelchairAccess ? '- ♿ WHEELCHAIR ACCESSIBILITY REQUIRED for all venues' : ''}
-${tripDetails.hasStroller ? '- 🚼 TRAVELING WITH STROLLER - need stroller-friendly routes and venues' : ''}`;
+${tripDetails.hasStroller ? '- 🚼 TRAVELING WITH STROLLER - need stroller-friendly routes and venues' : ''}
+${tripDetails.foodAllergies?.length > 0 ? `- ⚠️ ALLERGIES: ${tripDetails.foodAllergies.map((a: string) => a.startsWith('custom:') ? a.replace('custom:', '') : a).join(', ')}` : ''}
+${tripDetails.sensorySensitivities?.length > 0 ? `- 🧠 SENSORY NEEDS: ${tripDetails.sensorySensitivities.join(', ')}` : ''}
+${tripDetails.bedtime ? `- 🌙 BEDTIME: ${tripDetails.bedtime}` : ''}
+${tripDetails.maxWalkingMinutes ? `- 🚶 WALKING LIMIT: Max ${tripDetails.maxWalkingMinutes} min` : ''}
+${tripDetails.maxActivityMinutes ? `- ⏱️ ACTIVITY LIMIT: Max ${tripDetails.maxActivityMinutes} min` : ''}`;
 
   if (safeExtraContext) {
     userPrompt += `
@@ -868,9 +920,9 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Please sign in to generate itineraries.',
-        code: 'UNAUTHORIZED' 
+        code: 'UNAUTHORIZED'
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -890,9 +942,9 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Your session has expired. Please sign in again.',
-        code: 'INVALID_TOKEN' 
+        code: 'INVALID_TOKEN'
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -903,20 +955,20 @@ serve(async (req) => {
     logCtx.step = 'auth_complete';
 
     const rateLimit = await checkRateLimit(
-      serviceClient, user.id, 'generate-itinerary', 
+      serviceClient, user.id, 'generate-itinerary',
       RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MINUTES
     );
-    
+
     if (!rateLimit.allowed) {
       log('warn', 'Rate limit exceeded', logCtx, { retryAfter: rateLimit.retryAfter });
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'You\'ve made too many requests. Please wait a few minutes and try again.',
         code: 'RATE_LIMITED',
-        retryAfter: rateLimit.retryAfter 
+        retryAfter: rateLimit.retryAfter
       }), {
         status: 429,
-        headers: { 
-          ...corsHeaders, 
+        headers: {
+          ...corsHeaders,
           'Content-Type': 'application/json',
           'Retry-After': rateLimit.retryAfter?.toString() || '3600'
         },
@@ -926,17 +978,17 @@ serve(async (req) => {
     const rawDetails = await req.json();
     logCtx.payloadSize = JSON.stringify(rawDetails).length;
     logCtx.step = 'parsing_input';
-    
+
     const validationResult = TripDetailsSchema.safeParse(rawDetails);
-    
+
     if (!validationResult.success) {
-      log('warn', 'Input validation failed', logCtx, { 
-        errors: validationResult.error.errors.map(e => e.message) 
+      log('warn', 'Input validation failed', logCtx, {
+        errors: validationResult.error.errors.map(e => e.message)
       });
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Please check your trip details and try again.',
         code: 'VALIDATION_ERROR',
-        details: validationResult.error.errors.map(e => e.message) 
+        details: validationResult.error.errors.map(e => e.message)
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -945,13 +997,13 @@ serve(async (req) => {
 
     const tripDetails = validationResult.data;
     logCtx.destination = tripDetails.destination;
-    
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       log('error', 'LOVABLE_API_KEY not configured', logCtx);
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'The AI service is not configured. Please contact support.',
-        code: 'CONFIG_ERROR' 
+        code: 'CONFIG_ERROR'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -960,23 +1012,23 @@ serve(async (req) => {
 
     const startDate = new Date(tripDetails.startDate);
     const endDate = new Date(tripDetails.endDate);
-    
+
     if (endDate < startDate) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'End date must be after start date.',
-        code: 'INVALID_DATES' 
+        code: 'INVALID_DATES'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    
+
     const tripDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     if (tripDays > 30) {
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Trips cannot exceed 30 days.',
-        code: 'TRIP_TOO_LONG' 
+        code: 'TRIP_TOO_LONG'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -986,7 +1038,7 @@ serve(async (req) => {
     // Calculate exact dates for each day
     const dayDates = calculateDayDates(tripDetails.startDate, tripDays);
     const hasKids = tripDetails.hasKids || tripDetails.kidsAges.length > 0;
-    
+
     // Detect Italy station warnings
     const italyWarnings = detectItalyStationWarnings(tripDetails.destination);
 
@@ -1018,29 +1070,29 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       log('error', 'AI gateway error', logCtx, { status: response.status, error: errorText.substring(0, 200) });
-      
+
       if (response.status === 429) {
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
           error: 'The AI service is busy. Please try again in a moment.',
-          code: 'AI_RATE_LIMITED' 
+          code: 'AI_RATE_LIMITED'
         }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
           error: 'AI credits are exhausted. Please add credits to continue.',
-          code: 'CREDITS_EXHAUSTED' 
+          code: 'CREDITS_EXHAUSTED'
         }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      
-      return new Response(JSON.stringify({ 
+
+      return new Response(JSON.stringify({
         error: 'Failed to generate itinerary. Please try again.',
-        code: 'AI_ERROR' 
+        code: 'AI_ERROR'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1050,12 +1102,12 @@ serve(async (req) => {
     logCtx.step = 'parsing_response';
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    
+
     if (!content) {
       log('error', 'Empty AI response', logCtx);
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'The AI returned an empty response. Please try again.',
-        code: 'EMPTY_RESPONSE' 
+        code: 'EMPTY_RESPONSE'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1068,22 +1120,22 @@ serve(async (req) => {
         .replace(/```json\s*/gi, '')
         .replace(/```\s*/g, '')
         .trim();
-      
+
       const jsonStart = cleanedContent.indexOf('{');
       const jsonEnd = cleanedContent.lastIndexOf('}');
-      
+
       if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
         cleanedContent = cleanedContent.substring(jsonStart, jsonEnd + 1);
       }
-      
+
       rawItinerary = JSON.parse(cleanedContent);
     } catch (parseError) {
-      log('error', 'JSON parse failed', logCtx, { 
-        contentPreview: content.substring(0, 300) 
+      log('error', 'JSON parse failed', logCtx, {
+        contentPreview: content.substring(0, 300)
       });
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Failed to parse the AI response. Please try again.',
-        code: 'PARSE_ERROR' 
+        code: 'PARSE_ERROR'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1095,7 +1147,7 @@ serve(async (req) => {
       rawItinerary, tripDetails, tripDays, dayDates, logCtx, LOVABLE_API_KEY
     );
 
-    log('info', 'Itinerary generated successfully', logCtx, { 
+    log('info', 'Itinerary generated successfully', logCtx, {
       daysGenerated: itinerary.days.length,
       wasRepaired,
       hasLodgingSuggestions: !!itinerary.lodgingSuggestions?.length,
@@ -1104,11 +1156,11 @@ serve(async (req) => {
 
     // Mark days that need regeneration
     const daysNeedingRegeneration = itinerary.days
-      .filter(day => day.activities.length === 1 && 
+      .filter(day => day.activities.length === 1 &&
         day.activities[0].description?.includes("couldn't generate"))
       .map(day => day.dayNumber);
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       itinerary,
       meta: {
         requestId,
@@ -1125,8 +1177,8 @@ serve(async (req) => {
     logCtx.step = 'error';
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     log('error', 'Unexpected error', logCtx, { error: errorMessage });
-    
-    return new Response(JSON.stringify({ 
+
+    return new Response(JSON.stringify({
       error: 'Something went wrong. Please try again.',
       code: 'INTERNAL_ERROR',
       requestId,

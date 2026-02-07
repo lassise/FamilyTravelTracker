@@ -1,10 +1,11 @@
-import { countries, getEmojiFlag, type TCountryCode } from 'countries-list';
+import { countries, getCountryData, getEmojiFlag, type TCountryCode } from 'countries-list';
 
 export interface CountryOption {
   name: string;
   flag: string;
   continent: string;
   code: string;
+  iso3: string;
 }
 
 /**
@@ -152,9 +153,9 @@ export const getAllCountries = (): CountryOption[] => {
 
   // Add UK nations as separate entries
   const ukNations: CountryOption[] = [
-    { name: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', continent: 'Europe', code: 'GB-ENG' },
-    { name: 'Scotland', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', continent: 'Europe', code: 'GB-SCT' },  // Saltire
-    { name: 'Wales', flag: '🏴󠁧󠁢󠁷󠁬󠁳󠁿', continent: 'Europe', code: 'GB-WLS' },
+    { name: 'England', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', continent: 'Europe', code: 'GB-ENG', iso3: 'ENG' },
+    { name: 'Scotland', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', continent: 'Europe', code: 'GB-SCT', iso3: 'SCO' },  // Saltire
+    { name: 'Wales', flag: '🏴󠁧󠁢󠁷󠁬󠁳󠁿', continent: 'Europe', code: 'GB-WLS', iso3: 'WAL' },
   ];
 
   const standardCountries = Object.entries(countries)
@@ -164,6 +165,7 @@ export const getAllCountries = (): CountryOption[] => {
       flag: getEmojiFlag(code as TCountryCode),
       continent: continentNames[data.continent] || data.continent,
       code,
+      iso3: getCountryData(code as TCountryCode).iso3 || '',
     }));
 
   cachedCountries = [...standardCountries, ...ukNations]

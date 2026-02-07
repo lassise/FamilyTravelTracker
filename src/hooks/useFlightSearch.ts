@@ -79,11 +79,14 @@ export const useFlightSearch = (
 
   // Search a single leg
   const searchLeg = useCallback(
-    async (leg: FlightLegSearch): Promise<ScoredFlight[]> => {
+    async (leg: FlightLegSearch, outboundAirline?: string): Promise<ScoredFlight[]> => {
       const cacheKey = getCacheKey(leg.origin, leg.destination, leg.date);
-      const cached = getFromCache(cacheKey);
-      if (cached) {
-        return cached;
+      // Only use cache if no outbound airline context (cache doesn't account for airline matching)
+      if (!outboundAirline) {
+        const cached = getFromCache(cacheKey);
+        if (cached) {
+          return cached;
+        }
       }
 
       const effectiveCabinClass = cabinClass === "any" ? null : cabinClass;
@@ -106,9 +109,11 @@ export const useFlightSearch = (
       if (data.error) throw new Error(data.error);
 
       const rawFlights: FlightResult[] = data.flights || [];
-      const scored = scoreFlights(rawFlights, preferences, undefined, passengerBreakdown, cabinClass);
+      const scored = scoreFlights(rawFlights, preferences, undefined, passengerBreakdown, cabinClass, outboundAirline);
 
-      setCache(cacheKey, scored);
+      if (!outboundAirline) {
+        setCache(cacheKey, scored);
+      }
       return scored;
     },
     [preferences, passengerBreakdown, cabinClass, stopsFilter, passengers]
@@ -172,13 +177,13 @@ export const useFlightSearch = (
 
       // Search outbound only
       try {
-        const outboundFlights = await searchLeg({ 
-          legId: outboundId, 
-          origin, 
-          destination, 
-          date: departDate 
+        const outboundFlights = await searchLeg({
+          legId: outboundId,
+          origin,
+          destination,
+          date: departDate
         });
-        
+
         setLegResults((prev) => ({
           ...prev,
           [outboundId]: { legId: outboundId, flights: outboundFlights, isLoading: false, error: null },
@@ -203,13 +208,21 @@ export const useFlightSearch = (
     [searchLeg]
   );
 
+  // Store selected outbound airline for return scoring
+  const [selectedOutboundAirline, setSelectedOutboundAirline] = useState<string | null>(null);
+
   // Search return leg (called when outbound is selected)
   const searchReturnLeg = useCallback(
-    async () => {
+    async (outboundAirline?: string) => {
       if (!roundTripParams) return;
 
       const { origin, destination, returnDate } = roundTripParams;
       const returnId = "return";
+
+      // Store outbound airline for reference
+      if (outboundAirline) {
+        setSelectedOutboundAirline(outboundAirline);
+      }
 
       setLegResults((prev) => ({
         ...prev,
@@ -219,13 +232,14 @@ export const useFlightSearch = (
       setIsSearching(true);
 
       try {
-        const returnFlights = await searchLeg({ 
-          legId: returnId, 
-          origin: destination, 
-          destination: origin, 
-          date: returnDate 
-        });
-        
+        // Pass outbound airline for consistency scoring
+        const returnFlights = await searchLeg({
+          legId: returnId,
+          origin: destination,
+          destination: origin,
+          date: returnDate
+        }, outboundAirline);
+
         setLegResults((prev) => ({
           ...prev,
           [returnId]: { legId: returnId, flights: returnFlights, isLoading: false, error: null },
@@ -348,9 +362,9 @@ export const useFlightSearch = (
   }, []);
 
   // Check if return search is pending (for sequential round-trip)
-  const isReturnPending = roundTripParams !== null && 
-    legResults["return"]?.flights.length === 0 && 
-    !legResults["return"]?.isLoading && 
+  const isReturnPending = roundTripParams !== null &&
+    legResults["return"]?.flights.length === 0 &&
+    !legResults["return"]?.isLoading &&
     !legResults["return"]?.error;
 
   return {

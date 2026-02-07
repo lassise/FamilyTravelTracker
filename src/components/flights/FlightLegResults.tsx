@@ -38,6 +38,8 @@ import {
   Bell,
   Copy,
   ExternalLink,
+  Handshake,
+  Repeat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ScoredFlight } from "@/lib/flightScoring";
@@ -94,13 +96,13 @@ const extractAmenities = (flight: ScoredFlight) => {
   for (const it of flight.itineraries) {
     for (const seg of it.segments) {
       const ext = (seg.extensions || []).map((e: string) => e?.toLowerCase() || '');
-      
+
       if (ext.some(e => e.includes('wi-fi') || e.includes('wifi'))) amenities.hasWifi = true;
       if (ext.some(e => e.includes('personal device') || e.includes('seatback') || e.includes('on-demand') || e.includes('entertainment'))) amenities.hasSeatbackScreen = true;
       if (ext.some(e => e.includes('power outlet') || e.includes('in-seat power'))) amenities.hasPower = true;
       if (ext.some(e => e.includes('usb'))) amenities.hasUsbPorts = true;
       if (ext.some(e => e.includes('meal') || e.includes('food'))) amenities.meal = true;
-      
+
       if (seg.legroom) amenities.legroom = seg.legroom;
       if (seg.airplane || seg.aircraft) amenities.aircraft = seg.airplane || seg.aircraft;
     }
@@ -180,26 +182,26 @@ export const FlightLegResults = ({
     const bAirline = b.itineraries[0]?.segments[0]?.airline || "";
     const aAvoided = isAvoidedAirline(aAirline) || a.isAvoidedAirline;
     const bAvoided = isAvoidedAirline(bAirline) || b.isAvoidedAirline;
-    
+
     // Check if flights are nonstop
     const aIsNonstop = a.itineraries.every(it => it.segments.length === 1);
     const bIsNonstop = b.itineraries.every(it => it.segments.length === 1);
-    
+
     // If preferNonstop is set, nonstop flights come first (before avoided check)
     // This ensures nonstop flights appear above layover flights regardless of score
     if (preferNonstop) {
       if (aIsNonstop && !bIsNonstop) return -1;
       if (!aIsNonstop && bIsNonstop) return 1;
     }
-    
+
     // Avoided airlines go to the bottom (but only after nonstop sorting)
     if (aAvoided && !bAvoided) return 1;
     if (!aAvoided && bAvoided) return -1;
-    
+
     // Within same category (nonstop status and avoided status), sort by score
     return b.score - a.score;
   });
-  
+
   const displayedFlights = showAll ? sortedFlights : sortedFlights.slice(0, 5);
 
   // Quick categories
@@ -221,30 +223,30 @@ export const FlightLegResults = ({
   const fastest =
     featuredFlights.length > 0
       ? [...featuredFlights].sort((a, b) => {
-          // Calculate duration correctly for both flights
-          const aItinerary = a.itineraries[0];
-          const bItinerary = b.itineraries[0];
-          
-          const aDur = aItinerary ? (() => {
-            const calculated = calculateTotalDuration(aItinerary.segments, a.layovers, date);
-            if (calculated !== null && calculated > 0) return calculated;
-            // Fallback
-            const segSum = aItinerary.segments.reduce((s, seg) => s + (typeof seg.duration === "number" ? seg.duration : 0), 0);
-            const laySum = (a.layovers || []).reduce((s, lay) => s + (typeof lay.duration === "number" ? lay.duration : 0), 0);
-            return segSum + laySum;
-          })() : a.totalDuration || 0;
-          
-          const bDur = bItinerary ? (() => {
-            const calculated = calculateTotalDuration(bItinerary.segments, b.layovers, date);
-            if (calculated !== null && calculated > 0) return calculated;
-            // Fallback
-            const segSum = bItinerary.segments.reduce((s, seg) => s + (typeof seg.duration === "number" ? seg.duration : 0), 0);
-            const laySum = (b.layovers || []).reduce((s, lay) => s + (typeof lay.duration === "number" ? lay.duration : 0), 0);
-            return segSum + laySum;
-          })() : b.totalDuration || 0;
-          
-          return aDur - bDur;
-        })[0]
+        // Calculate duration correctly for both flights
+        const aItinerary = a.itineraries[0];
+        const bItinerary = b.itineraries[0];
+
+        const aDur = aItinerary ? (() => {
+          const calculated = calculateTotalDuration(aItinerary.segments, a.layovers, date);
+          if (calculated !== null && calculated > 0) return calculated;
+          // Fallback
+          const segSum = aItinerary.segments.reduce((s, seg) => s + (typeof seg.duration === "number" ? seg.duration : 0), 0);
+          const laySum = (a.layovers || []).reduce((s, lay) => s + (typeof lay.duration === "number" ? lay.duration : 0), 0);
+          return segSum + laySum;
+        })() : a.totalDuration || 0;
+
+        const bDur = bItinerary ? (() => {
+          const calculated = calculateTotalDuration(bItinerary.segments, b.layovers, date);
+          if (calculated !== null && calculated > 0) return calculated;
+          // Fallback
+          const segSum = bItinerary.segments.reduce((s, seg) => s + (typeof seg.duration === "number" ? seg.duration : 0), 0);
+          const laySum = (b.layovers || []).reduce((s, lay) => s + (typeof lay.duration === "number" ? lay.duration : 0), 0);
+          return segSum + laySum;
+        })() : b.totalDuration || 0;
+
+        return aDur - bDur;
+      })[0]
       : null;
 
   if (isLoading) {
@@ -332,14 +334,14 @@ export const FlightLegResults = ({
   const selectedDuration = selectedFlight ? (() => {
     const itinerary = selectedFlight.itineraries[0];
     if (!itinerary || !itinerary.segments || itinerary.segments.length === 0) return 0;
-    
+
     // Use the utility function to calculate total duration
     const calculated = calculateTotalDuration(
       itinerary.segments,
       selectedFlight.layovers,
       date // Use the leg date as base date
     );
-    
+
     // Fallback to sum if calculation fails
     if (calculated === null || calculated === 0) {
       const segmentsSum = itinerary.segments.reduce(
@@ -352,7 +354,7 @@ export const FlightLegResults = ({
       );
       return segmentsSum + layoversSum;
     }
-    
+
     return calculated;
   })() : 0;
 
@@ -407,10 +409,10 @@ export const FlightLegResults = ({
               <p className="text-xl font-bold text-primary">${selectedFlight.price}</p>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-3 gap-2" 
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3 gap-2"
             onClick={() => {
               if (onGoBack) onGoBack();
             }}
@@ -418,7 +420,7 @@ export const FlightLegResults = ({
             <RefreshCw className="h-3 w-3" />
             Change {legLabel} Flight
           </Button>
-          
+
           {/* One-way flight: Show checklist and Google Flights buttons directly */}
           {tripType === "oneway" && selectedFlight && (
             <div className="mt-4 space-y-3">
@@ -468,7 +470,7 @@ export const FlightLegResults = ({
                   </div>
                 </CollapsibleContent>
               </Collapsible>
-              
+
               {/* Continue to Google Flights */}
               {onContinueToGoogle && (
                 <Button
@@ -556,14 +558,14 @@ export const FlightLegResults = ({
                 if (!itinerary || !itinerary.segments || itinerary.segments.length === 0) {
                   return flight.totalDuration || 0;
                 }
-                
+
                 // Use the utility function to calculate total duration
                 const calculated = calculateTotalDuration(
                   itinerary.segments,
                   flight.layovers,
                   date // Use the leg date as base date
                 );
-                
+
                 // Fallback to flight.totalDuration or sum if calculation fails
                 if (calculated === null || calculated === 0) {
                   if (flight.totalDuration) {
@@ -580,7 +582,7 @@ export const FlightLegResults = ({
                   );
                   return segmentsSum + layoversSum;
                 }
-                
+
                 return calculated;
               })();
               const isSelected = flight.id === selectedFlightId;
@@ -628,7 +630,7 @@ export const FlightLegResults = ({
                       </Badge>
                     </div>
                   )}
-                  
+
                   {/* Preferred airline boost indicator */}
                   {flight.isPreferredAirline && !isAvoided && !flight.isAvoidedAirline && (
                     <div className="flex items-center justify-between gap-2 px-3 pt-2 bg-emerald-100/50 dark:bg-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800">
@@ -643,7 +645,7 @@ export const FlightLegResults = ({
                     </div>
                   )}
 
-                  <div 
+                  <div
                     className="p-3 cursor-pointer"
                     onClick={() => onSelectFlight(flight)}
                   >
@@ -659,7 +661,7 @@ export const FlightLegResults = ({
                               {firstSeg?.flightNumber}
                             </span>
                           </div>
-                          
+
                           {/* Ranking badges */}
                           {idx === 0 && !isAvoided && (
                             <Badge className="text-[10px] bg-primary gap-1">
@@ -689,7 +691,7 @@ export const FlightLegResults = ({
                             <p className="text-lg font-semibold">{formatTime(firstSeg?.departureTime || "")}</p>
                             <p className="text-xs text-muted-foreground">{firstSeg?.departureAirport}</p>
                           </div>
-                          
+
                           <div className="flex-1 flex flex-col items-center px-2">
                             <span className="text-xs text-muted-foreground">
                               {Math.floor(duration / 60)}h {duration % 60}m
@@ -710,7 +712,7 @@ export const FlightLegResults = ({
                               {stops === 0 ? "Nonstop" : `${stops} stop${stops > 1 ? 's' : ''}`}
                             </span>
                           </div>
-                          
+
                           <div className="text-center">
                             <p className="text-lg font-semibold">{formatTime(lastSeg?.arrivalTime || "")}</p>
                             <p className="text-xs text-muted-foreground">{lastSeg?.arrivalAirport}</p>
@@ -720,7 +722,7 @@ export const FlightLegResults = ({
                         {/* Connection risk for stops */}
                         {stops > 0 && layoverMinutes > 0 && (
                           <div className="mt-2">
-                            <ConnectionRiskIndicator 
+                            <ConnectionRiskIndicator
                               layoverMinutes={layoverMinutes}
                               hasTerminalChange={hasTerminalChange}
                               className="text-[10px]"
@@ -787,12 +789,12 @@ export const FlightLegResults = ({
                             ${Math.round(flight.pricePerTicket)}/person
                           </p>
                         )}
-                        
+
                         {/* Score indicator */}
                         <div className="flex items-center justify-end gap-1 mt-1">
                           <span className="text-xs text-muted-foreground">Score:</span>
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={cn(
                               "text-[10px] px-1.5",
                               flight.score >= 80 && "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400",
@@ -840,7 +842,13 @@ export const FlightLegResults = ({
                         <Tooltip key={`pos-${i}`}>
                           <TooltipTrigger asChild>
                             <Badge variant="outline" className="text-[10px] gap-0.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400">
-                              <ThumbsUp className="h-2.5 w-2.5" />
+                              {match.label.includes('Same airline') ? (
+                                <Repeat className="h-2.5 w-2.5" />
+                              ) : match.label.includes('partner') ? (
+                                <Handshake className="h-2.5 w-2.5" />
+                              ) : (
+                                <ThumbsUp className="h-2.5 w-2.5" />
+                              )}
                               {match.label}
                             </Badge>
                           </TooltipTrigger>
@@ -859,8 +867,8 @@ export const FlightLegResults = ({
                         </Tooltip>
                       ))}
                       {(positiveMatches.length > 3 || negativeMatches.length > 2) && (
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className="text-[10px] cursor-pointer hover:bg-muted"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -876,7 +884,7 @@ export const FlightLegResults = ({
                   {/* Expanded details */}
                   <Collapsible open={isFlightExpanded}>
                     <CollapsibleTrigger asChild>
-                      <button 
+                      <button
                         className="w-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 border-t hover:bg-muted/50"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -888,7 +896,7 @@ export const FlightLegResults = ({
                         {isFlightExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       </button>
                     </CollapsibleTrigger>
-                    
+
                     <CollapsibleContent>
                       <div className="px-3 pb-3 space-y-3 border-t bg-muted/30">
                         {/* Match explanation */}
@@ -989,7 +997,7 @@ export const FlightLegResults = ({
                               {flight.itineraries[0].segments.map((segment, segIndex) => {
                                 const isLastSegment = segIndex === flight.itineraries[0].segments.length - 1;
                                 const nextSegment = !isLastSegment ? flight.itineraries[0].segments[segIndex + 1] : null;
-                                
+
                                 // Calculate layover duration if there's a next segment
                                 let layoverMinutes = 0;
                                 let layoverAirportCode = '';
@@ -1002,7 +1010,7 @@ export const FlightLegResults = ({
                                     layoverAirportCode // Pass airport code for timezone-aware calculation
                                   );
                                 }
-                                
+
                                 return (
                                   <div key={segIndex} className="space-y-2">
                                     {/* Flight segment */}
@@ -1013,7 +1021,7 @@ export const FlightLegResults = ({
                                             {segment.airline} {segment.flightNumber}
                                           </Badge>
                                           <span className="text-muted-foreground">
-                                            {typeof segment.duration === 'number' 
+                                            {typeof segment.duration === 'number'
                                               ? `${Math.floor(segment.duration / 60)}h ${segment.duration % 60}m`
                                               : segment.duration}
                                           </span>
@@ -1031,7 +1039,7 @@ export const FlightLegResults = ({
                                         </div>
                                       </div>
                                     </div>
-                                    
+
                                     {/* Layover information */}
                                     {nextSegment && layoverAirportCode && layoverMinutes > 0 && (
                                       <div className="ml-4 pl-3 border-l-2 border-muted-foreground/30">
@@ -1045,10 +1053,10 @@ export const FlightLegResults = ({
                                               const isShortLayover = layoverMinutes < 70;
                                               const hours = Math.floor(layoverMinutes / 60);
                                               const mins = layoverMinutes % 60;
-                                              const durationStr = hours > 0 
+                                              const durationStr = hours > 0
                                                 ? `${hours}h ${mins}m`
                                                 : `${mins}m`;
-                                              
+
                                               return (
                                                 <div className="space-y-1">
                                                   <div className="flex items-center gap-2 flex-wrap">
@@ -1071,8 +1079,8 @@ export const FlightLegResults = ({
                                                     </span>
                                                   </div>
                                                   {isShortLayover && (
-                                                    <Badge 
-                                                      variant="outline" 
+                                                    <Badge
+                                                      variant="outline"
                                                       className="text-[10px] bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 mt-1 inline-flex items-center gap-1"
                                                     >
                                                       <AlertTriangle className="h-2.5 w-2.5" />
@@ -1096,7 +1104,7 @@ export const FlightLegResults = ({
                         {/* Delay risk */}
                         <div className="pt-2 border-t">
                           <p className="text-xs font-medium mb-1">Delay risk assessment</p>
-                          <Badge 
+                          <Badge
                             variant="outline"
                             className={cn(
                               "text-[10px]",
@@ -1117,7 +1125,7 @@ export const FlightLegResults = ({
                             <p className="text-xs font-medium mb-1 flex items-center gap-1">
                               <Baby className="h-3 w-3" /> Family friendliness
                             </p>
-                            <Badge 
+                            <Badge
                               variant="outline"
                               className={cn(
                                 "text-[10px]",
@@ -1170,7 +1178,7 @@ export const FlightLegResults = ({
                               'Seat assigned at check-in',
                             ] : []}
                             estimatedBagFees={
-                              ['NK', 'F9'].includes(flightAirline) 
+                              ['NK', 'F9'].includes(flightAirline)
                                 ? { carryOn: 45, firstBag: 35, secondBag: 45 }
                                 : { firstBag: 35, secondBag: 45 }
                             }
@@ -1179,7 +1187,7 @@ export const FlightLegResults = ({
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
-                  
+
                   {/* Confirm selection button - appears right below selected flight */}
                   {isSelected && !isConfirmed && (
                     <div className="mt-3 mx-3 mb-3">
@@ -1188,8 +1196,8 @@ export const FlightLegResults = ({
                           <Check className="h-4 w-4 text-primary" />
                           <span className="text-sm font-medium">Flight selected</span>
                         </div>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           className="gap-2"
                           onClick={(e) => {
                             e.stopPropagation();

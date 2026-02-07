@@ -8,6 +8,55 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Retry helper with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  timeoutMs = 30000
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      // Success or client error - don't retry
+      if (response.ok || (response.status >= 400 && response.status < 500)) {
+        return response;
+      }
+
+      // Server error - retry with backoff
+      lastError = new Error(`HTTP ${response.status}`);
+
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on abort (timeout)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+    }
+
+    // Retry with exponential backoff (1s, 2s, 4s)
+    if (attempt < maxRetries - 1) {
+      const backoff = Math.pow(2, attempt) * 1000;
+      console.log(`Retry ${attempt + 1}/${maxRetries} after ${backoff}ms`);
+      await new Promise(r => setTimeout(r, backoff));
+    }
+  }
+
+  throw lastError || new Error('Max retries exceeded');
+}
+
 interface AlternateAirport {
   code: string;
   name: string;
@@ -41,11 +90,11 @@ async function searchFlightsFromOrigin(
   // SerpAPI: 1 = Economy, 2 = Premium Economy, 3 = Business, 4 = First
   const cabinClassMap: Record<string, string> = {
     'economy': '1',
-    'premium_economy': '2', 
+    'premium_economy': '2',
     'business': '3',
     'first': '4',
   };
-  
+
   const searchParams = new URLSearchParams({
     api_key: serpApiKey,
     engine: 'google_flights',
@@ -58,7 +107,7 @@ async function searchFlightsFromOrigin(
     type: tripType === 'roundtrip' ? '1' : '2',
     travel_class: cabinClassMap[cabinClass] || '1',
   });
-  
+
   if (returnDate && tripType === 'roundtrip') {
     searchParams.append('return_date', returnDate);
   }
@@ -66,7 +115,7 @@ async function searchFlightsFromOrigin(
   console.log(`Searching flights from ${origin} -> ${destination}`);
 
   try {
-    const response = await fetch(`https://serpapi.com/search.json?${searchParams.toString()}`, {
+    const response = await fetchWithRetry(`https://serpapi.com/search.json?${searchParams.toString()}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
     });
@@ -98,7 +147,7 @@ async function searchFlightsFromOrigin(
       const outboundLegs = flight.flights || [];
       const totalDuration = flight.total_duration || outboundLegs.reduce((sum: number, leg: any) => sum + (leg.duration || 0), 0);
       const stops = outboundLegs.length - 1;
-      
+
       // Build outbound itinerary
       const outboundItinerary = {
         type: 'outbound',
@@ -119,9 +168,9 @@ async function searchFlightsFromOrigin(
           overnight: leg.overnight || false,
         })),
       };
-      
+
       const itineraries: Array<{ type: string; segments: any[] }> = [outboundItinerary];
-      
+
       return {
         id: `serpapi-${origin}-${index}-${Date.now()}`,
         price: flight.price || 0,
@@ -178,7 +227,7 @@ serve(async (req) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    
+
     if (claimsError || !claimsData?.claims) {
       console.error('Invalid authentication token:', claimsError?.message);
       return new Response(
@@ -190,12 +239,12 @@ serve(async (req) => {
     const userId = claimsData.claims.sub;
     console.log('Authenticated user:', userId);
 
-    const { 
-      origin, 
-      destination, 
-      departureDate, 
-      returnDate, 
-      passengers, 
+    const {
+      origin,
+      destination,
+      departureDate,
+      returnDate,
+      passengers,
       tripType,
       cabinClass = 'economy',
       alternateAirports = []
@@ -209,14 +258,14 @@ serve(async (req) => {
     }
 
     const serpApiKey = Deno.env.get('SERPAPI_KEY');
-    
+
     if (!serpApiKey) {
       console.log('No SerpAPI key configured');
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Flight search not configured',
         errorCode: 'NO_API_KEY',
         message: 'SerpAPI key is not configured. Please add your SERPAPI_KEY to enable flight search.',
-        flights: [] 
+        flights: []
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -228,7 +277,7 @@ serve(async (req) => {
     );
 
     // Search from alternate airports in parallel
-    const alternateSearches = alternateAirports.map(alt => 
+    const alternateSearches = alternateAirports.map(alt =>
       searchFlightsFromOrigin(
         alt.code, destination, departureDate, returnDate, passengers, tripType, serpApiKey, true, alt.minSavings, cabinClass
       )
@@ -239,9 +288,9 @@ serve(async (req) => {
 
     // Combine all flights
     let allFlights = [...primaryResult.flights];
-    
+
     // Find cheapest primary flight for comparison
-    const cheapestPrimary = primaryResult.flights.length > 0 
+    const cheapestPrimary = primaryResult.flights.length > 0
       ? Math.min(...primaryResult.flights.map((f: any) => f.price))
       : Infinity;
 
@@ -253,7 +302,7 @@ serve(async (req) => {
           const savings = cheapestPrimary - f.price;
           return savings >= altAirport.minSavings;
         });
-        
+
         console.log(`${altAirport.code}: ${result.flights.length} flights found, ${qualifyingFlights.length} meet $${altAirport.minSavings} savings threshold`);
         allFlights = [...allFlights, ...qualifyingFlights];
       }
@@ -264,7 +313,7 @@ serve(async (req) => {
 
     if (allFlights.length === 0) {
       console.log('No flights found for any origin');
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         flights: [],
         message: 'No flights found for this route and date. Try different dates or airports.',
       }), {
@@ -274,7 +323,7 @@ serve(async (req) => {
 
     console.log(`Found ${allFlights.length} total flight options for user ${userId}`);
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       flights: allFlights,
       searchMetadata: {
         primaryOrigin: origin,
@@ -290,11 +339,11 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error in search-flights function:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: errorMessage,
       errorCode: 'INTERNAL_ERROR',
       message: 'An unexpected error occurred. Please try again.',
-      flights: [] 
+      flights: []
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

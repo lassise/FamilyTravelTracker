@@ -45,6 +45,12 @@ export interface TripFormData {
   hasStroller: boolean;
   // Multi-country trip legs
   legs: TripLegDraft[];
+  // Phase 1: Critical family needs
+  foodAllergies: string[];
+  sensorySensitivities: string[]; // 'avoid_crowds', 'avoid_loud', 'need_routine', 'need_quiet_spaces'
+  bedtime: string; // HH:MM format, e.g., "19:30"
+  maxWalkingMinutes: number; // 0 means no limit
+  maxActivityMinutes: number; // 0 means no limit
 }
 
 const STEPS = [
@@ -103,6 +109,12 @@ const TripWizard = () => {
     hasStroller: false,
     // Multi-country trip legs
     legs: [],
+    // Phase 1: Critical family needs
+    foodAllergies: [],
+    sensorySensitivities: [],
+    bedtime: "",
+    maxWalkingMinutes: 0,
+    maxActivityMinutes: 0,
   });
 
   // Pre-fill legs when opened via "Add Another Country To Trip" (from CountryVisitDetailsDialog)
@@ -153,9 +165,9 @@ const TripWizard = () => {
         // At least one leg with country and dates required
         if (formData.legs.length === 0) return false;
         // All legs must have country_name and dates
-        const hasValidLegs = formData.legs.every(leg => 
-          leg.country_name.trim() && 
-          leg.start_date && 
+        const hasValidLegs = formData.legs.every(leg =>
+          leg.country_name.trim() &&
+          leg.start_date &&
           leg.end_date &&
           new Date(leg.end_date) >= new Date(leg.start_date)
         );
@@ -191,34 +203,34 @@ const TripWizard = () => {
 
   const handleGenerate = async () => {
     setIsGenerating(true);
-    
+
     try {
       // Calculate trip dates and destination from legs
       const tripDates = calculateTripDatesFromLegs(formData.legs);
       const countryNames = formData.legs.map(leg => leg.country_name);
       const uniqueCountries = [...new Set(countryNames)];
       const destinationString = uniqueCountries.join(" + ");
-      
+
       // Generate title if not provided
-      const tripTitle = formData.title || 
-        (uniqueCountries.length === 1 
+      const tripTitle = formData.title ||
+        (uniqueCountries.length === 1
           ? `${uniqueCountries[0]} Family Trip`
           : `${uniqueCountries.slice(0, 2).join(" & ")}${uniqueCountries.length > 2 ? ` +${uniqueCountries.length - 2}` : ""} Trip`);
-      
+
       // Determine kids ages based on mode
-      const effectiveKidsAges = formData.plannerMode === 'planner' 
-        ? formData.clientInfo.kidsAges 
+      const effectiveKidsAges = formData.plannerMode === 'planner'
+        ? formData.clientInfo.kidsAges
         : formData.kidsAges;
-      
+
       const effectiveBudget = formData.plannerMode === 'planner'
         ? formData.clientInfo.budgetRange
         : formData.budgetLevel;
-      
+
       // Get active profile preferences if available
       const selectedProfile = formData.plannerMode === 'planner' && formData.clientInfo.profileId
         ? profiles.find(p => p.id === formData.clientInfo.profileId)
         : activeProfile;
-      
+
       // First create the trip in the database
       const { data: trip, error: tripError } = await createTrip({
         title: tripTitle,
@@ -286,8 +298,8 @@ const TripWizard = () => {
           napSchedule: formData.travelingWithKids ? formData.napSchedule : "",
           strollerNeeds: formData.travelingWithKids ? formData.strollerNeeds : false,
           tripPurpose: formData.tripPurpose,
-          hasKids: (formData.travelingWithKids && effectiveKidsAges.length > 0) || 
-                   (formData.plannerMode === 'planner' && formData.clientInfo.numKids > 0),
+          hasKids: (formData.travelingWithKids && effectiveKidsAges.length > 0) ||
+            (formData.plannerMode === 'planner' && formData.clientInfo.numKids > 0),
           // New fields
           plannerMode: formData.plannerMode,
           extraContext: formData.extraContext,
@@ -305,6 +317,12 @@ const TripWizard = () => {
           // Accessibility preferences
           needsWheelchairAccess: formData.needsWheelchairAccess,
           hasStroller: formData.hasStroller || formData.strollerNeeds,
+          // Phase 1: Critical family needs
+          foodAllergies: formData.travelingWithKids ? formData.foodAllergies : [],
+          sensorySensitivities: formData.travelingWithKids ? formData.sensorySensitivities : [],
+          bedtime: formData.travelingWithKids ? formData.bedtime : "",
+          maxWalkingMinutes: formData.travelingWithKids ? formData.maxWalkingMinutes : 0,
+          maxActivityMinutes: formData.travelingWithKids ? formData.maxActivityMinutes : 0,
         },
       });
 
@@ -312,7 +330,7 @@ const TripWizard = () => {
         // Handle specific error codes with user-friendly messages
         let errorData: any = {};
         let errorCode: string | undefined;
-        
+
         try {
           if (itineraryError.message) {
             errorData = JSON.parse(itineraryError.message);
@@ -322,7 +340,7 @@ const TripWizard = () => {
           // If parsing fails, treat as generic error
           errorData = { error: itineraryError.message || 'Unknown error' };
         }
-        
+
         switch (errorCode) {
           case 'RATE_LIMITED':
           case 'AI_RATE_LIMITED':
@@ -341,7 +359,7 @@ const TripWizard = () => {
       }
 
       const { itinerary, meta } = itineraryData;
-      
+
       // Check if any days need regeneration
       if (meta?.daysNeedingRegeneration?.length > 0) {
         toast.warning(`Generated itinerary with ${meta.daysNeedingRegeneration.length} day(s) that may need regeneration.`);
@@ -494,7 +512,7 @@ const TripWizard = () => {
 
       toast.success("Itinerary generated successfully!");
       navigate(`/trips/${trip.id}`);
-      
+
     } catch (error: any) {
       console.error('Error generating itinerary:', error);
       // Error already shown via toast above for known errors
@@ -510,7 +528,7 @@ const TripWizard = () => {
     switch (currentStep) {
       case 1:
         return (
-          <PlannerModeStep 
+          <PlannerModeStep
             mode={formData.plannerMode}
             clientInfo={formData.clientInfo}
             onModeChange={(mode) => updateFormData({ plannerMode: mode })}
@@ -527,7 +545,7 @@ const TripWizard = () => {
         return <PreferencesStep formData={formData} updateFormData={updateFormData} />;
       case 6:
         return (
-          <ContextStep 
+          <ContextStep
             extraContext={formData.extraContext}
             onChange={(value) => updateFormData({ extraContext: value })}
           />
@@ -547,13 +565,12 @@ const TripWizard = () => {
           {STEPS.map((step) => (
             <div
               key={step.id}
-              className={`text-center flex-1 ${
-                step.id === currentStep
-                  ? "text-primary font-medium"
-                  : step.id < currentStep
+              className={`text-center flex-1 ${step.id === currentStep
+                ? "text-primary font-medium"
+                : step.id < currentStep
                   ? "text-muted-foreground"
                   : "text-muted-foreground/50"
-              }`}
+                }`}
             >
               <div className="text-xs sm:text-sm">{step.title}</div>
             </div>

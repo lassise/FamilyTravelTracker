@@ -359,6 +359,17 @@ export function calculateTotalDuration(
     return calculateTotalDurationBySum(segments, layovers);
   }
 
+  // DST SANITY CHECK: Compare with sum method
+  // If the difference is > 2 hours, there may be a DST issue - prefer sum method
+  // This handles edge cases where the timezone iteration didn't fully converge
+  if (hasAnySegmentDurations) {
+    const sumDuration = calculateTotalDurationBySum(segments, layovers);
+    if (sumDuration > 0 && Math.abs(durationMinutes - sumDuration) > 120) {
+      // Large discrepancy suggests DST transition or parsing issue - use sum method
+      return sumDuration;
+    }
+  }
+
   // If we have segment durations available, prefer sum method over timezone calculation
   // because sum gives actual flight time (what users expect), while timezone calc gives wall-clock time
   if (hasAnySegmentDurations) {

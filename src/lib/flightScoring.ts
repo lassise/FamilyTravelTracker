@@ -79,6 +79,9 @@ export interface ScoredFlight extends FlightResult {
   isPreferredAirline?: boolean;
   scorePenalty?: number;
   scoreBoost?: number;
+  // Round-trip airline consistency
+  airlineMatchType?: "same" | "alliance" | "different";
+  airlineMatchDetail?: string;  // e.g., "Star Alliance partner"
 }
 
 export interface ScoreBreakdown {
@@ -154,9 +157,9 @@ const normalizeAirline = (airlineInput: string | null | undefined): NormalizedAi
   // Try to find airline by code first (most reliable)
   let airline = AIRLINES.find(a => {
     const codeMatch = inputUpper === a.code || inputUpper.startsWith(a.code);
-    const nameMatch = inputLower === a.name.toLowerCase() || 
-                     a.name.toLowerCase().includes(inputLower) ||
-                     inputLower.includes(a.name.toLowerCase());
+    const nameMatch = inputLower === a.name.toLowerCase() ||
+      a.name.toLowerCase().includes(inputLower) ||
+      inputLower.includes(a.name.toLowerCase());
     return codeMatch || nameMatch;
   });
 
@@ -166,11 +169,11 @@ const normalizeAirline = (airlineInput: string | null | undefined): NormalizedAi
       if (aliases.some(alias => {
         const aliasUpper = alias.toUpperCase();
         const aliasLower = alias.toLowerCase();
-        return inputUpper === aliasUpper || 
-               inputUpper.startsWith(aliasUpper) ||
-               inputLower === aliasLower ||
-               inputLower.includes(aliasLower) ||
-               aliasLower.includes(inputLower);
+        return inputUpper === aliasUpper ||
+          inputUpper.startsWith(aliasUpper) ||
+          inputLower === aliasLower ||
+          inputLower.includes(aliasLower) ||
+          aliasLower.includes(inputLower);
       })) {
         // Find airline by canonical name
         airline = AIRLINES.find(a => a.name.toLowerCase().includes(canonical));
@@ -219,55 +222,55 @@ const matchesAirlinePreference = (
 
   const normalized = normalizeAirline(airlineInput);
   if (!normalized.codeNormalized && !normalized.nameNormalized) return false;
-  
+
   // Check each preference in the list
   for (const pref of preferenceList) {
     const prefTrimmed = (pref || "").trim();
     if (!prefTrimmed) continue;
-    
+
     const prefUpper = prefTrimmed.toUpperCase();
     const prefLower = prefTrimmed.toLowerCase();
-    
+
     // 1. Direct code match (e.g., preference "B6" matches flight "B6" or "B61707")
     if (normalized.codeNormalized) {
-      if (prefUpper === normalized.codeNormalized || 
-          prefUpper.startsWith(normalized.codeNormalized) ||
-          normalized.codeNormalized.startsWith(prefUpper)) {
+      if (prefUpper === normalized.codeNormalized ||
+        prefUpper.startsWith(normalized.codeNormalized) ||
+        normalized.codeNormalized.startsWith(prefUpper)) {
         return true;
       }
     }
-    
+
     // 2. Direct name match (case-insensitive)
     if (normalized.nameNormalized) {
       if (prefLower === normalized.nameNormalized ||
-          normalized.nameNormalized.includes(prefLower) ||
-          prefLower.includes(normalized.nameNormalized)) {
+        normalized.nameNormalized.includes(prefLower) ||
+        prefLower.includes(normalized.nameNormalized)) {
         return true;
       }
     }
-    
+
     // 3. Alias matching - check if preference is an alias for the airline
     for (const [canonical, aliases] of Object.entries(AIRLINE_ALIASES)) {
       // Check if preference matches any alias
       const prefMatchesAlias = aliases.some(alias => {
         const aliasUpper = alias.toUpperCase();
         const aliasLower = alias.toLowerCase();
-        return prefUpper === aliasUpper || 
-               prefUpper.startsWith(aliasUpper) ||
-               prefLower === aliasLower ||
-               prefLower.includes(aliasLower) ||
-               aliasLower.includes(prefLower);
+        return prefUpper === aliasUpper ||
+          prefUpper.startsWith(aliasUpper) ||
+          prefLower === aliasLower ||
+          prefLower.includes(aliasLower) ||
+          aliasLower.includes(prefLower);
       });
-      
+
       // If preference matches alias, check if airline matches canonical
       if (prefMatchesAlias) {
         if (normalized.nameNormalized?.includes(canonical) ||
-            normalized.codeNormalized === aliases[0]?.toUpperCase()) {
+          normalized.codeNormalized === aliases[0]?.toUpperCase()) {
           return true;
         }
       }
     }
-    
+
     // 4. Normalize preference and check against airline
     const prefNormalized = normalizeAirline(prefTrimmed);
     if (prefNormalized.codeNormalized && normalized.codeNormalized) {
@@ -277,8 +280,8 @@ const matchesAirlinePreference = (
     }
     if (prefNormalized.nameNormalized && normalized.nameNormalized) {
       if (prefNormalized.nameNormalized === normalized.nameNormalized ||
-          prefNormalized.nameNormalized.includes(normalized.nameNormalized) ||
-          normalized.nameNormalized.includes(prefNormalized.nameNormalized)) {
+        prefNormalized.nameNormalized.includes(normalized.nameNormalized) ||
+        normalized.nameNormalized.includes(prefNormalized.nameNormalized)) {
         return true;
       }
     }
@@ -334,6 +337,74 @@ const scoreDepartureTime = (hour: number, preferences: FlightPreferences): numbe
 const isAvoidedAirline = (airlineCode: string, preferences: FlightPreferences): boolean => {
   if (!airlineCode || preferences.avoided_airlines.length === 0) return false;
   return matchesAirlinePreference(airlineCode, preferences.avoided_airlines);
+};
+
+/**
+ * Get all airline codes from all segments of a flight
+ * Used to check ALL segments for avoided/preferred airlines, not just the first
+ */
+const getAllAirlinesFromFlight = (flight: FlightResult): string[] => {
+  const airlines: string[] = [];
+  for (const it of flight.itineraries) {
+    for (const seg of it.segments) {
+      if (seg.airline) airlines.push(seg.airline);
+    }
+  }
+  return airlines;
+};
+
+/**
+ * Extract operating carrier from segment extensions ("Operated by" parsing)
+ * Used to detect codeshare flights where marketing carrier differs from operating
+ */
+const extractOperatingCarrier = (segment: FlightSegment): string | null => {
+  if (!segment.extensions) return null;
+  for (const ext of segment.extensions) {
+    if (typeof ext !== 'string') continue;
+    const match = ext.match(/operated by\s+(.+)/i);
+    if (match) return match[1].trim();
+  }
+  return null;
+};
+
+/**
+ * Check if two airlines are compatible for round-trip booking
+ * Compatible = same airline OR same alliance (e.g., United + ANA = Star Alliance)
+ * @returns Object with compatibility status and reason (alliance name if partners)
+ */
+export const areAirlinesCompatible = (
+  airline1: string | null | undefined,
+  airline2: string | null | undefined
+): { compatible: boolean; matchType: "same" | "alliance" | "different"; detail: string | null } => {
+  if (!airline1 || !airline2) {
+    return { compatible: true, matchType: "different", detail: null };
+  }
+
+  // Normalize both airlines
+  const norm1 = normalizeAirline(airline1);
+  const norm2 = normalizeAirline(airline2);
+
+  // Same airline (by code)
+  if (norm1.codeNormalized && norm1.codeNormalized === norm2.codeNormalized) {
+    return { compatible: true, matchType: "same", detail: null };
+  }
+
+  // Same airline (by name)
+  if (norm1.airline?.name && norm1.airline.name === norm2.airline?.name) {
+    return { compatible: true, matchType: "same", detail: null };
+  }
+
+  // Same alliance - these airlines can be combined on round trips
+  if (norm1.airline?.alliance && norm1.airline.alliance === norm2.airline?.alliance) {
+    return {
+      compatible: true,
+      matchType: "alliance",
+      detail: norm1.airline.alliance
+    };
+  }
+
+  // Different airlines, no alliance match
+  return { compatible: false, matchType: "different", detail: null };
 };
 
 // Score airline reliability - returns score and flags for preference boosts/penalties
@@ -538,37 +609,37 @@ const detectAmenities = (flight: FlightResult): FlightAmenities => {
     for (const segment of itinerary.segments) {
       const extensions = segment.extensions || [];
       const extLower = extensions.map((e: string) => e?.toLowerCase() || '');
-      
+
       // Check for seatback entertainment
-      if (extLower.some(e => 
-        e.includes('personal device') || 
-        e.includes('seatback') || 
+      if (extLower.some(e =>
+        e.includes('personal device') ||
+        e.includes('seatback') ||
         e.includes('in-seat') ||
         e.includes('on-demand') ||
         e.includes('entertainment')
       )) {
         amenities.hasSeatbackEntertainment = true;
       }
-      
+
       // Check for mobile/streaming entertainment
-      if (extLower.some(e => 
-        e.includes('stream') || 
-        e.includes('wi-fi') || 
+      if (extLower.some(e =>
+        e.includes('stream') ||
+        e.includes('wi-fi') ||
         e.includes('wifi')
       )) {
         amenities.hasMobileEntertainment = true;
       }
-      
+
       // Check for USB/power
-      if (extLower.some(e => 
-        e.includes('usb') || 
+      if (extLower.some(e =>
+        e.includes('usb') ||
         e.includes('power outlet') ||
         e.includes('in-seat power')
       )) {
         amenities.hasUsbCharging = true;
         amenities.hasPowerOutlet = true;
       }
-      
+
       // Check legroom
       if (segment.legroom) {
         amenities.legroom = segment.legroom;
@@ -638,7 +709,7 @@ const scoreAmenities = (amenities: FlightAmenities, preferences: FlightPreferenc
   if (preferences.legroom_preference === 'must_have' || preferences.legroom_preference === 'nice_to_have') {
     const avgLegroom = 31; // Average economy legroom
     const minRequired = preferences.min_legroom_inches || (avgLegroom + 2);
-    
+
     if (amenities.legroomInches !== null) {
       if (amenities.legroomInches >= minRequired) {
         score += preferences.legroom_preference === 'must_have' ? AMENITY_NICE_TO_HAVE_BOOST * 1.5 : AMENITY_NICE_TO_HAVE_BOOST;
@@ -658,7 +729,7 @@ export type FlightRanking = "best" | "good_alternative" | "acceptable" | "not_re
 
 // Generate explanation for why this flight was scored this way
 const generateExplanation = (
-  flight: ScoredFlight, 
+  flight: ScoredFlight,
   preferences: FlightPreferences,
   ranking: FlightRanking,
   rankIndex: number
@@ -692,7 +763,7 @@ const generateExplanation = (
   // Different verbiage based on ranking
   // All flights are numbered sequentially: #1, #2, #3, etc.
   const flightNumber = rankIndex + 1;
-  
+
   if (ranking === "best") {
     if (reasons.length === 0) {
       return `🏆 Top pick (#${flightNumber}): Best balance of your preferences`;
@@ -717,7 +788,7 @@ const generateExplanation = (
     if (!isNonstop && preferences.prefer_nonstop) negatives.push("has stops");
     if (flight.delayRisk === "high") negatives.push("high delay risk");
     if (flight.breakdown.airlineReliability < 60) negatives.push("less reliable airline");
-    
+
     if (negatives.length === 0) {
       return `⚠️ Not recommended: Doesn't match your preferences well`;
     }
@@ -729,10 +800,10 @@ const generateExplanation = (
 const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPreferences): MatchExplanation => {
   const whyNotPerfect: string[] = [];
   const whyBestChoice: string[] = [];
-  
+
   const negativeMatches = flight.preferenceMatches.filter(m => m.type === "negative");
   const positiveMatches = flight.preferenceMatches.filter(m => m.type === "positive");
-  
+
   // Why not perfect - based on negative preference matches
   for (const match of negativeMatches) {
     if (match.label.includes("stops") || match.label === "Has stops") {
@@ -751,7 +822,7 @@ const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPrefe
       whyNotPerfect.push("Connection airport has limited amenities");
     }
   }
-  
+
   // Add score-based reasons
   if (flight.breakdown.price < 70) {
     whyNotPerfect.push("Not the most affordable option");
@@ -762,7 +833,7 @@ const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPrefe
   if (flight.breakdown.departureTime < 70 && !whyNotPerfect.some(r => r.includes("Departure"))) {
     whyNotPerfect.push("Departure time is not your preferred slot");
   }
-  
+
   // Why it's still the best choice
   for (const match of positiveMatches) {
     if (match.label.includes("Non-stop")) {
@@ -785,7 +856,7 @@ const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPrefe
       whyBestChoice.push(`Flying on ${airlineName}, your preferred airline`);
     }
   }
-  
+
   // Also check if isPreferredAirline flag is set (fallback if not in preferenceMatches)
   if (flight.isPreferredAirline && !whyBestChoice.some(r => r.includes("preferred airline"))) {
     const airline = AIRLINES.find(a => {
@@ -796,7 +867,7 @@ const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPrefe
     const airlineName = airline?.name || flight.itineraries[0]?.segments[0]?.airline || "this airline";
     whyBestChoice.push(`Flying on ${airlineName}, your preferred airline`);
   }
-  
+
   // Add breakdown-based positives
   if (flight.breakdown.price >= 85 && !whyBestChoice.some(r => r.includes("value"))) {
     whyBestChoice.push("One of the most affordable options");
@@ -810,7 +881,7 @@ const generateMatchExplanation = (flight: ScoredFlight, preferences: FlightPrefe
   if (flight.breakdown.layoverQuality >= 85) {
     whyBestChoice.push("Well-connected hub airports if stopping");
   }
-  
+
   return {
     whyNotPerfect: whyNotPerfect.slice(0, 3), // Limit to top 3
     whyBestChoice: whyBestChoice.slice(0, 3),
@@ -844,8 +915,8 @@ const isLikelyInternational = (departureAirport: string, arrivalAirport: string)
 };
 
 const calculatePriceInsight = (
-  price: number, 
-  allPrices: number[], 
+  price: number,
+  allPrices: number[],
   departureDate?: string,
   departureAirport?: string,
   arrivalAirport?: string
@@ -854,7 +925,7 @@ const calculatePriceInsight = (
   const depDate = departureDate ? new Date(departureDate) : null;
   const daysUntilDeparture = depDate ? Math.ceil((depDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
   const isInternational = departureAirport && arrivalAirport ? isLikelyInternational(departureAirport, arrivalAirport) : false;
-  
+
   if (allPrices.length < 2) {
     return {
       level: "medium",
@@ -862,15 +933,15 @@ const calculatePriceInsight = (
       advice: "Prices vary. Set a price alert to get notified when prices drop.",
     };
   }
-  
+
   const sorted = [...allPrices].sort((a, b) => a - b);
   const min = sorted[0];
   const max = sorted[sorted.length - 1];
   const range = max - min;
-  
+
   // Determine percentile position
   const percentile = range > 0 ? ((price - min) / range) * 100 : 50;
-  
+
   if (percentile <= 25) {
     let advice = "This is a good deal – book soon before prices rise.";
     if (daysUntilDeparture !== null) {
@@ -887,7 +958,7 @@ const calculatePriceInsight = (
     };
   } else if (percentile <= 60) {
     let advice = "Average pricing.";
-    
+
     if (daysUntilDeparture !== null && depDate) {
       if (isInternational) {
         // International: best 2-3 months out
@@ -895,7 +966,7 @@ const calculatePriceInsight = (
         idealBookingStart.setDate(idealBookingStart.getDate() - 90); // 3 months
         const idealBookingEnd = new Date(depDate);
         idealBookingEnd.setDate(idealBookingEnd.getDate() - 60); // 2 months
-        
+
         if (daysUntilDeparture > 90) {
           advice = `Fair price. The sweet spot for international flights is typically ${formatDateShort(idealBookingStart)} to ${formatDateShort(idealBookingEnd)} (2-3 months before departure).`;
         } else if (daysUntilDeparture >= 60) {
@@ -909,7 +980,7 @@ const calculatePriceInsight = (
         idealBookingStart.setDate(idealBookingStart.getDate() - 42); // 6 weeks
         const idealBookingEnd = new Date(depDate);
         idealBookingEnd.setDate(idealBookingEnd.getDate() - 21); // 3 weeks
-        
+
         if (daysUntilDeparture > 42) {
           advice = `Fair price. The sweet spot for domestic flights is typically ${formatDateShort(idealBookingStart)} to ${formatDateShort(idealBookingEnd)} (3-6 weeks before departure).`;
         } else if (daysUntilDeparture >= 21) {
@@ -921,21 +992,21 @@ const calculatePriceInsight = (
     } else {
       advice = "Average pricing. Best to book 3-6 weeks before domestic or 2-3 months before international flights.";
     }
-    
+
     return {
-      level: "medium", 
+      level: "medium",
       label: "Fair price",
       advice,
     };
   } else {
     // High price - suggest checking back
     let advice = "Consider waiting if your dates are flexible.";
-    
+
     if (depDate && daysUntilDeparture !== null) {
       const nextTuesday = getNextTuesday(today);
       const tuesdayAfter = new Date(nextTuesday);
       tuesdayAfter.setDate(tuesdayAfter.getDate() + 7);
-      
+
       if (daysUntilDeparture <= 14) {
         advice = `Prices are high this close to departure. If flexible, check again on ${formatDateShort(nextTuesday)} – airlines often release deals on Tuesdays.`;
       } else if (daysUntilDeparture <= 30) {
@@ -946,7 +1017,7 @@ const calculatePriceInsight = (
         idealStart.setDate(idealStart.getDate() - (isInternational ? 90 : 42));
         const idealEnd = new Date(depDate);
         idealEnd.setDate(idealEnd.getDate() - (isInternational ? 60 : 21));
-        
+
         if (today < idealStart) {
           advice = `Prices are high now. The best time to book is ${formatDateShort(idealStart)} to ${formatDateShort(idealEnd)}. Set a price alert to track drops.`;
         } else {
@@ -956,7 +1027,7 @@ const calculatePriceInsight = (
     } else {
       advice = "Consider waiting if your dates are flexible. Prices often drop on Tuesdays or during sales. Set a price alert to track this route.";
     }
-    
+
     return {
       level: "high",
       label: "Higher price",
@@ -985,7 +1056,7 @@ const buildGoogleFlightsUrl = (
   const children = passengerBreakdown?.children || 0;
   const infantsInSeat = passengerBreakdown?.infantsInSeat || 0;
   const infantsOnLap = passengerBreakdown?.infantsOnLap || 0;
-  
+
   // Cabin class mapping for Google Flights
   const cabinMap: Record<string, string> = {
     economy: "economy",
@@ -993,18 +1064,18 @@ const buildGoogleFlightsUrl = (
     business: "business",
     first: "first",
   };
-  
+
   const cabin = cabinMap[cabinClass] || "economy";
-  
+
   // Build passenger string parts
   const passengerParts: string[] = [];
   if (adults > 0) passengerParts.push(`${adults}%20adult${adults > 1 ? 's' : ''}`);
   if (children > 0) passengerParts.push(`${children}%20child${children > 1 ? 'ren' : ''}`);
   if (infantsInSeat > 0) passengerParts.push(`${infantsInSeat}%20infant${infantsInSeat > 1 ? 's' : ''}%20in%20seat`);
   if (infantsOnLap > 0) passengerParts.push(`${infantsOnLap}%20infant${infantsOnLap > 1 ? 's' : ''}%20on%20lap`);
-  
+
   const passengerString = passengerParts.length > 0 ? `%20${passengerParts.join('%20')}` : '';
-  
+
   // Build the query - format that Google Flights understands
   // Example: flights from JFK to LAX on 2024-03-15 return 2024-03-22 2 adults 1 child business class
   let query = `flights%20from%20${departureAirport}%20to%20${arrivalAirport}%20on%20${departureDate}`;
@@ -1015,7 +1086,7 @@ const buildGoogleFlightsUrl = (
   if (cabin !== "economy") {
     query += `%20${cabin}%20class`;
   }
-  
+
   return `https://www.google.com/travel/flights/search?q=${query}&curr=USD`;
 };
 
@@ -1025,11 +1096,12 @@ export const scoreFlights = (
   preferences: FlightPreferences,
   allFlightPrices?: number[],
   passengerBreakdown?: PassengerBreakdown,
-  cabinClass: string = "economy"
+  cabinClass: string = "economy",
+  outboundAirline?: string  // For round-trip: compare return flights to outbound airline
 ): ScoredFlight[] => {
   if (!flights || flights.length === 0) return [];
-  
-  const totalPassengers = passengerBreakdown 
+
+  const totalPassengers = passengerBreakdown
     ? passengerBreakdown.adults + passengerBreakdown.children + passengerBreakdown.infantsInSeat + passengerBreakdown.infantsOnLap
     : 1;
 
@@ -1044,7 +1116,7 @@ export const scoreFlights = (
   const travelTimes: number[] = new Array(flights.length);
   for (let i = 0; i < flights.length; i++) {
     const flight = flights[i];
-    
+
     // Prefer flight.totalDuration if available (should include all segments + layovers)
     if (flight.totalDuration && flight.totalDuration > 0) {
       travelTimes[i] = flight.totalDuration;
@@ -1056,7 +1128,7 @@ export const scoreFlights = (
           segmentsSum += parseDuration(seg.duration);
         }
       }
-      
+
       // Add all layover durations
       let layoversSum = 0;
       if (flight.layovers) {
@@ -1068,11 +1140,11 @@ export const scoreFlights = (
           }
         }
       }
-      
+
       travelTimes[i] = segmentsSum + layoversSum;
     }
   }
-  
+
   const minTime = Math.min(...travelTimes);
   const maxTime = Math.max(...travelTimes);
   const timeRange = maxTime - minTime || 1;
@@ -1136,11 +1208,37 @@ export const scoreFlights = (
     const arrivalHour = getHour(lastSegment?.arrivalTime);
     breakdown.arrivalTime = arrivalHour >= 22 ? 50 : arrivalHour <= 6 ? 60 : 85;
 
-    // Score airline reliability
+    // Score airline reliability (use first segment for base score)
     const airlineResult = scoreAirlineReliability(firstSegment?.airline || "", preferences);
     breakdown.airlineReliability = airlineResult.score;
-    const isAvoidedAirlineFlight = airlineResult.isAvoided;
-    const isPreferredAirlineFlight = airlineResult.isPreferred;
+
+    // Check ALL segments for avoided/preferred airlines (not just first)
+    // This ensures connecting flights with avoided airlines are properly flagged
+    const allAirlines = getAllAirlinesFromFlight(flight);
+    const isAvoidedAirlineFlight = allAirlines.some(a =>
+      matchesAirlinePreference(a, preferences.avoided_airlines)
+    );
+    const isPreferredAirlineFlight = allAirlines.some(a =>
+      matchesAirlinePreference(a, preferences.preferred_airlines)
+    );
+
+    // Check airline compatibility for round-trip return flights
+    let airlineMatchType: "same" | "alliance" | "different" | undefined;
+    let airlineMatchDetail: string | undefined;
+    let airlineMatchBoost = 0;
+
+    if (outboundAirline && firstSegment?.airline) {
+      const compatibility = areAirlinesCompatible(outboundAirline, firstSegment.airline);
+      airlineMatchType = compatibility.matchType;
+      airlineMatchDetail = compatibility.detail || undefined;
+
+      // Apply small score boosts for airline consistency
+      if (compatibility.matchType === "same") {
+        airlineMatchBoost = 5;  // Same airline preferred
+      } else if (compatibility.matchType === "alliance") {
+        airlineMatchBoost = 3;  // Alliance partners are good too
+      }
+    }
 
     // Score price (normalized)
     breakdown.price = 100 - ((flight.price - minPrice) / priceRange) * 100;
@@ -1153,16 +1251,16 @@ export const scoreFlights = (
     // Calculate weighted total
     // When prefer_nonstop is true, increase nonstop weight by 20% (from 22% to 26.4%)
     // This makes nonstop flights score higher when it's a non-negotiable preference
-    const nonstopWeight = preferences.prefer_nonstop 
+    const nonstopWeight = preferences.prefer_nonstop
       ? WEIGHTS.nonstop * 1.2  // 20% increase: 22 * 1.2 = 26.4
       : WEIGHTS.nonstop;
-    
+
     // Adjust other weights proportionally to maintain sum of 100
-    const weightSum = nonstopWeight + WEIGHTS.travelTime + WEIGHTS.layoverQuality + 
-                     WEIGHTS.departureTime + WEIGHTS.arrivalTime + 
-                     WEIGHTS.airlineReliability + WEIGHTS.price + WEIGHTS.amenities;
+    const weightSum = nonstopWeight + WEIGHTS.travelTime + WEIGHTS.layoverQuality +
+      WEIGHTS.departureTime + WEIGHTS.arrivalTime +
+      WEIGHTS.airlineReliability + WEIGHTS.price + WEIGHTS.amenities;
     const weightMultiplier = 100 / weightSum; // Normalize to sum to 100
-    
+
     let weightedTotal = Math.round(
       (breakdown.nonstop * nonstopWeight * weightMultiplier +
         breakdown.travelTime * WEIGHTS.travelTime * weightMultiplier +
@@ -1182,6 +1280,11 @@ export const scoreFlights = (
     // Apply boost for preferred airlines
     if (isPreferredAirlineFlight) {
       weightedTotal = Math.min(100, weightedTotal + PREFERRED_AIRLINE_BOOST);
+    }
+
+    // Apply boost for airline consistency on round-trip return flights
+    if (airlineMatchBoost > 0) {
+      weightedTotal = Math.min(100, weightedTotal + airlineMatchBoost);
     }
 
     // Calculate priceInsight early to apply penalty if needed
@@ -1213,18 +1316,18 @@ export const scoreFlights = (
 
     // Generate preference matches
     const preferenceMatches: PreferenceMatch[] = [];
-    
+
     // Positive matches
     if (isNonstop && preferences.prefer_nonstop) {
       preferenceMatches.push({ type: "positive", label: "Non-stop", detail: "Matches your preference" });
     } else if (isNonstop) {
       preferenceMatches.push({ type: "positive", label: "Non-stop flight" });
     }
-    
+
     if (breakdown.departureTime > 80) {
       preferenceMatches.push({ type: "positive", label: "Preferred departure time" });
     }
-    
+
     const airlineCode = firstSegment?.airline || "";
     // Check preferred airlines using canonical matching
     if (airlineCode && preferences.preferred_airlines.length > 0) {
@@ -1235,15 +1338,36 @@ export const scoreFlights = (
         preferenceMatches.push({ type: "positive", label: airlineName, detail: "Your preferred airline" });
       }
     }
-    
+
+    // Add airline match badges for round-trip return flights
+    if (airlineMatchType === "same") {
+      preferenceMatches.push({
+        type: "positive",
+        label: "Same airline",
+        detail: "Matches your outbound flight"
+      });
+    } else if (airlineMatchType === "alliance" && airlineMatchDetail) {
+      preferenceMatches.push({
+        type: "positive",
+        label: `${airlineMatchDetail} partner`,
+        detail: "Alliance partner with outbound airline"
+      });
+    } else if (airlineMatchType === "different" && outboundAirline) {
+      preferenceMatches.push({
+        type: "negative",
+        label: "Different airline",
+        detail: "Does not match outbound - may affect booking"
+      });
+    }
+
     if (breakdown.airlineReliability > 85) {
       preferenceMatches.push({ type: "positive", label: "Highly reliable", detail: `${breakdown.airlineReliability}% reliability` });
     }
-    
+
     if (travelTimes[index] <= minTime + 30) {
       preferenceMatches.push({ type: "positive", label: "Short travel time" });
     }
-    
+
     if (breakdown.price > 90) {
       preferenceMatches.push({ type: "positive", label: "Great price", detail: "Among the cheapest" });
     }
@@ -1263,21 +1387,21 @@ export const scoreFlights = (
       // Only show generic WiFi badge if user hasn't set specific preferences
       preferenceMatches.push({ type: "positive", label: "Has WiFi" });
     }
-    
+
     // Add amenity preference matches from scoring
     for (const match of amenityResult.matches) {
       preferenceMatches.push(match);
     }
-    
+
     // Negative matches
     if (!isNonstop && preferences.prefer_nonstop) {
       preferenceMatches.push({ type: "negative", label: "Has stops", detail: "You prefer non-stop" });
     }
-    
+
     if ((depHour >= 21 || depHour < 5) && !preferences.red_eye_allowed) {
       preferenceMatches.push({ type: "negative", label: "Red-eye flight", detail: "You prefer to avoid" });
     }
-    
+
     // Check avoided airlines using canonical matching
     if (airlineCode && preferences.avoided_airlines.length > 0) {
       const isAvoided = matchesAirlinePreference(airlineCode, preferences.avoided_airlines);
@@ -1287,7 +1411,26 @@ export const scoreFlights = (
         preferenceMatches.push({ type: "negative", label: airlineName, detail: "Airline you avoid" });
       }
     }
-    
+
+    // Check for codeshare flights operated by avoided airlines
+    if (preferences.avoided_airlines.length > 0) {
+      for (const it of flight.itineraries) {
+        for (const seg of it.segments) {
+          const operatedBy = extractOperatingCarrier(seg);
+          if (operatedBy && matchesAirlinePreference(operatedBy, preferences.avoided_airlines)) {
+            const normalized = normalizeAirline(operatedBy);
+            const operatorName = normalized.airline?.name || operatedBy;
+            preferenceMatches.push({
+              type: "negative",
+              label: `Operated by ${operatorName}`,
+              detail: "Codeshare - operating airline you avoid"
+            });
+            break; // Only show once per flight
+          }
+        }
+      }
+    }
+
     if (breakdown.layoverQuality < 60) {
       preferenceMatches.push({ type: "negative", label: "Limited airport", detail: "Connection airport has fewer amenities" });
     }
@@ -1299,7 +1442,7 @@ export const scoreFlights = (
           const arrival = new Date(it.segments[i].arrivalTime);
           const nextDeparture = new Date(it.segments[i + 1].departureTime);
           const connectionMinutes = (nextDeparture.getTime() - arrival.getTime()) / (1000 * 60);
-          
+
           if (connectionMinutes > preferences.max_layover_hours * 60) {
             preferenceMatches.push({ type: "negative", label: "Long layover", detail: `${Math.round(connectionMinutes / 60)}h layover exceeds your ${preferences.max_layover_hours}h max` });
             break outer;
@@ -1319,7 +1462,7 @@ export const scoreFlights = (
         preferenceMatches.push({ type: "negative", label: "Bag fees extra", detail: "Ultra low-cost carrier" });
       }
     }
-    
+
     let familyStressScore: number | undefined;
     if (preferences.family_mode) {
       familyStressScore = calculateFamilyStressScore(flight, preferences);
@@ -1333,7 +1476,7 @@ export const scoreFlights = (
     // Build booking URL (reuse variables calculated above)
     const returnSegment = flight.itineraries[1]?.segments[0];
     const returnDateStr = returnSegment?.departureTime ? new Date(returnSegment.departureTime).toISOString().split('T')[0] : "";
-    
+
     const bookingUrl = departureAirport && arrivalAirport && departureDateStr
       ? buildGoogleFlightsUrl(departureAirport, arrivalAirport, departureDateStr, returnDateStr, passengerBreakdown, cabinClass)
       : undefined;
@@ -1359,12 +1502,14 @@ export const scoreFlights = (
       isAvoidedAirline: isAvoidedAirlineFlight,
       isPreferredAirline: isPreferredAirlineFlight,
       scorePenalty: isAvoidedAirlineFlight ? AVOIDED_AIRLINE_PENALTY : undefined,
-      scoreBoost: isPreferredAirlineFlight ? PREFERRED_AIRLINE_BOOST : undefined,
+      scoreBoost: isPreferredAirlineFlight ? PREFERRED_AIRLINE_BOOST : (airlineMatchBoost > 0 ? airlineMatchBoost : undefined),
+      airlineMatchType,
+      airlineMatchDetail,
     };
 
     // Explanation will be set after sorting
     scoredFlight.explanation = "";
-    
+
     if (breakdown.total < 100) {
       scoredFlight.matchExplanation = generateMatchExplanation(scoredFlight, preferences);
     }
@@ -1381,22 +1526,22 @@ export const scoreFlights = (
     // Within same category (both avoided or both not avoided), sort by FINAL score descending
     return b.score - a.score;
   });
-  
+
   // Now assign rankings and explanations based on FINAL sorted order
   // Separate non-avoided flights for "best" ranking determination
   const nonAvoidedFlights = scoredFlights.filter(f => !f.isAvoidedAirline);
   const topScore = nonAvoidedFlights.length > 0 ? nonAvoidedFlights[0].score : (scoredFlights[0]?.score || 0);
-  
+
   // Track rank index separately for non-avoided flights (starts at 0 for #1)
   let nonAvoidedRankIndex = 0;
-  
+
   for (let i = 0; i < scoredFlights.length; i++) {
     const flight = scoredFlights[i];
     const scoreDiff = topScore - flight.score;
-    
+
     let ranking: FlightRanking;
     let rankIndex: number;
-    
+
     // CRITICAL: Avoided airlines CANNOT be #1 if any non-avoided option exists
     if (flight.isAvoidedAirline) {
       ranking = "not_recommended";
@@ -1408,7 +1553,7 @@ export const scoreFlights = (
       // For non-avoided flights, use sequential numbering starting from 0 (#1, #2, etc.)
       rankIndex = nonAvoidedRankIndex;
       nonAvoidedRankIndex++;
-      
+
       // Determine ranking category based on position and score
       if (rankIndex === 0) {
         // First non-avoided flight is always "best" (#1)
@@ -1421,11 +1566,11 @@ export const scoreFlights = (
         ranking = "not_recommended";
       }
     }
-    
+
     // Generate explanation with correct rank index (will be displayed as rankIndex + 1)
     flight.explanation = generateExplanation(flight, preferences, ranking, rankIndex);
   }
-  
+
   return scoredFlights;
 };
 
@@ -1460,10 +1605,10 @@ export const categorizeFlights = (scoredFlights: ScoredFlight[]): {
     if ((f.familyStressScore || 100) < (bestForFamilies.familyStressScore || 100)) bestForFamilies = f;
   }
 
-  return { 
-    bestOverall: flightsForBest[0] || null, 
-    fastest, 
-    cheapest, 
-    bestForFamilies 
+  return {
+    bestOverall: flightsForBest[0] || null,
+    fastest,
+    cheapest,
+    bestForFamilies
   };
 };

@@ -84,7 +84,7 @@ export const CountryFlag = ({
 
   // Get initials for fallback
   const initials = isValidCode
-    ? normalizedCode
+    ? resolvedCode
     : (countryName || '').slice(0, 2).toUpperCase();
 
   // If code is invalid or image failed, show initials
@@ -96,7 +96,7 @@ export const CountryFlag = ({
           initialsSizeClasses[size],
           className
         )}
-        title={countryName || normalizedCode}
+        title={countryName || resolvedCode}
       >
         {initials}
       </div>
@@ -106,7 +106,7 @@ export const CountryFlag = ({
   return (
     <img
       src={flagUrl}
-      alt={`${countryName || normalizedCode} flag`}
+      alt={`${countryName || resolvedCode} flag`}
       className={cn(
         'object-cover rounded-sm shadow-sm',
         sizeClasses[size],
