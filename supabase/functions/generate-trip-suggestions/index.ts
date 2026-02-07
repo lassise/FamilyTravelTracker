@@ -94,7 +94,7 @@ const checkRateLimit = async (
   }
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -203,7 +203,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-1.5-flash",
           messages: [
             { role: "system", content: "You are an expert travel advisor who creates personalized recommendations. Always respond with valid JSON only." },
             { role: "user", content: prompt }
@@ -281,7 +281,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-1.5-flash",
           messages: [
             { role: "system", content: "You are an expert travel planner creating detailed, practical itineraries. Always respond with valid JSON only." },
             { role: "user", content: prompt }
@@ -353,7 +353,7 @@ Return ONLY the JSON, nothing else.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-1.5-flash",
           messages: [
             { role: "system", content: "You extract structured data from text. Always respond with valid JSON only. Be lenient - if you see anything that looks like travel info, extract it." },
             { role: "user", content: prompt }
@@ -419,7 +419,7 @@ Return ONLY valid JSON, no markdown or explanation.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-1.5-flash",
         messages: [
           { role: "system", content: "You are a travel expert. Always respond with valid JSON only." },
           { role: "user", content: prompt }

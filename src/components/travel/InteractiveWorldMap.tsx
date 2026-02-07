@@ -673,7 +673,7 @@ const InteractiveWorldMap = ({
       map.current?.remove();
       map.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mapToken, initialCenter, homeCountryISO, handleCountryClick]);
 
   // Handle window resize and visibility changes

@@ -716,7 +716,7 @@ const CountryVisitDetailsDialog = ({
                     const isApproximate = (displayVisit.is_approximate as boolean | undefined) ?? (visit.is_approximate || false);
 
                     const handleVisitDateSave = (startDate: string | null, endDate: string | null) => {
-                      let updateData: Record<string, string | number | null | boolean> = {
+                      const updateData: Record<string, string | number | null | boolean> = {
                         visit_date: startDate,
                         end_date: endDate,
                         is_approximate: false,
@@ -785,7 +785,7 @@ const CountryVisitDetailsDialog = ({
                     const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
                     // Build a display title for the visit
-                    let visitTitle = (displayVisit.trip_name as string | null) || `Visit #${visitDetails.length - index}`;
+                    const visitTitle = (displayVisit.trip_name as string | null) || `Visit #${visitDetails.length - index}`;
                     let visitSubtitle = "";
                     const displayIsApproximate = (displayVisit.is_approximate as boolean | undefined) ?? isApproximate;
                     if (displayIsApproximate) {

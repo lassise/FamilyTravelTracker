@@ -67,7 +67,7 @@ const TravelStreaks = () => {
     const sortedVisits = [...visitsWithDates].sort((a, b) => a.date.getTime() - b.date.getTime());
     
     if (sortedVisits.length > 0) {
-      let mergedPeriods: { start: Date; end: Date }[] = [];
+      const mergedPeriods: { start: Date; end: Date }[] = [];
       let currentPeriod = { start: sortedVisits[0].date, end: sortedVisits[0].endDate };
       
       for (let i = 1; i < sortedVisits.length; i++) {

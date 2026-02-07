@@ -595,7 +595,7 @@ export const FlightLegResults = ({
 
               // Calculate layover info for connection risk
               let layoverMinutes = 0;
-              let hasTerminalChange = false;
+              const hasTerminalChange = false;
               if (stops > 0 && flight.itineraries[0]?.segments.length > 1) {
                 const seg1 = flight.itineraries[0].segments[0];
                 const seg2 = flight.itineraries[0].segments[1];

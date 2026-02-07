@@ -39,6 +39,7 @@ export interface FlightResult {
   isAlternateOrigin?: boolean;
   minSavingsRequired?: number;
   layovers?: LayoverInfo[];
+  totalDuration?: number;
 }
 
 export interface PreferenceMatch {
@@ -1486,6 +1487,7 @@ export const scoreFlights = (
 
     const scoredFlight: ScoredFlight = {
       ...flight,
+      totalDuration: travelTimes[index],
       score: breakdown.total,
       breakdown,
       badges,

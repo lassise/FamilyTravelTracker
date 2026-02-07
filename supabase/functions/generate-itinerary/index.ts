@@ -456,7 +456,7 @@ const validateAndRepairItinerary = async (
   }
 
   log('warn', 'Itinerary validation failed, attempting repair', logCtx, {
-    errors: validationResult.error.errors.slice(0, 5).map(e => e.message)
+    errors: validationResult.error.errors.slice(0, 5).map((e: any) => e.message)
   });
 
   // Attempt repair via AI
@@ -483,7 +483,7 @@ Required structure:
 CRITICAL: The dates MUST be exactly: ${dayDates.join(', ')}. Do NOT change these dates.
 
 Errors found:
-${validationResult.error.errors.slice(0, 10).map(e => `- ${e.path.join('.')}: ${e.message}`).join('\n')}
+${validationResult.error.errors.slice(0, 10).map((e: any) => `- ${e.path.join('.')}: ${e.message}`).join('\n')}
 
 Original JSON to repair:
 ${JSON.stringify(itinerary).substring(0, 10000)}
@@ -498,7 +498,7 @@ Return ONLY the repaired valid JSON, no explanation.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-1.5-flash',
         messages: [{ role: 'user', content: repairPrompt }],
       }),
     });
@@ -596,7 +596,7 @@ CRITICAL RULES:
 
   // Provider preferences
   if (!providerPrefs.includes('any')) {
-    const providerNames = providerPrefs.map(p => {
+    const providerNames = providerPrefs.map((p: string) => {
       if (p === 'local_tour') return 'local tour operators';
       if (p === 'airbnb_experience') return 'Airbnb Experiences';
       return p;
@@ -760,7 +760,7 @@ const buildUserPrompt = (
 
   const safeDestination = sanitizeForPrompt(tripDetails.destination);
   const allInterests = tripDetails.interests
-    .map(i => i.startsWith("custom:") ? i.replace("custom:", "") : i)
+    .map((i: string) => i.startsWith("custom:") ? i.replace("custom:", "") : i)
     .map(sanitizeForPrompt)
     .join(', ');
   const safePace = sanitizeForPrompt(tripDetails.pacePreference);
@@ -936,7 +936,7 @@ CRITICAL REQUIREMENTS:
   return userPrompt;
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1010,12 +1010,12 @@ serve(async (req) => {
 
     if (!validationResult.success) {
       log('warn', 'Input validation failed', logCtx, {
-        errors: validationResult.error.errors.map(e => e.message)
+        errors: validationResult.error.errors.map((e: any) => e.message)
       });
       return new Response(JSON.stringify({
         error: 'Please check your trip details and try again.',
         code: 'VALIDATION_ERROR',
-        details: validationResult.error.errors.map(e => e.message)
+        details: validationResult.error.errors.map((e: any) => e.message)
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1084,7 +1084,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-3-flash-preview',
+          model: 'google/gemini-1.5-flash',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -1178,14 +1178,14 @@ serve(async (req) => {
       daysGenerated: itinerary.days.length,
       wasRepaired,
       hasLodgingSuggestions: !!itinerary.lodgingSuggestions?.length,
-      hasTrainSegments: itinerary.days.some(d => d.trainSegments?.length)
+      hasTrainSegments: itinerary.days.some((d: any) => d.trainSegments?.length)
     });
 
     // Mark days that need regeneration
     const daysNeedingRegeneration = itinerary.days
-      .filter(day => day.activities.length === 1 &&
+      .filter((day: any) => day.activities.length === 1 &&
         day.activities[0].description?.includes("couldn't generate"))
-      .map(day => day.dayNumber);
+      .map((day: any) => day.dayNumber);
 
     return new Response(JSON.stringify({
       itinerary,

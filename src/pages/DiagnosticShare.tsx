@@ -315,7 +315,7 @@ export default function DiagnosticShare() {
     // Generate summary
     const failedTests = tests.filter(t => t.status === "fail").map(t => t.name);
     const testsRef = document.querySelectorAll('[data-test-status]');
-    let problems: string[] = [];
+    const problems: string[] = [];
 
     setFullReport(report);
 

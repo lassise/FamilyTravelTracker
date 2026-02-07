@@ -121,12 +121,12 @@ export function runFlightAvoidanceSelfTest(): void {
 
   if (failed.length > 0) {
     // Throw to make it loud in console during dev.
-    // eslint-disable-next-line no-console
+     
     console.error("[flightAvoidanceSelfTest] FAILED", failed, { scored, sorted, bestOverall });
     throw new Error(`flightAvoidanceSelfTest failed: ${failed.join("; ")}`);
   }
 
-  // eslint-disable-next-line no-console
+   
   console.info("[flightAvoidanceSelfTest] PASSED", {
     spiritScore: spirit?.score,
     spiritAvoided: spirit?.isAvoidedAirline,

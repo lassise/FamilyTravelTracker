@@ -25,11 +25,43 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { savedFlightId, currentPrice, origin, destination, outboundDate, returnDate }: PriceAlertRequest = await req.json();
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Check if the request is using the Service Role Key (Admin/Cron)
+    const isServiceRole = authHeader.includes(supabaseServiceKey);
+    let requestingUserId: string | null = null;
+
+    if (!isServiceRole) {
+      // If not service role, verify user token
+      const supabaseAuth = createClient(
+        supabaseUrl,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Invalid authentication" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      requestingUserId = user.id;
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log("Processing price alert for flight:", savedFlightId, "Current price:", currentPrice);
 
@@ -44,6 +76,15 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Failed to fetch saved flight:", flightError);
       return new Response(JSON.stringify({ error: "Flight not found" }), {
         status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Authorization Check: checks if the requesting user owns this flight
+    if (requestingUserId && savedFlight.user_id !== requestingUserId) {
+      console.warn(`Unauthorized attempt by ${requestingUserId} to access flight ${savedFlightId}`);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -144,17 +185,17 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log("Email sent successfully:", emailResponse);
 
-      return new Response(JSON.stringify({ 
-        success: true, 
+      return new Response(JSON.stringify({
+        success: true,
         message: "Price alert email sent",
-        emailResponse 
+        emailResponse
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       message: "Price not below target",
       currentPrice,
       targetPrice
