@@ -204,7 +204,7 @@ async function searchFlightsFromOrigin(
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { status: 200, headers: corsHeaders });
   }
@@ -289,21 +289,36 @@ serve(async (req) => {
     // Combine all flights
     let allFlights = [...primaryResult.flights];
 
-    // Find cheapest primary flight for comparison
+    // Find if primary origin has any nonstop flights
+    const primaryHasNonstop = primaryResult.flights.some((f: any) =>
+      (f.flights || []).length === 1
+    );
+
     const cheapestPrimary = primaryResult.flights.length > 0
       ? Math.min(...primaryResult.flights.map((f: any) => f.price))
       : Infinity;
 
-    // Add alternate flights that meet savings threshold
+    // Add alternate flights that meet savings threshold OR are nonstop when primary has none
     alternateResults.forEach((result, index) => {
       if (result.flights.length > 0) {
         const altAirport = alternateAirports[index];
         const qualifyingFlights = result.flights.filter((f: any) => {
           const savings = cheapestPrimary - f.price;
-          return savings >= altAirport.minSavings;
+
+          // Qualify if savings exceed threshold
+          if (savings >= altAirport.minSavings) return true;
+
+          // NEW: Also qualify if this flight is nonstop but the primary airport has none
+          const isNonstop = (f.itineraries?.[0]?.segments?.length === 1) || (f.flights?.length === 1);
+          if (isNonstop && !primaryHasNonstop) {
+            console.log(`Including nonstop alternate flight from ${altAirport.code} because primary origin has no nonstop flights`);
+            return true;
+          }
+
+          return false;
         });
 
-        console.log(`${altAirport.code}: ${result.flights.length} flights found, ${qualifyingFlights.length} meet $${altAirport.minSavings} savings threshold`);
+        console.log(`${altAirport.code}: ${result.flights.length} flights found, ${qualifyingFlights.length} qualified (savings or nonstop)`);
         allFlights = [...allFlights, ...qualifyingFlights];
       }
     });

@@ -121,7 +121,9 @@ const AMENITY_NICE_TO_HAVE_BOOST = 10; // Boost for having nice-to-have amenity
 
 // Airline preference constants
 const AVOIDED_AIRLINE_PENALTY = 50; // Massive penalty applied to total score for avoided airlines
-const PREFERRED_AIRLINE_BOOST = 15; // Boost applied to total score for preferred airlines
+const PREFERRED_AIRLINE_BOOST = 10; // Boost applied to total score for preferred airlines (+10 as requested)
+const MUST_HAVE_AIRLINE_PENALTY = 100; // Penalty to ensure non-preferred airlines are at the bottom when MUST_HAVE is selected
+const NONSTOP_ALTERNATIVE_BOOST = 25; // Boost for alternate airports that offer nonstop when primary doesn't
 const HIGH_PRICE_PENALTY = 5; // Penalty for flights identified as higher price
 
 // Airline alias map for common variations (e.g., "JetBlue" -> "JetBlue Airways", "B6")
@@ -1161,6 +1163,11 @@ export const scoreFlights = (
 
   const scoredFlights: ScoredFlight[] = new Array(flights.length);
 
+  // Pre-calculate if any flight from the primary origin is nonstop
+  const primaryHasNonstop = flights.some(f =>
+    !f.isAlternateOrigin && f.itineraries.every(it => it.segments.length === 1)
+  );
+
   for (let index = 0; index < flights.length; index++) {
     const flight = flights[index];
     const breakdown: ScoreBreakdown = {
@@ -1313,9 +1320,24 @@ export const scoreFlights = (
       weightedTotal = Math.max(0, weightedTotal - AVOIDED_AIRLINE_PENALTY);
     }
 
-    // Apply boost for preferred airlines
-    if (isPreferredAirlineFlight) {
+    // Handle Preferred Airline Logic based on priority
+    if (preferences.airline_priority === 'must_have') {
+      if (!isPreferredAirlineFlight) {
+        // If it MUST be a preferred airline and it isn't, apply a massive penalty
+        weightedTotal = Math.max(0, weightedTotal - MUST_HAVE_AIRLINE_PENALTY);
+      } else {
+        // Still give a small boost for the match
+        weightedTotal = Math.min(100, weightedTotal + PREFERRED_AIRLINE_BOOST);
+      }
+    } else if (isPreferredAirlineFlight) {
+      // Regular preference boost (+10)
       weightedTotal = Math.min(100, weightedTotal + PREFERRED_AIRLINE_BOOST);
+    }
+
+    // Handle Alternate Airport Nonstop logic
+    // If this is an alternate airport, it IS nonstop, but the primary airport has NO nonstop options
+    if (flight.isAlternateOrigin && isNonstop && !primaryHasNonstop) {
+      weightedTotal = Math.min(100, weightedTotal + NONSTOP_ALTERNATIVE_BOOST);
     }
 
     // Apply boost for airline consistency on round-trip return flights
@@ -1371,8 +1393,27 @@ export const scoreFlights = (
       if (isPreferred) {
         const normalized = normalizeAirline(airlineCode);
         const airlineName = normalized.airline?.name || normalized.codeNormalized || airlineCode;
-        preferenceMatches.push({ type: "positive", label: airlineName, detail: "Your preferred airline" });
+        preferenceMatches.push({
+          type: "positive",
+          label: airlineName,
+          detail: preferences.airline_priority === 'must_have' ? "Required airline" : "Your preferred airline"
+        });
+      } else if (preferences.airline_priority === 'must_have') {
+        preferenceMatches.push({
+          type: "negative",
+          label: "Non-preferred airline",
+          detail: "Does not match your 'Must Have' requirement"
+        });
       }
+    }
+
+    // Add alternate nonstop match
+    if (flight.isAlternateOrigin && isNonstop && !primaryHasNonstop) {
+      preferenceMatches.push({
+        type: "positive",
+        label: "Nonstop from nearby",
+        detail: "Better than primary airport's connections"
+      });
     }
 
     // Add airline match badges for round-trip return flights
