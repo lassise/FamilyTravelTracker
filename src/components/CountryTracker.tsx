@@ -12,7 +12,7 @@ import { TripImportDialog, type ParsedFlightData } from "@/components/trips/Trip
 import CountryVisitDetailsDialog from "./CountryVisitDetailsDialog";
 import { Country, FamilyMember } from "@/hooks/useFamilyData";
 import { useVisitDetails } from "@/hooks/useVisitDetails";
-import { getAllCountries, getRegionCode, getCountryCode } from "@/lib/countriesData";
+import { getAllCountries, getRegionCode, getCountryCode, getEffectiveFlagCode } from "@/lib/countriesData";
 import { cn } from "@/lib/utils";
 import CountryFlag from "./common/CountryFlag";
 import CountryFilters from "./travel/CountryFilters";
@@ -207,14 +207,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
     });
   };
 
-  const getCountryCode = (countryName: string): string => {
-    // Scotland should always use its own flag, not the GB Union Jack
-    if (countryName?.toLowerCase().includes("scotland")) {
-      return "GB-SCT";
-    }
-    const found = allCountriesData.find((c) => c.name === countryName);
-    return found?.code || "";
-  };
+
 
   const handleUpdate = () => {
     onUpdate();
@@ -392,28 +385,11 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
 
             // Parse country name in case it has ISO2 prefix (legacy data: "AT Austria")
             const parsed = (country.name || "").match(/^([A-Z]{2})\s+(.+)$/);
-            const codeFromName = parsed?.[1] || "";
             const displayName = parsed?.[2] || country.name;
 
-            // Derive ISO2 code: check stored flag if it's a code, then name prefix, then lookup
-            // Also check for region codes like GB-SCT for Scotland
-            const rawFlag = (country.flag || "").trim();
-            const storedFlag = rawFlag.toUpperCase();
-            const isStoredFlagACode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(storedFlag);
-
-            // Scotland safeguard: if the stored emoji itself is the Scotland flag, always use GB-SCT
-            const isScotlandEmoji = rawFlag.includes("🏴");
-
-            const regionCode = getRegionCode(displayName) || getRegionCode(country.name);
-            const countryCode = (
-              (isScotlandEmoji ? "GB-SCT" : "") ||
-              (isStoredFlagACode ? storedFlag : "") ||
-              regionCode ||
-              codeFromName ||
-              getCountryCode(displayName) ||
-              getCountryCode(country.name) ||
-              ""
-            ).toUpperCase();
+            // Use the centralized robust function to get the correct code
+            // This handles cases like "JA" (Jamaica) which looks like a code but isn't a valid ISO code
+            const { code: countryCode } = getEffectiveFlagCode(displayName, country.flag);
 
             const isExpanded = expandedCountries.has(country.id);
 
