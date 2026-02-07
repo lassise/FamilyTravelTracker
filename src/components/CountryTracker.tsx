@@ -400,9 +400,9 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                 onOpenChange={() => toggleCountry(country.id)}
               >
                 <div className="border rounded-lg bg-card overflow-hidden">
-                  <CollapsibleTrigger asChild>
-                    <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left">
-                      <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                    <CollapsibleTrigger asChild>
+                      <button className="flex-1 flex items-center gap-3 text-left">
                         <CountryFlag countryCode={countryCode} countryName={displayName} size="xl" />
                         <div>
                           <h3 className="font-semibold text-foreground">
@@ -437,31 +437,56 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                             )}
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!hasAtLeastOneTrip && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
-                            }}
-                          >
-                            Add Details
-                          </Button>
-                        )}
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                        <ChevronDown
-                          className={cn(
-                            "w-5 h-5 text-muted-foreground transition-transform duration-200",
-                            isExpanded && "rotate-180"
-                          )}
-                        />
-                      </div>
-                    </button>
-                  </CollapsibleTrigger>
+                      </button>
+                    </CollapsibleTrigger>
+
+                    <div className="flex items-center gap-2 ml-4">
+                      {!hasAtLeastOneTrip && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
+                          }}
+                        >
+                          Add Details
+                        </Button>
+                      )}
+
+                      <CollapsibleTrigger asChild>
+                        <button className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          <ChevronDown
+                            className={cn(
+                              "w-5 h-5 text-muted-foreground transition-transform duration-200",
+                              isExpanded && "rotate-180"
+                            )}
+                          />
+                        </button>
+                      </CollapsibleTrigger>
+                    </div>
+                  </div>
+
+                  {/* Dialog must be outside CollapsibleContent to work when collapsed */}
+                  <CountryVisitDetailsDialog
+                    countryId={country.id}
+                    countryName={country.name}
+                    countryCode={countryCode}
+                    onUpdate={handleUpdate}
+                    buttonLabel={hasAtLeastOneTrip ? "View / Add Trips" : "View Details"}
+                    initialFamilyMemberIds={
+                      // Pre-select family members who already visited this country (from quick add)
+                      familyMembers
+                        .filter((m) => country.visitedBy.includes(m.name))
+                        .map((m) => m.id)
+                    }
+                    open={visitDetailsDialogOpen[country.id]}
+                    onOpenChange={(open) => {
+                      setVisitDetailsDialogOpen(prev => ({ ...prev, [country.id]: open }));
+                    }}
+                  />
 
                   <CollapsibleContent>
                     <div className="border-t p-4 space-y-4 bg-muted/20">
@@ -688,24 +713,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                         </div>
                       </div>
 
-                      <div className="flex gap-2 pt-2 flex-wrap">
-                        <CountryVisitDetailsDialog
-                          countryId={country.id}
-                          countryName={country.name}
-                          countryCode={countryCode}
-                          onUpdate={handleUpdate}
-                          buttonLabel={hasAtLeastOneTrip ? "View / Add Trips" : "View Details"}
-                          initialFamilyMemberIds={
-                            // Pre-select family members who already visited this country (from quick add)
-                            familyMembers
-                              .filter((m) => country.visitedBy.includes(m.name))
-                              .map((m) => m.id)
-                          }
-                          open={visitDetailsDialogOpen[country.id]}
-                          onOpenChange={(open) => {
-                            setVisitDetailsDialogOpen(prev => ({ ...prev, [country.id]: open }));
-                          }}
-                        />
+                      <div className="flex justify-end pt-2">
                         <Button
                           variant="outline"
                           size="sm"
