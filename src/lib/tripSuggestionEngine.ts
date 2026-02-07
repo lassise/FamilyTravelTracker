@@ -46,7 +46,7 @@ export class TripSuggestionEngine {
                 // Calculate start/end dates
                 const allDates = [
                     ...cluster.photos.map(p => p.dateTaken),
-                    ...cluster.emails.map(e => e.extractedDate).filter((d): d is Date => !!d)
+                    ...cluster.emails.map(e => e.extractedDate || e.date)
                 ].sort((a, b) => a.getTime() - b.getTime());
 
                 const startDate = allDates[0];

@@ -38,17 +38,17 @@ export const useFamilyData = () => {
       setLoading(false);
       return;
     }
-    
+
     // Prevent duplicate fetches
     if (isFetching.current) return;
     isFetching.current = true;
-    
+
     // Only show loading on initial load, not refetches
     if (lastUserId.current !== user.id) {
       setLoading(true);
       lastUserId.current = user.id;
     }
-    
+
     try {
       // Fetch all data in parallel
       // IMPORTANT: Fetch BOTH old system (country_visits) and new system (visit_family_members)
@@ -96,7 +96,9 @@ export const useFamilyData = () => {
       for (const visitMember of visitMembersData) {
         const visitId = visitMember.visit_id;
         const countryId = visitToCountry.get(visitId);
-        const memberName = (visitMember as any).family_members?.name;
+        // Safe type check: family_members may not be joined if data is missing
+        const memberData = visitMember.family_members;
+        const memberName = memberData && typeof memberData === 'object' && 'name' in memberData ? memberData.name : null;
         const memberId = visitMember.family_member_id;
 
         if (countryId && memberName && memberId) {
@@ -118,7 +120,9 @@ export const useFamilyData = () => {
       // This preserves countries that were added without full trip details
       for (const countryVisit of countryVisitsData) {
         const countryId = countryVisit.country_id;
-        const memberName = (countryVisit as any).family_members?.name;
+        // Safe type check: family_members may not be joined if data is missing
+        const memberData = countryVisit.family_members;
+        const memberName = memberData && typeof memberData === 'object' && 'name' in memberData ? memberData.name : null;
         const memberId = countryVisit.family_member_id;
 
         if (countryId && memberName && memberId) {
@@ -196,18 +200,18 @@ export const useFamilyData = () => {
   }, [user, fetchData]);
 
   // Memoize totalContinents calculation
-  const totalContinents = useMemo(() => 
+  const totalContinents = useMemo(() =>
     new Set(countries.filter(c => c.visitedBy.length > 0).map(c => c.continent)).size,
     [countries]
   );
 
-  return { 
-    familyMembers, 
-    countries, 
+  return {
+    familyMembers,
+    countries,
     wishlist,
     homeCountry,
-    loading, 
+    loading,
     refetch: fetchData,
-    totalContinents 
+    totalContinents
   };
 };

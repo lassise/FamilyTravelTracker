@@ -28,6 +28,86 @@ export interface Trip {
   updated_at: string;
 }
 
+/**
+ * Check if a trip overlaps with any existing trips for the same family members
+ * @returns Array of overlapping trip titles, or empty array if no overlaps
+ */
+const checkForOverlappingTrips = async (
+  userId: string,
+  startDate: string | null,
+  endDate: string | null,
+  familyMemberIds: string[],
+  excludeTripId?: string
+): Promise<string[]> => {
+  if (!startDate || !endDate || familyMemberIds.length === 0) {
+    return [];
+  }
+
+  try {
+    // Query for trips that overlap with the date range
+    let query = supabase
+      .from('trips')
+      .select(`
+        id,
+        title,
+        start_date,
+        end_date,
+        trip_family_members(family_member_id)
+      `)
+      .eq('user_id', userId)
+      .not('start_date', 'is', null)
+      .not('end_date', 'is', null);
+
+    // Exclude current trip if updating
+    if (excludeTripId) {
+      query = query.neq('id', excludeTripId);
+    }
+
+    const { data: existingTrips, error } = await query;
+
+    if (error || !existingTrips) return [];
+
+    const overlappingTrips: string[] = [];
+
+    for (const trip of existingTrips) {
+      // Check if date ranges overlap
+      const tripStart = new Date(trip.start_date!);
+      const tripEnd = new Date(trip.end_date!);
+      const newStart = new Date(startDate);
+      const newEnd = new Date(endDate);
+
+      const hasDateOverlap = tripStart <= newEnd && newStart <= tripEnd;
+
+      if (hasDateOverlap) {
+        // Check if any family members overlap
+        const tripFamilyMembers = trip.trip_family_members;
+        const tripMemberIds: string[] = [];
+
+        if (Array.isArray(tripFamilyMembers)) {
+          tripFamilyMembers.forEach((tfm: any) => {
+            if (tfm?.family_member_id) {
+              tripMemberIds.push(tfm.family_member_id);
+            }
+          });
+        }
+
+        const hasMemberOverlap = familyMemberIds.some(id =>
+          tripMemberIds.includes(id)
+        );
+
+        if (hasMemberOverlap) {
+          overlappingTrips.push(trip.title || 'Untitled Trip');
+        }
+      }
+    }
+
+    return overlappingTrips;
+  } catch (error) {
+    console.error('Error checking for overlapping trips:', error);
+    return [];
+  }
+};
+
 export const useTrips = () => {
   const { user } = useAuth();
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -76,8 +156,28 @@ export const useTrips = () => {
     };
   }, [user]);
 
-  const createTrip = async (tripData: Partial<Omit<Trip, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => {
+  const createTrip = async (
+    tripData: Partial<Omit<Trip, 'id' | 'user_id' | 'created_at' | 'updated_at'>>,
+    familyMemberIds: string[] = []
+  ) => {
     if (!user) return { data: null, error: new Error("Not authenticated") };
+
+    // Check for overlapping trips
+    const overlaps = await checkForOverlappingTrips(
+      user.id,
+      tripData.start_date || null,
+      tripData.end_date || null,
+      familyMemberIds
+    );
+
+    if (overlaps.length > 0) {
+      return {
+        data: null,
+        error: new Error(
+          `Trip dates overlap with existing trip(s): ${overlaps.join(', ')}. Please check family member schedules.`
+        ),
+      };
+    }
 
     const { data, error } = await supabase
       .from("trips")

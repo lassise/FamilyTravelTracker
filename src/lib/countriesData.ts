@@ -112,6 +112,7 @@ const buildCountryNameToCodeMap = (): Map<string, string> => {
     'hong kong': 'HK',
     'macau': 'MO',
     'macao': 'MO',
+    'the netherlands': 'NL',
   };
 
   Object.entries(aliases).forEach(([name, code]) => {

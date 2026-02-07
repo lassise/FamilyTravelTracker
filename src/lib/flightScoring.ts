@@ -1178,7 +1178,42 @@ export const scoreFlights = (
     // Score nonstop
     const isNonstop = flight.itineraries.every(it => it.segments.length === 1);
     const hasOneStop = flight.itineraries.every(it => it.segments.length <= 2);
-    breakdown.nonstop = isNonstop ? 100 : hasOneStop ? 60 : 30;
+
+    // CRITICAL: Validate max stops preference (especially important for families)
+    const maxSegments = Math.max(...flight.itineraries.map(it => it.segments.length));
+    const totalStops = maxSegments - 1; // segments - 1 = stops
+
+    // If user set max_stops preference AND flight exceeds it, heavily penalize or skip
+    if (preferences.max_stops !== null && preferences.max_stops !== undefined && totalStops > preferences.max_stops) {
+      // For families, completely reject flights exceeding max stops
+      if (preferences.family_mode) {
+        breakdown.nonstop = 0;
+        breakdown.travelTime = 0;
+        breakdown.total = 0;
+        scoredFlights[index] = {
+          ...flight,
+          score: 0,
+          breakdown,
+          badges: [],
+          explanation: `❌ Flight has ${totalStops} stops but you set max stops to ${preferences.max_stops}`,
+          warnings: [`This flight exceeds your maximum ${preferences.max_stops} stop${preferences.max_stops === 1 ? '' : 's'} preference`],
+          delayRisk: "high",
+          hiddenCosts: [],
+          preferenceMatches: []
+        };
+        continue; // Skip to next flight
+      } else {
+        // For non-family mode, apply heavy penalty but don't completely reject
+        breakdown.nonstop = Math.max(0, 20 - (totalStops * 10)); // Heavy penalty
+      }
+    } else {
+      breakdown.nonstop = isNonstop ? 100 : hasOneStop ? 60 : 30;
+    }
+
+    // Additional family mode penalty for 3+ stops (even if no explicit max_stops set)
+    if (preferences.family_mode && totalStops >= 3) {
+      breakdown.nonstop = Math.min(breakdown.nonstop, 15); // Cap at very low score
+    }
 
     if (preferences.prefer_nonstop && !isNonstop) {
       breakdown.nonstop = Math.max(0, breakdown.nonstop - 30);

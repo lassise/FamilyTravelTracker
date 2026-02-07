@@ -273,8 +273,10 @@ export function calculateTotalDuration(
       let arrivalDate = departureDate;
 
       // Check for explicit overnight indicators first
-      const hasOvernight = segments.some(seg => (seg as any).overnight) ||
-        (layovers && layovers.some(lay => lay.overnight));
+      // Use type guard to safely check if segment has overnight property
+      const hasOvernight = segments.some(seg =>
+        typeof seg === 'object' && seg !== null && 'overnight' in seg && seg.overnight === true
+      ) || (layovers && layovers.some(lay => lay.overnight));
 
       if (hasOvernight) {
         // Try next day if overnight indicator is present
@@ -291,17 +293,33 @@ export function calculateTotalDuration(
       );
 
       // If we have both times, check if arrival is before departure (invalid)
-      // This indicates arrival is on a later day
+      // This indicates arrival is on a later day - could be 1, 2, or more days
       if (finalArrivalUTC && firstDepartureUTC && finalArrivalUTC.getTime() < firstDepartureUTC.getTime()) {
-        // Arrival is before departure - must be next day (or later)
-        const depDate = new Date(arrivalDate + 'T00:00:00');
-        depDate.setDate(depDate.getDate() + 1);
-        const nextDayStr = depDate.toISOString().split('T')[0];
-        finalArrivalUTC = parseDateTimeInTimezone(
-          lastSegment.arrivalTime,
-          nextDayStr,
-          lastArrTimezone
-        );
+        // Try adding days until arrival is after departure
+        // Limit to 5 days to prevent infinite loop (no commercial flight > 5 days)
+        let daysToAdd = 1;
+        let adjustedArrivalUTC = finalArrivalUTC;
+
+        while (daysToAdd <= 5 && adjustedArrivalUTC.getTime() < firstDepartureUTC.getTime()) {
+          const depDate = new Date(arrivalDate + 'T00:00:00');
+          depDate.setDate(depDate.getDate() + daysToAdd);
+          const adjustedDateStr = depDate.toISOString().split('T')[0];
+
+          const tempArrival = parseDateTimeInTimezone(
+            lastSegment.arrivalTime,
+            adjustedDateStr,
+            lastArrTimezone
+          );
+
+          if (tempArrival && tempArrival.getTime() > firstDepartureUTC.getTime()) {
+            adjustedArrivalUTC = tempArrival;
+            break;
+          }
+
+          daysToAdd++;
+        }
+
+        finalArrivalUTC = adjustedArrivalUTC;
       }
     }
   }
