@@ -157,7 +157,7 @@ const InteractiveWorldMap = ({
   } | null>(null);
 
   // Visit details dialog state (for "Add Details" option)
-  const [visitDetailsOpen, setVisitDetailsOpen] = useState(false);
+  const [visitDetailsDialogOpen, setVisitDetailsDialogOpen] = useState<Record<string, boolean | 'add'>>({});
   const [visitDetailsCountry, setVisitDetailsCountry] = useState<{
     id: string;
     name: string;
@@ -434,7 +434,8 @@ const InteractiveWorldMap = ({
   // Handler for opening visit details dialog (from quick action)
   const handleOpenVisitDetails = useCallback((countryId: string, countryName: string, countryCode: string) => {
     setVisitDetailsCountry({ id: countryId, name: countryName, code: countryCode });
-    setVisitDetailsOpen(true);
+    // This is typically called from "Add Details" button in quick action
+    setVisitDetailsDialogOpen(prev => ({ ...prev, [countryId]: 'add' }));
   }, []);
 
   useEffect(() => {
@@ -673,7 +674,7 @@ const InteractiveWorldMap = ({
       map.current?.remove();
       map.current = null;
     };
-     
+
   }, [mapToken, initialCenter, homeCountryISO, handleCountryClick]);
 
   // Handle window resize and visibility changes
@@ -991,11 +992,12 @@ const InteractiveWorldMap = ({
           onUpdate={() => {
             onRefetch?.();
           }}
-          open={visitDetailsOpen}
+          open={visitDetailsDialogOpen[visitDetailsCountry.id]}
           onOpenChange={(open) => {
-            setVisitDetailsOpen(open);
+            setVisitDetailsDialogOpen(prev => ({ ...prev, [visitDetailsCountry.id]: open }));
             if (!open) setVisitDetailsCountry(null);
           }}
+          buttonLabel="View Details"
         />
       )}
     </Card>

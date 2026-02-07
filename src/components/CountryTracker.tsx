@@ -46,7 +46,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
     countryName: ''
   });
   const [isDeleting, setIsDeleting] = useState(false);
-  const [visitDetailsDialogOpen, setVisitDetailsDialogOpen] = useState<Record<string, boolean>>({});
+  const [visitDetailsDialogOpen, setVisitDetailsDialogOpen] = useState<Record<string, boolean | 'add'>>({});
   const [tripLegsByCountry, setTripLegsByCountry] = useState<Record<string, TripLeg[]>>({});
   const [boardingPassPrefill, setBoardingPassPrefill] = useState<{ countryName?: string; visitDate?: string; endDate?: string; tripName?: string } | null>(null);
   const [addCountryDialogOpen, setAddCountryDialogOpen] = useState(false);
@@ -446,7 +446,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                             className="shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: true }));
+                              setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
                             }}
                           >
                             Add Details
@@ -694,7 +694,7 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                           countryName={country.name}
                           countryCode={countryCode}
                           onUpdate={handleUpdate}
-                          buttonLabel={hasAtLeastOneTrip ? "View / Add Trips" : "Add Details"}
+                          buttonLabel={hasAtLeastOneTrip ? "View / Add Trips" : "View Details"}
                           initialFamilyMemberIds={
                             // Pre-select family members who already visited this country (from quick add)
                             familyMembers

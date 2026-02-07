@@ -65,6 +65,6 @@ export interface CountryVisitDetailsDialogProps {
     /** Pre-select these family member IDs for new visits (e.g. from quick-add country_visits). */
     initialFamilyMemberIds?: string[];
     // Optional controlled props
-    open?: boolean;
+    open?: boolean | 'add';
     onOpenChange?: (open: boolean) => void;
 }

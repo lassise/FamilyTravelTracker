@@ -65,7 +65,7 @@ const CountryVisitDetailsDialog = ({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: CountryVisitDetailsDialogProps) => {
-  const [internalOpen, setInternalOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState<boolean | 'add'>(false);
 
   // Support both controlled and uncontrolled usage
   const isControlled = controlledOpen !== undefined;
@@ -146,6 +146,7 @@ const CountryVisitDetailsDialog = ({
     }
   }, [countryId]);
 
+  // Reset state when dialog opens and fetch data
   useEffect(() => {
     if (open) {
       fetchData();
@@ -154,22 +155,31 @@ const CountryVisitDetailsDialog = ({
       setPendingCityAdditions([]);
       setPendingCityDeletions([]);
       setPendingFamilyMemberChanges({});
-
-      // Automatically add a new visit draft if there are no existing visits
-      // This makes the "Add Details" button flow immediately into adding a trip
-      setTimeout(() => {
-        if (visitDetails.length === 0 && newVisits.length === 0) {
-          setNewVisits([createNewVisitDraft(initialFamilyMemberIds)]);
-        }
-      }, 100); // Small delay to ensure fetch completes first
     }
-  }, [open, fetchData, initialFamilyMemberIds]);
+  }, [open, fetchData]);
+
+  // Handle auto-adding drafts based on mode
+  useEffect(() => {
+    if (!open || loading) return;
+
+    if (open === 'add') {
+      // triggered by "Add Details" orange button - always add a draft
+      if (newVisits.length === 0) {
+        handleAddNewVisitDraft();
+      }
+    } else if (open === true) {
+      // triggered by "View Details" button - only add if no existing visits
+      if (visitDetails.length === 0 && newVisits.length === 0) {
+        handleAddNewVisitDraft();
+      }
+    }
+  }, [open, loading, visitDetails.length, newVisits.length, handleAddNewVisitDraft]);
 
   /**
    * Creates a new visit draft. Pre-fills familyMemberIds from initialFamilyMemberIds
    * (who already visited this country via quick add) so trip details form has smart defaults.
    */
-  const createNewVisitDraft = (preSelectedMemberIds: string[] = []): NewVisitDraft => ({
+  const createNewVisitDraft = useCallback((preSelectedMemberIds: string[] = []): NewVisitDraft => ({
     id: crypto.randomUUID(),
     tripName: "",
     isApproximate: false,
@@ -182,11 +192,11 @@ const CountryVisitDetailsDialog = ({
     familyMemberIds: [...preSelectedMemberIds],
     highlight: "",
     whyItMattered: "",
-  });
+  }), []);
 
-  const handleAddNewVisitDraft = () => {
+  const handleAddNewVisitDraft = useCallback(() => {
     setNewVisits((prev) => [...prev, createNewVisitDraft(initialFamilyMemberIds)]);
-  };
+  }, [createNewVisitDraft, initialFamilyMemberIds]);
 
   const handleUpdateNewVisitDraft = (id: string, updates: Partial<NewVisitDraft>) => {
     setNewVisits((prev) =>
