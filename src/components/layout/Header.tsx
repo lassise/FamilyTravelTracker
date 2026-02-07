@@ -4,9 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 // import { Logo } from "@/components/common/Logo";
-import { 
-  Plus, 
-  Menu, 
+import {
+  Plus,
+  Menu,
   User,
   LogOut,
   Settings,
@@ -54,9 +54,6 @@ const Header = () => {
 
   // Trip planning links
   const tripPlanningLinks = [
-    { href: "/trips", label: "My Trips", icon: Luggage, premium: false },
-    { href: "/trips/new", label: "Plan New Trip", icon: Plus, premium: true },
-    { href: "/flights", label: "Find Flights", icon: PlaneTakeoff, premium: true },
     { href: "/saved-flights", label: "Saved Flights", icon: Bell, premium: true },
     { href: "/explore", label: "Explore Destinations", icon: Map, premium: false },
   ];
@@ -93,14 +90,13 @@ const Header = () => {
             <Link
               key={link.href}
               to={link.href}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                isActive(link.href)
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${isActive(link.href)
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
             >
               {link.label}
-              {link.premium && <Crown className="h-4 w-4 text-amber-500" title="Premium" />}
+              {link.premium && <Crown className="h-4 w-4 text-amber-500" />}
             </Link>
           ))}
         </nav>
@@ -166,15 +162,14 @@ const Header = () => {
                     <button
                       key={link.href}
                       onClick={() => handleNavigate(link.href)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${
-                        isActive(link.href)
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${isActive(link.href)
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
                     >
                       <Icon className="h-5 w-5 shrink-0" />
                       <span className="flex-1 text-left">{link.label}</span>
-                      {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" title="Premium" />}
+                      {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" />}
                     </button>
                   );
                 })}
@@ -182,7 +177,7 @@ const Header = () => {
                 {user && (
                   <>
                     <Separator className="my-3" />
-                    
+
                     {/* Trip Planning Links */}
                     <p className="text-xs font-medium text-muted-foreground px-3 mb-1">Trip Planning</p>
                     {tripPlanningLinks.map((link) => {
@@ -191,21 +186,20 @@ const Header = () => {
                         <button
                           key={link.href}
                           onClick={() => handleNavigate(link.href)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${
-                            isActive(link.href)
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                          }`}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${isActive(link.href)
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            }`}
                         >
                           <Icon className="h-5 w-5 shrink-0" />
                           <span className="flex-1 text-left">{link.label}</span>
-                          {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" title="Premium" />}
+                          {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" />}
                         </button>
                       );
                     })}
 
                     <Separator className="my-3" />
-                    
+
                     {/* Profile Links */}
                     <p className="text-xs font-medium text-muted-foreground px-3 mb-1">Account</p>
                     {profileLinks.map((link) => {
@@ -214,11 +208,10 @@ const Header = () => {
                         <button
                           key={link.href}
                           onClick={() => handleNavigate(link.href)}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${
-                            isActive(link.href)
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                          }`}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left ${isActive(link.href)
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                            }`}
                         >
                           <Icon className="h-5 w-5" />
                           {link.label}
@@ -227,7 +220,7 @@ const Header = () => {
                     })}
 
                     <Separator className="my-3" />
-                    
+
                     <button
                       onClick={handleSignOut}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 w-full text-left"
@@ -241,8 +234,8 @@ const Header = () => {
                 {!user && (
                   <>
                     <Separator className="my-3" />
-                    <Button 
-                      onClick={() => handleNavigate("/auth")} 
+                    <Button
+                      onClick={() => handleNavigate("/auth")}
                       className="w-full"
                     >
                       Sign In
