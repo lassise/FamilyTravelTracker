@@ -70,6 +70,13 @@ const buildCountryNameToCodeMap = (): Map<string, string> => {
   map.set('wales', 'GB-WLS');
   map.set('northern ireland', 'GB-NIR');
 
+  // Explicitly add problematic countries to ensure they are mapped correctly
+  map.set('jamaica', 'JM');
+  map.set('france', 'FR');
+  map.set('colombia', 'CO');
+  map.set('united states', 'US');
+  map.set('united kingdom', 'GB');
+
   // Common aliases and variations
   const aliases: Record<string, string> = {
     'usa': 'US',
@@ -187,6 +194,9 @@ const countryAliases: Record<string, string[]> = {
   'KR': ['south korea', 'korea'],
   'CZ': ['czechia'],
   'NL': ['holland'],
+  'JM': ['jamaica'],
+  'FR': ['france'],
+  'CO': ['colombia'],
 };
 
 // Normalize a free-form location string for robust matching
@@ -230,37 +240,55 @@ export const getRegionCode = (name: string): string => {
   return '';
 };
 
+// Helper: Check if a code is a valid ISO key in our countries list or a known subdivision
+const isValidIsoCode = (code: string): boolean => {
+  if (!code) return false;
+  // Subdivision codes are valid
+  if (/^[A-Z]{2}-[A-Z]{3}$/.test(code)) return true;
+  // Check against countries library
+  return countries && Object.prototype.hasOwnProperty.call(countries, code);
+};
+
+// Helper alias for isValidIsoCode to match recursive call above
+const isValidCode = isValidIsoCode;
+
 // Helper to get the effective flag code for a country (handles UK nations by name, emoji flags, etc.)
 export const getEffectiveFlagCode = (countryName: string, storedFlag?: string): { code: string; isSubdivision: boolean } => {
-  // First, check for special region codes (UK nations, etc.)
-  const regionCode = getRegionCode(countryName);
-  if (regionCode) {
-    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(regionCode);
-    return { code: regionCode, isSubdivision };
-  }
+  // 1. Try to get code from name first (standard path for most reliability)
+  const nameCode = getCodeFromName(countryName);
 
-  // Check if stored flag is already a valid ISO code
+  // 2. Check for special region codes (UK nations, etc.) via getRegionCode
+  const regionCode = getRegionCode(countryName);
+
+  // Decide best name-based code
+  const bestNameCode = regionCode || nameCode;
+
+  // 3. Process stored flag
   const normalizedFlag = (storedFlag || '').trim().toUpperCase();
-  const storedFlagIsCode = /^[A-Z]{2}(-[A-Z]{3})?$/.test(normalizedFlag);
-  if (storedFlagIsCode) {
+
+  // Check if stored flag looks like a code (e.g. "US", "GB-SCT", "JA")
+  const storedFlagIsCodeLike = /^[A-Z]{2}(-[A-Z]{3})?$/.test(normalizedFlag);
+
+  // If stored flag IS a valid code in our DB (e.g. "US"), use it.
+  // But if it's "JA" and "JA" is NOT in our countries list, ignore it (likely 'Jamaica' initials)
+  if (storedFlagIsCodeLike && isValidIsoCode(normalizedFlag)) {
     const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(normalizedFlag);
     return { code: normalizedFlag, isSubdivision };
   }
 
-  // Try to extract code from emoji flag (e.g., 🇨🇴 → CO)
+  // 4. Try to extract code from emoji flag (e.g., 🇨🇴 → CO)
   const emojiCode = emojiToCountryCode(storedFlag || '');
-  if (emojiCode) {
+  if (emojiCode && isValidCode(emojiCode)) {
     return { code: emojiCode, isSubdivision: false };
   }
 
-  // Fall back to name-based lookup using comprehensive mapping
-  const nameCode = getCodeFromName(countryName);
-  if (nameCode) {
-    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(nameCode);
-    return { code: nameCode, isSubdivision };
+  // 5. Fallback to name-based code (most reliable for cases like "Jamaica" with stored flag "JA")
+  if (bestNameCode) {
+    const isSubdivision = /^[A-Z]{2}-[A-Z]{3}$/.test(bestNameCode);
+    return { code: bestNameCode, isSubdivision };
   }
 
-  // Try the getAllCountries lookup as last resort
+  // 6. Try the getAllCountries lookup as absolute last resort
   const allCountries = getAllCountries();
   const match = allCountries.find(c => c.name.toLowerCase() === countryName.toLowerCase());
   if (match) {

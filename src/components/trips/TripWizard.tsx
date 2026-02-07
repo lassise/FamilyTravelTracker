@@ -14,6 +14,7 @@ import { InterestsStep } from "./wizard/InterestsStep";
 import { PreferencesStep } from "./wizard/PreferencesStep";
 import { ReviewStep } from "./wizard/ReviewStep";
 import { PlannerModeStep, type ClientInfo } from "./wizard/PlannerModeStep";
+import { LogisticsStep } from "./wizard/LogisticsStep";
 import { ContextStep } from "./wizard/ContextStep";
 import { useTravelProfiles } from "@/hooks/useTravelProfiles";
 import type { TripLegDraft } from "./TripLegEditor";
@@ -51,16 +52,23 @@ export interface TripFormData {
   bedtime: string; // HH:MM format, e.g., "19:30"
   maxWalkingMinutes: number; // 0 means no limit
   maxActivityMinutes: number; // 0 means no limit
+  // Phase 2: Logistics & Equipment
+  carSeatNeeds: 'none' | 'infant' | 'convertible' | 'booster' | 'multiple';
+  flightTimePreference: 'any' | 'morning' | 'afternoon' | 'red_eye';
+  accommodationNeeds: string[];
+  isSingleParent: boolean;
+  kidHeightsInches: number[];
 }
 
 const STEPS = [
   { id: 1, title: "Mode", description: "Who's this for?" },
   { id: 2, title: "Basics", description: "Where & when" },
   { id: 3, title: "Kids", description: "Ages & needs" },
-  { id: 4, title: "Interests", description: "What you love" },
-  { id: 5, title: "Preferences", description: "Your style" },
-  { id: 6, title: "Context", description: "Extra details" },
-  { id: 7, title: "Generate", description: "Create itinerary" },
+  { id: 4, title: "Logistics", description: "Transport & stay" },
+  { id: 5, title: "Interests", description: "What you love" },
+  { id: 6, title: "Preferences", description: "Your style" },
+  { id: 7, title: "Context", description: "Extra details" },
+  { id: 8, title: "Generate", description: "Create itinerary" },
 ];
 
 /** Generate a temporary ID for a leg draft */
@@ -115,6 +123,12 @@ const TripWizard = () => {
     bedtime: "",
     maxWalkingMinutes: 0,
     maxActivityMinutes: 0,
+    // Phase 2
+    carSeatNeeds: 'none',
+    flightTimePreference: 'any',
+    accommodationNeeds: [],
+    isSingleParent: false,
+    kidHeightsInches: [],
   });
 
   // Pre-fill legs when opened via "Add Another Country To Trip" (from CountryVisitDetailsDialog)
@@ -178,10 +192,12 @@ const TripWizard = () => {
         if (formData.travelingWithKids && formData.kidsAges.length === 0) return false;
         return true;
       case 4:
-        return formData.interests.length > 0;
+        return true; // Logistics step - defaults allow proceeding
       case 5:
-        return formData.pacePreference && formData.budgetLevel;
+        return formData.interests.length > 0;
       case 6:
+        return formData.pacePreference && formData.budgetLevel;
+      case 7:
         // Context step is optional
         return true;
       default:
@@ -323,6 +339,12 @@ const TripWizard = () => {
           bedtime: formData.travelingWithKids ? formData.bedtime : "",
           maxWalkingMinutes: formData.travelingWithKids ? formData.maxWalkingMinutes : 0,
           maxActivityMinutes: formData.travelingWithKids ? formData.maxActivityMinutes : 0,
+          // Phase 2: Logistics & Equipment
+          carSeatNeeds: formData.travelingWithKids ? formData.carSeatNeeds : 'none',
+          flightTimePreference: formData.flightTimePreference,
+          accommodationNeeds: formData.accommodationNeeds,
+          isSingleParent: formData.travelingWithKids ? formData.isSingleParent : false,
+          kidHeightsInches: formData.travelingWithKids ? formData.kidHeightsInches : [],
         },
       });
 
@@ -540,17 +562,19 @@ const TripWizard = () => {
       case 3:
         return <KidsStep formData={formData} updateFormData={updateFormData} />;
       case 4:
-        return <InterestsStep formData={formData} updateFormData={updateFormData} />;
+        return <LogisticsStep formData={formData} updateFormData={updateFormData} />;
       case 5:
-        return <PreferencesStep formData={formData} updateFormData={updateFormData} />;
+        return <InterestsStep formData={formData} updateFormData={updateFormData} />;
       case 6:
+        return <PreferencesStep formData={formData} updateFormData={updateFormData} />;
+      case 7:
         return (
           <ContextStep
             extraContext={formData.extraContext}
             onChange={(value) => updateFormData({ extraContext: value })}
           />
         );
-      case 7:
+      case 8:
         return <ReviewStep formData={formData} />;
       default:
         return null;

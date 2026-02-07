@@ -89,6 +89,12 @@ const TripDetailsSchema = z.object({
   bedtime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   maxWalkingMinutes: z.number().int().min(0).max(180).optional(),
   maxActivityMinutes: z.number().int().min(0).max(480).optional(),
+  // Phase 2: Logistics & Equipment
+  carSeatNeeds: z.string().optional(),
+  flightTimePreference: z.string().optional(),
+  accommodationNeeds: z.array(z.string()).optional().default([]),
+  isSingleParent: z.boolean().optional().default(false),
+  kidHeightsInches: z.array(z.number()).optional().default([]),
 });
 
 // Enhanced activity schema with booking, seasonal, and accessibility info
@@ -697,6 +703,25 @@ ${hasKids ? '- Include family activities during leisure time' : ''}`;
     systemPrompt += `\n\n⏱️ ACTIVITY DURATION LIMIT: Max ${tripDetails.maxActivityMinutes} minutes per single activity.`;
   }
 
+  // Phase 2: Logistics & Equipment
+  if (tripDetails.carSeatNeeds && tripDetails.carSeatNeeds !== 'none') {
+    systemPrompt += `\n\n🚗 CAR SEAT REQUIREMENT: ${tripDetails.carSeatNeeds}
+- Prioritize transport options that provide car seats or are car-seat friendly (private transfers).
+- Note if rideshares in the area typically have car seats available.`;
+  }
+
+  if (tripDetails.isSingleParent) {
+    systemPrompt += `\n\n👤 SINGLE PARENT TRIP:
+- Avoid overly complex logistics or split locations.
+- Ensure all locations are manageable for one adult with kids.
+- Suggest "parent helper" services if available (hotel babysitting, supervised kids clubs).`;
+  }
+
+  if (tripDetails.kidHeightsInches && tripDetails.kidHeightsInches.length > 0) {
+    systemPrompt += `\n\n📏 KID HEIGHTS: ${tripDetails.kidHeightsInches.join(', ')}"
+- Check height restrictions for any theme park rides or adventure activities.`;
+  }
+
   // Distance and transit requirements
   systemPrompt += `\n\nDISTANCE AND TRANSIT REQUIREMENTS:
 For EVERY activity, include:
@@ -765,7 +790,9 @@ ${tripDetails.foodAllergies?.length > 0 ? `- ⚠️ ALLERGIES: ${tripDetails.foo
 ${tripDetails.sensorySensitivities?.length > 0 ? `- 🧠 SENSORY NEEDS: ${tripDetails.sensorySensitivities.join(', ')}` : ''}
 ${tripDetails.bedtime ? `- 🌙 BEDTIME: ${tripDetails.bedtime}` : ''}
 ${tripDetails.maxWalkingMinutes ? `- 🚶 WALKING LIMIT: Max ${tripDetails.maxWalkingMinutes} min` : ''}
-${tripDetails.maxActivityMinutes ? `- ⏱️ ACTIVITY LIMIT: Max ${tripDetails.maxActivityMinutes} min` : ''}`;
+${tripDetails.maxActivityMinutes ? `- ⏱️ ACTIVITY LIMIT: Max ${tripDetails.maxActivityMinutes} min` : ''}
+${tripDetails.carSeatNeeds && tripDetails.carSeatNeeds !== 'none' ? `- 🚗 CAR SEATS: ${tripDetails.carSeatNeeds}` : ''}
+${tripDetails.isSingleParent ? `- 👤 SINGLE PARENT TRIP` : ''}`;
 
   if (safeExtraContext) {
     userPrompt += `
