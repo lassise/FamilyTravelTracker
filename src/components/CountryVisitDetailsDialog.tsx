@@ -154,8 +154,16 @@ const CountryVisitDetailsDialog = ({
       setPendingCityAdditions([]);
       setPendingCityDeletions([]);
       setPendingFamilyMemberChanges({});
+
+      // Automatically add a new visit draft if there are no existing visits
+      // This makes the "Add Details" button flow immediately into adding a trip
+      setTimeout(() => {
+        if (visitDetails.length === 0 && newVisits.length === 0) {
+          setNewVisits([createNewVisitDraft(initialFamilyMemberIds)]);
+        }
+      }, 100); // Small delay to ensure fetch completes first
     }
-  }, [open, fetchData]);
+  }, [open, fetchData, initialFamilyMemberIds]);
 
   /**
    * Creates a new visit draft. Pre-fills familyMemberIds from initialFamilyMemberIds
