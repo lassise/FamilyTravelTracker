@@ -104,7 +104,30 @@ export function ScanningDialog({ open, onOpenChange }: ScanningDialogProps) {
         }
     };
 
-    // ... existing handlers
+    const handleAccept = (suggestion: TripSuggestion) => {
+        // In a real implementation, this would save to the database
+        // For now, we simulate success
+        toast({
+            title: "Trip Added",
+            description: `Successfully added ${suggestion.tripName} to your history.`,
+        });
+
+        const remaining = suggestions.filter(s => s.id !== suggestion.id);
+        setSuggestions(remaining);
+
+        if (remaining.length === 0) {
+            setStage('complete');
+        }
+    };
+
+    const handleReject = (suggestion: TripSuggestion) => {
+        const remaining = suggestions.filter(s => s.id !== suggestion.id);
+        setSuggestions(remaining);
+
+        if (remaining.length === 0) {
+            setStage('complete');
+        }
+    };
 
     const renderContent = () => {
         switch (stage) {
@@ -155,8 +178,6 @@ export function ScanningDialog({ open, onOpenChange }: ScanningDialogProps) {
 
             // ... other cases remain same
             case 'scanning_photos':
-                return (
-// ... (rest of the file content matches existing, essentially just replacing the top part and initial case)
                 return (
                     <div className="flex flex-col items-center justify-center py-12 space-y-6 text-center">
                         <div className="p-4 bg-blue-100 rounded-full text-blue-600 animate-bounce">
