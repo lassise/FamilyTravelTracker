@@ -30,7 +30,6 @@ export interface NewVisitDraft {
     cities: string[];
     familyMemberIds: string[];
     highlight: string;
-    whyItMattered: string;
 }
 
 export interface VisitDetail {
@@ -45,7 +44,6 @@ export interface VisitDetail {
     approximate_year?: number | null;
     is_approximate?: boolean;
     highlight?: string | null;
-    why_it_mattered?: string | null;
 }
 
 export interface CityVisit {

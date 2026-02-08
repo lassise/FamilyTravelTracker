@@ -170,7 +170,6 @@ const CountryVisitDetailsDialog = ({
     cities: [],
     familyMemberIds: [...preSelectedMemberIds],
     highlight: "",
-    whyItMattered: "",
   }), []);
 
   const handleAddNewVisitDraft = useCallback(() => {
@@ -236,12 +235,11 @@ const CountryVisitDetailsDialog = ({
         }
 
         // Update the journal fields separately (in case RPC doesn't support them yet)
-        if (draft.highlight || draft.whyItMattered) {
+        if (draft.highlight) {
           const { error: updateError } = await supabase
             .from("country_visit_details")
             .update({
               highlight: draft.highlight || null,
-              why_it_mattered: draft.whyItMattered || null
             })
             .eq("id", insertedVisit.id);
 
@@ -993,17 +991,7 @@ const CountryVisitDetailsDialog = ({
                                         />
                                       </div>
                                     </div>
-                                    <div>
-                                      <Label className="text-xs mb-1 block">Why it mattered</Label>
-                                      <div className="flex gap-2">
-                                        <Input
-                                          value={(pendingChanges[visit.id]?.why_it_mattered as string | undefined) ?? visit.why_it_mattered ?? ""}
-                                          onChange={(e) => handleUpdateVisit(visit.id, "why_it_mattered", e.target.value, visit)}
-                                          className="h-8 text-sm bg-background/50"
-                                          placeholder="Why is this trip special?"
-                                        />
-                                      </div>
-                                    </div>
+
                                   </div>
                                 </div>
 
@@ -1047,53 +1035,100 @@ const CountryVisitDetailsDialog = ({
                                     <MapPin className="w-3 h-3" />
                                     Cities (optional)
                                   </Label>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" size="sm" className="w-full justify-start">
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add a city...
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[280px] p-0" align="start">
-                                      <Command>
-                                        <CommandInput placeholder="Search or type city name..." />
-                                        <CommandList className="max-h-[300px] overflow-y-auto">
-                                          <CommandEmpty>
-                                            <Button
-                                              variant="ghost"
-                                              className="w-full justify-start"
-                                              onClick={(e) => {
-                                                const input = (e.target as HTMLElement).closest('[cmdk-root]')?.querySelector('input');
-                                                if (input?.value) handleAddCity(input.value);
-                                              }}
-                                            >
-                                              <Plus className="w-4 h-4 mr-2" />
-                                              Add custom city
-                                            </Button>
-                                          </CommandEmpty>
-                                          <CommandGroup>
-                                            {cities
-                                              .filter(
-                                                (city) =>
-                                                  !cityVisits.some(
-                                                    (c) => c.city_name.toLowerCase() === city.toLowerCase()
-                                                  )
-                                              )
-                                              .map((city) => (
-                                                <CommandItem
-                                                  key={city}
-                                                  value={city}
-                                                  onSelect={() => handleAddCity(city)}
-                                                >
-                                                  <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
-                                                  {city}
-                                                </CommandItem>
-                                              ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button variant="outline" size="sm" className="justify-start">
+                                          <Plus className="w-4 h-4 mr-2" />
+                                          Add a city...
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-[280px] p-0" align="start">
+                                        <Command>
+                                          <CommandInput placeholder="Search or type city name..." />
+                                          <CommandList className="max-h-[300px] overflow-y-auto">
+                                            <CommandEmpty>
+                                              <Button
+                                                variant="ghost"
+                                                className="w-full justify-start"
+                                                onClick={(e) => {
+                                                  const input = (e.target as HTMLElement).closest('[cmdk-root]')?.querySelector('input');
+                                                  if (input?.value) handleAddCity(input.value);
+                                                }}
+                                              >
+                                                <Plus className="w-4 h-4 mr-2" />
+                                                Add custom city
+                                              </Button>
+                                            </CommandEmpty>
+                                            <CommandGroup>
+                                              {cities
+                                                .filter(
+                                                  (city) =>
+                                                    !cityVisits.some(
+                                                      (c) => c.city_name.toLowerCase() === city.toLowerCase()
+                                                    ) &&
+                                                    !pendingCityAdditions.some(
+                                                      (c) => c.toLowerCase() === city.toLowerCase()
+                                                    )
+                                                )
+                                                .map((city) => (
+                                                  <CommandItem
+                                                    key={city}
+                                                    value={city}
+                                                    onSelect={() => handleAddCity(city)}
+                                                  >
+                                                    <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
+                                                    {city}
+                                                  </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                          </CommandList>
+                                        </Command>
+                                      </PopoverContent>
+                                    </Popover>
+
+                                    {/* Existing Cities */}
+                                    {cityVisits
+                                      .filter((c) => !pendingCityDeletions.includes(c.id))
+                                      .map((c) => (
+                                        <Badge key={c.id} variant="secondary" className="gap-1 pr-1">
+                                          {c.city_name}
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteCity(c.id);
+                                            }}
+                                            className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
+                                          >
+                                            <X className="w-3 h-3" />
+                                            <span className="sr-only">Remove {c.city_name}</span>
+                                          </button>
+                                        </Badge>
+                                      ))}
+
+                                    {/* Pending Additions */}
+                                    {pendingCityAdditions.map((cityName, i) => (
+                                      <Badge
+                                        key={`pending-${i}`}
+                                        variant="secondary"
+                                        className="gap-1 pr-1 border-dashed border-secondary-foreground/20 bg-secondary/60"
+                                      >
+                                        {cityName}
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPendingCityAdditions((prev) =>
+                                              prev.filter((_, idx) => idx !== i)
+                                            );
+                                          }}
+                                          className="ml-1 hover:bg-muted rounded-full p-0.5 transition-colors"
+                                        >
+                                          <X className="w-3 h-3" />
+                                          <span className="sr-only">Remove {cityName}</span>
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             </CardContent>

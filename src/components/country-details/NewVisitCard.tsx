@@ -252,15 +252,7 @@ export const NewVisitCard = ({
                                     placeholder="What was the best moment?"
                                 />
                             </div>
-                            <div>
-                                <Label className="text-xs mb-1 block">Why it mattered (e.g. "First family hike")</Label>
-                                <Input
-                                    value={draft.whyItMattered}
-                                    onChange={(e) => onUpdate(draft.id, { whyItMattered: e.target.value })}
-                                    className="h-8 text-sm bg-background/50"
-                                    placeholder="Why is this trip special?"
-                                />
-                            </div>
+
                         </div>
                     </div>
                 </div>

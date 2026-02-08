@@ -21,6 +21,30 @@ interface ExtractedTripData {
   }>;
 }
 
+const systemPrompt = `You are an expert travel assistant. Your job is to analyze travel documents (boarding passes, hotel reservations, itineraries) and extract structured trip information.
+
+CRITICAL RULES FOR DATES:
+1. TRIP START DATE: This is the date the traveler ARRIVES in the destination country. 
+   - If a flight leaves the home country on May 10 and lands in the destination on May 11, the 'start_date' MUST be May 11.
+2. TRIP END DATE: This is the date the traveler DEPARTS from the destination country.
+3. YEAR DETECTION: Look VERY carefully for the year (e.g., "2024"). If you see "2024" in the text near the dates, DO NOT use the current year (2026). Use the year found in the text.
+4. DURATION: If you see "3 nights" or similar, ensure the date range matches that duration.
+
+OTHER RULES:
+- DESTINATION: Identify the final destination country and city. Ignore layovers in the 'homeCountry'.
+- SOURCE: Identify if this is a 'flight', 'hotel', or 'general' itinerary.
+- OUTPUT: Return ONLY a valid JSON object with a "trips" array.`;
+
+const buildUserPrompt = (text: string, homeCountry?: string) => `
+Analyze this travel document:
+Home Country: ${homeCountry || 'Not Specified'}
+Current Year (for reference only): 2026
+
+DOCUMENT TEXT:
+${text}
+
+Return JSON with "trips" array.`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -50,7 +74,7 @@ serve(async (req) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `${systemPrompt}\n\n${userPrompt}`
+            text: `${systemPrompt}\n\n${buildUserPrompt(text, homeCountry)}`
           }]
         }],
         generationConfig: {

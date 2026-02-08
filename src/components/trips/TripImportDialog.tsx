@@ -2,8 +2,10 @@ import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Upload, FileText } from "lucide-react";
+import { Loader2, Upload, FileText, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as pdfjsLib from 'pdfjs-dist';
 import { getAirportInfo, extractAirportCodes, isSameCountry } from "@/lib/airportData";
@@ -23,6 +25,7 @@ export interface ParsedTravelData {
     source: 'flight' | 'hotel' | 'country';
     isDomestic: boolean;
     isDuplicate?: boolean;
+    missingYear?: boolean;
 }
 
 interface TripImportDialogProps {
@@ -55,6 +58,12 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
     const [pasteContent, setPasteContent] = useState("");
     const [files, setFiles] = useState<File[]>([]);
     const [processingStatus, setProcessingStatus] = useState<string>("");
+
+    // Missing Year Confirmation State
+    const [showYearInput, setShowYearInput] = useState(false);
+    const [manualYear, setManualYear] = useState<string>(new Date().getFullYear().toString());
+    const [pendingParsedData, setPendingParsedData] = useState<ParsedTravelData | null>(null);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
 
@@ -84,22 +93,43 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
     };
 
     // Extract dates in various formats
-    const extractDates = (text: string): { startDate: string | null; endDate: string | null } => {
-        // Helper to parse various date formats
-        const parseDateFromMatch = (dateText: string): string | null => {
-            // Remove day names (Monday, Tuesday, etc.)
-            const cleanedText = dateText.replace(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s*/i, '').trim();
+    const extractDates = (text: string): { startDate: string | null; endDate: string | null; missingYear: boolean } => {
+        let missingYear = false;
+        const currentYear = new Date().getFullYear();
 
-            // Try "Month Day, Year" (e.g., "March 25, 2025")
-            const monthDayYear = cleanedText.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
-            if (monthDayYear) {
-                const monthNum = parseMonth(monthDayYear[1]);
-                if (monthNum) {
-                    return `${monthDayYear[3]}-${monthNum}-${monthDayYear[2].padStart(2, '0')}`;
-                }
+        const parseMonth = (month: string): string | null => {
+            const months: Record<string, string> = {
+                'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
+                'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
+                'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+            };
+            return months[month.toLowerCase().substring(0, 3)] || null;
+        };
+
+        const createDateString = (year: string | undefined, month: string, day: string): string | null => {
+            const monthNum = parseMonth(month);
+            if (!monthNum) return null;
+
+            let finalYear = year;
+            if (!finalYear) {
+                finalYear = currentYear.toString();
+                missingYear = true;
+            }
+            return `${finalYear}-${monthNum}-${day.padStart(2, '0')}`;
+        };
+
+        const parseDateFromMatch = (dateText: string): string | null => {
+            // Remove day names
+            const cleanedText = dateText.replace(/(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\.?,?\s*/i, '').trim();
+
+            // Try "Month Day, Year" or "Month Day"
+            // Matches: "May 10, 2025", "May 10"
+            const match = cleanedText.match(/([A-Za-z]+)\s+(\d{1,2})(?:,?\s*(\d{4}))?/);
+            if (match) {
+                return createDateString(match[3], match[1], match[2]);
             }
 
-            // Try "M/D/YYYY" or "MM/DD/YYYY" (e.g., "3/25/2025")
+            // M/D/YYYY
             const slashDate = cleanedText.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
             if (slashDate) {
                 return `${slashDate[3]}-${slashDate[1].padStart(2, '0')}-${slashDate[2].padStart(2, '0')}`;
@@ -108,92 +138,68 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
             return null;
         };
 
-        // ARRIVAL / DEPARTURE pattern (e.g., "ARRIVAL Tuesday, March 25, 2025")
-        const arrivalMatch = text.match(/arrival[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
-        const departureMatch = text.match(/departure[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
+        // ARRIVAL / DEPARTURE pattern
+        const arrivalMatch = text.match(/arrival[:\s]+(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?([A-Za-z]+\s+\d{1,2}(?:,?\s+\d{4})?)/i);
+        const departureMatch = text.match(/departure[:\s]+(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?([A-Za-z]+\s+\d{1,2}(?:,?\s+\d{4})?)/i);
 
         if (arrivalMatch || departureMatch) {
             return {
                 startDate: arrivalMatch ? parseDateFromMatch(arrivalMatch[1]) : null,
                 endDate: departureMatch ? parseDateFromMatch(departureMatch[1]) : null,
+                missingYear
             };
         }
 
-        // Check-in / Check-out pattern (e.g., "Check in Sep 7, 2022")
-        const checkInMatch = text.match(/check\s*-?\s*in[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
-        const checkOutMatch = text.match(/check\s*-?\s*out[:\s]+(?:(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+)?([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
+        // Check-in / Check-out pattern
+        const checkInMatch = text.match(/check\s*-?\s*in[:\s]+(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?([A-Za-z]+\s+\d{1,2}(?:,?\s+\d{4})?)/i);
+        const checkOutMatch = text.match(/check\s*-?\s*out[:\s]+(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?([A-Za-z]+\s+\d{1,2}(?:,?\s+\d{4})?)/i);
 
         if (checkInMatch || checkOutMatch) {
             return {
                 startDate: checkInMatch ? parseDateFromMatch(checkInMatch[1]) : null,
                 endDate: checkOutMatch ? parseDateFromMatch(checkOutMatch[1]) : null,
+                missingYear
             };
         }
 
-        // Date range pattern (e.g., "Sep 7–11, 2022")
-        const rangeMatch = text.match(/([A-Za-z]+)\s+(\d{1,2})[–\-](\d{1,2}),?\s+(\d{4})/i);
+        // Date range pattern (Sep 7-11 or Sep 7 - 11, 2024)
+        const rangeMatch = text.match(/([A-Za-z]+)\s+(\d{1,2})\s*[–\-]\s*(\d{1,2})(?:,?\s+(\d{4}))?/i);
         if (rangeMatch) {
             const [, month, startDay, endDay, year] = rangeMatch;
-            const monthNum = parseMonth(month);
-            if (monthNum) {
-                return {
-                    startDate: `${year}-${monthNum}-${startDay.padStart(2, '0')}`,
-                    endDate: `${year}-${monthNum}-${endDay.padStart(2, '0')}`,
-                };
+            const sDate = createDateString(year, month, startDay);
+            const eDate = createDateString(year, month, endDay);
+            if (sDate && eDate) {
+                return { startDate: sDate, endDate: eDate, missingYear };
             }
         }
 
-        // Full multi-date range (e.g., "Jun 4, 2018 ... Jun 12, 2018")
-        const allDates = text.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/gi);
+        // Full multi-date range (e.g. "May 10 ... May 11")
+        const allDates = text.match(/([A-Za-z]+)\s+(\d{1,2})(?:,?\s*(\d{4}))?/gi);
         if (allDates && allDates.length >= 2) {
-            const startDate = parseDateString(allDates[0]);
-            // Take the last date that is different from the first one as potential end date
-            let endDate = null;
-            for (let i = allDates.length - 1; i > 0; i--) {
-                const candidate = parseDateString(allDates[i]);
-                if (candidate && candidate !== startDate) {
-                    endDate = candidate;
-                    break;
-                }
+            // Find ALL date components in the text to avoid losing the year
+            const datesWithYears: string[] = [];
+            const regex = /([A-Za-z]+)\s+(\d{1,2})(?:,?\s*(\d{4}))?/gi;
+            let m;
+            while ((m = regex.exec(text)) !== null) {
+                const d = createDateString(m[3], m[1], m[2]);
+                if (d) datesWithYears.push(d);
             }
-            if (startDate) return { startDate, endDate };
+
+            if (datesWithYears.length >= 2) {
+                const startDate = datesWithYears[0];
+                const endDate = datesWithYears[datesWithYears.length - 1];
+                return { startDate, endDate, missingYear };
+            }
         }
 
-        // Single Month Day, Year format anywhere in text (e.g., "Jan 29, 2026")
-        const monthDayMatch = text.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i);
+        // Single Month Day
+        const monthDayMatch = text.match(/([A-Za-z]+)\s+(\d{1,2})(?:,?\s*(\d{4}))?/i);
         if (monthDayMatch) {
-            const [, month, day, year] = monthDayMatch;
-            const monthNum = parseMonth(month);
-            if (monthNum) {
-                return {
-                    startDate: `${year}-${monthNum}-${day.padStart(2, '0')}`,
-                    endDate: null,
-                };
-            }
+            const startDate = createDateString(monthDayMatch[3], monthDayMatch[1], monthDayMatch[2]);
+            if (startDate) return { startDate, endDate: null, missingYear };
         }
 
-        return { startDate: null, endDate: null };
-    };
-
-    const parseMonth = (month: string): string | null => {
-        const months: Record<string, string> = {
-            'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04',
-            'may': '05', 'jun': '06', 'jul': '07', 'aug': '08',
-            'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
-        };
-        return months[month.toLowerCase().substring(0, 3)] || null;
-    };
-
-    const parseDateString = (dateStr: string): string | null => {
-        const match = dateStr.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
-        if (match) {
-            const [, month, day, year] = match;
-            const monthNum = parseMonth(month);
-            if (monthNum) {
-                return `${year}-${monthNum}-${day.padStart(2, '0')}`;
-            }
-        }
-        return null;
+        return { startDate: null, endDate: null, missingYear: false };
     };
 
     // Find country name in text
@@ -266,8 +272,12 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
         if (!data) return 'none';
 
         // High Confidence Scenarios:
-        // 1. It's a flight with identified airports (source 'flight' implies airports were found)
-        if (data.source === 'flight') return 'high';
+        // 1. It's a domestic flight (identified airports in same home country)
+        if (data.source === 'flight') {
+            if (data.isDomestic) return 'high';
+            // International flights should use AI to resolve complex stopovers/overnight logistics
+            return 'low';
+        }
 
         // 2. Explicit address marker found in text
         if (text.match(/address[:\s]+/i)) return 'high';
@@ -276,7 +286,7 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
         if (text.match(/check\s*-?\s*in/i) && data.startDate) return 'high';
 
         // Low Confidence:
-        // Just matched a country name loosely in the text (e.g. "I love France")
+        // Just matched a country name loosely in the text
         return 'low';
     };
 
@@ -393,7 +403,43 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
         }
     };
 
+    const handleYearConfirm = () => {
+        if (pendingParsedData && manualYear) {
+            const year = parseInt(manualYear) || new Date().getFullYear();
+            const replaceYear = (dateStr: string | null) => {
+                if (!dateStr) return null;
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    // Replace the year part (index 0)
+                    return `${year}-${parts[1]}-${parts[2]}`;
+                }
+                return dateStr;
+            };
+
+            const updatedData: ParsedTravelData = {
+                ...pendingParsedData,
+                startDate: replaceYear(pendingParsedData.startDate),
+                endDate: replaceYear(pendingParsedData.endDate),
+                missingYear: false // Resolved
+            };
+
+            // Reset state
+            setPendingParsedData(null);
+            setShowYearInput(false);
+
+            // Proceed
+            handleSuccess(updatedData);
+        }
+    };
+
     const handleSuccess = async (parsedData: ParsedTravelData) => {
+        // If missing year, pause and ask user
+        if (parsedData.missingYear && !showYearInput) {
+            setPendingParsedData(parsedData);
+            setShowYearInput(true);
+            return;
+        }
+
         let isDuplicate = false;
 
         // Check for duplicates
@@ -447,7 +493,7 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                     title: "Duplicate Trip Detected",
                     description: `A trip to ${parsedData.country} with these exact dates already exists. please review details.`,
                     duration: 6000,
-                    variant: "default", // Or maybe warning style?
+                    variant: "default",
                 });
             } else {
                 toast({
@@ -460,6 +506,8 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
             setOpen(false);
             setPasteContent("");
             setFiles([]);
+            setPendingParsedData(null);
+            setShowYearInput(false);
             onCountryDetected({ ...parsedData, isDuplicate });
         }
     };
@@ -496,6 +544,7 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                         endDate: dates.endDate,
                         tripName: `Trip to ${arrivalInfo.city}`,
                         source: 'flight',
+                        missingYear: dates.missingYear,
                         isDomestic: isSameCountry(departureCode, arrivalCode),
                     };
                 }
@@ -515,6 +564,7 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                     endDate: dates.endDate,
                     tripName: placeName ? `Stay at ${placeName}` : `Trip to ${countryInfo.city || countryInfo.country}`,
                     source: 'hotel',
+                    missingYear: dates.missingYear,
                     isDomestic: false,
                 };
             }
@@ -592,15 +642,42 @@ Examples:
                 </Tabs>
 
                 <div className="flex flex-col gap-2">
-                    {loading && (
-                        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>{processingStatus}</span>
+                    {showYearInput ? (
+                        <div className="bg-muted p-4 rounded-md space-y-4">
+                            <div className="flex items-center gap-2 text-amber-600">
+                                <Calendar className="h-5 w-5" />
+                                <h4 className="font-semibold text-sm">Valid Year Required</h4>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                We detected dates from your text, but the year was missing.
+                                Please confirm which year this trip coincides with:
+                            </p>
+                            <div className="flex gap-2 items-end">
+                                <div className="grid w-full max-w-sm items-center gap-1.5">
+                                    <Label htmlFor="year">Trip Year</Label>
+                                    <Input
+                                        type="number"
+                                        id="year"
+                                        value={manualYear}
+                                        onChange={(e) => setManualYear(e.target.value)}
+                                    />
+                                </div>
+                                <Button onClick={handleYearConfirm}>Confirm Year</Button>
+                            </div>
                         </div>
+                    ) : (
+                        <>
+                            {loading && (
+                                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>{processingStatus}</span>
+                                </div>
+                            )}
+                            <Button onClick={processContent} disabled={loading} className="w-full">
+                                {loading ? "Analyzing..." : "Detect Country"}
+                            </Button>
+                        </>
                     )}
-                    <Button onClick={processContent} disabled={loading} className="w-full">
-                        {loading ? "Analyzing..." : "Detect Country"}
-                    </Button>
                 </div>
             </DialogContent>
         </Dialog>
