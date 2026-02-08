@@ -1,3 +1,4 @@
+/// <reference lib="deno.ns" />
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
@@ -95,6 +96,16 @@ const TripDetailsSchema = z.object({
   accommodationNeeds: z.array(z.string()).optional().default([]),
   isSingleParent: z.boolean().optional().default(false),
   kidHeightsInches: z.array(z.number()).optional().default([]),
+  isFlexibleDates: z.boolean().optional().default(false),
+  preferredSeason: z.string().nullable().optional(),
+  tripLegs: z.array(z.object({
+    country_name: z.string(),
+    start_date: z.string().nullable().optional(),
+    end_date: z.string().nullable().optional(),
+    cities: z.array(z.string()).optional(),
+    duration_days: z.number().optional(),
+    order: z.number(),
+  })).optional().default([]),
 });
 
 // Enhanced activity schema with booking, seasonal, and accessibility info
@@ -586,13 +597,31 @@ const buildSystemPrompt = (tripDetails: TripDetails): string => {
 
 CRITICAL RULES:
 1. You MUST use the EXACT dates provided by the user. Never suggest alternative dates.
+   (NOTE: If isFlexibleDates is true, these are placeholder dates, but still use them for the JSON structure).
 2. Return ONLY valid JSON, no markdown or additional text.
 3. Each day must have at least one activity.
 4. Be realistic about timing and travel between locations.
 5. ALWAYS include booking information and ratings when possible.
 6. For EVERY activity/tour, include a "whyItFits" explaining why it matches user preferences.
 7. Include "bestTimeToVisit" and "crowdLevel" for each attraction.
-8. Generate REAL booking URLs for activities (use Viator, GetYourGuide, TripAdvisor formats).`;
+8. Generate REAL booking URLs for activities (use Viator, GetYourGuide, TripAdvisor formats).
+9. If preferredSeason is provided and isFlexibleDates is true, prioritize activities appropriate for that season.`;
+
+  if (tripDetails.isFlexibleDates && tripDetails.preferredSeason) {
+    systemPrompt += `\n\nFLEXIBLE TRIP CONTEXT:
+- These dates are placeholders for a general plan.
+- PREFERRED SEASON: ${tripDetails.preferredSeason || 'Unknown'}
+- Focus on activities, festivals, and weather appropriate for ${tripDetails.preferredSeason || 'typical conditions'}.`;
+  }
+
+  if (tripDetails.tripLegs && tripDetails.tripLegs.length > 0) {
+    const legsSummary = tripDetails.tripLegs.map((leg: any) =>
+      `- ${leg.country_name}: ${leg.duration_days || 'unspecified'} days${leg.cities ? ` (Cities: ${leg.cities.join(', ')})` : ''}`
+    ).join('\n');
+    systemPrompt += `\n\nTRIP ROUTE & DURATION:
+${legsSummary}
+Please ensure the itinerary respects these country allocations and the specified number of days in each.`;
+  }
 
   // Provider preferences
   if (!providerPrefs.includes('any')) {
@@ -969,13 +998,11 @@ serve(async (req: Request) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({
-        error: 'Your session has expired. Please sign in again.',
-        code: 'INVALID_TOKEN'
-      }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token', details: authError?.message }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     logCtx.userId = user.id;

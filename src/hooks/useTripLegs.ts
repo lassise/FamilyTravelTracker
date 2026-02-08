@@ -260,7 +260,7 @@ export const useTripLegs = () => {
   }, [user, deleteLegsForTrip, createLegs]);
 
   // Calculate trip dates from legs (first leg start to last leg end)
-  const calculateTripDatesFromLegs = useCallback((legs: TripLeg[] | TripLegInput[]): {
+  const calculateTripDatesFromLegs = useCallback((legs: Array<{ start_date: string; end_date: string; duration_days?: number }>): {
     start_date: string | null;
     end_date: string | null;
     total_days: number;
@@ -269,9 +269,23 @@ export const useTripLegs = () => {
       return { start_date: null, end_date: null, total_days: 0 };
     }
 
-    const sortedLegs = [...legs].sort((a, b) => 
-      new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
-    );
+    const hasAnyDates = legs.some(l => l.start_date && l.end_date);
+
+    if (!hasAnyDates) {
+      const totalDays = legs.reduce((sum, l) => sum + (l.duration_days || 0), 0);
+      return { start_date: null, end_date: null, total_days: totalDays };
+    }
+
+    const sortedLegs = [...legs]
+      .filter(l => l.start_date)
+      .sort((a, b) =>
+        new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+
+    if (sortedLegs.length === 0) {
+      const totalDays = legs.reduce((sum, l) => sum + (l.duration_days || 0), 0);
+      return { start_date: null, end_date: null, total_days: totalDays };
+    }
 
     const firstLeg = sortedLegs[0];
     const lastLeg = sortedLegs[sortedLegs.length - 1];

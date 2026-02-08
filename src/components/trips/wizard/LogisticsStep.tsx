@@ -162,33 +162,35 @@ export const LogisticsStep = ({ formData, updateFormData }: LogisticsStepProps) 
                         </div>
                     </div>
 
-                    {/* Kid Heights */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2 font-medium">
-                            <Ruler className="h-4 w-4 text-yellow-500" />
-                            <span>Kid Heights (Inches)</span>
+                    {/* Kid Heights - Only if theme parks selected */}
+                    {formData.interests.includes('theme-parks') && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 font-medium">
+                                <Ruler className="h-4 w-4 text-yellow-500" />
+                                <span>Kid Heights (Inches)</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Helpful for theme park rides</p>
+                            <div className="flex gap-2">
+                                <Input
+                                    type="number"
+                                    placeholder='e.g. 42"'
+                                    value={newHeight}
+                                    onChange={(e) => setNewHeight(e.target.value)}
+                                    className="w-24"
+                                    onKeyDown={(e) => e.key === "Enter" && addHeight()}
+                                />
+                                <Button type="button" variant="outline" size="sm" onClick={addHeight}>Add</Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {formData.kidHeightsInches?.map((height, i) => (
+                                    <Badge key={i} variant="secondary" className="gap-1">
+                                        {height}"
+                                        <span className="cursor-pointer hover:text-destructive ml-1" onClick={() => removeHeight(i)}>×</span>
+                                    </Badge>
+                                ))}
+                            </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">Helpful for theme park rides</p>
-                        <div className="flex gap-2">
-                            <Input
-                                type="number"
-                                placeholder='e.g. 42"'
-                                value={newHeight}
-                                onChange={(e) => setNewHeight(e.target.value)}
-                                className="w-24"
-                                onKeyDown={(e) => e.key === "Enter" && addHeight()}
-                            />
-                            <Button type="button" variant="outline" size="sm" onClick={addHeight}>Add</Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {formData.kidHeightsInches?.map((height, i) => (
-                                <Badge key={i} variant="secondary" className="gap-1">
-                                    {height}"
-                                    <span className="cursor-pointer hover:text-destructive ml-1" onClick={() => removeHeight(i)}>×</span>
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
+                    )}
                 </div>
             )}
         </div>

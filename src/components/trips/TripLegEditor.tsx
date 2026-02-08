@@ -29,6 +29,7 @@ export interface TripLegDraft {
   country_code: string | null;
   start_date: string;
   end_date: string;
+  duration_days?: number;
   cities: string[];
   notes: string;
 }
@@ -37,6 +38,8 @@ interface TripLegEditorProps {
   legs: TripLegDraft[];
   onLegsChange: (legs: TripLegDraft[]) => void;
   minDate?: string;
+  hasDates?: boolean;
+  hideDateInputs?: boolean;
   className?: string;
 }
 
@@ -51,7 +54,7 @@ const calculateDays = (startDate: string, endDate: string): number => {
   }
 };
 
-export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLegEditorProps) => {
+export const TripLegEditor = ({ legs, onLegsChange, minDate, hasDates = true, hideDateInputs = false, className }: TripLegEditorProps) => {
   const countries = getAllCountries();
   const [newlyAddedLegId, setNewlyAddedLegId] = useState<string | null>(null);
 
@@ -59,7 +62,7 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
     // Default new leg starts after the last leg ends
     const lastLeg = legs[legs.length - 1];
     const newStartDate = lastLeg?.end_date || "";
-    
+
     const newLegId = generateTempId();
     const newLeg: TripLegDraft = {
       id: newLegId,
@@ -67,10 +70,11 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
       country_code: null,
       start_date: newStartDate,
       end_date: "",
+      duration_days: 7,
       cities: [],
       notes: "",
     };
-    
+
     // Mark this leg as newly added so it auto-opens country selector
     setNewlyAddedLegId(newLegId);
     onLegsChange([...legs, newLeg]);
@@ -81,7 +85,7 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
   }, [legs, onLegsChange]);
 
   const updateLeg = useCallback((id: string, updates: Partial<TripLegDraft>) => {
-    onLegsChange(legs.map(leg => 
+    onLegsChange(legs.map(leg =>
       leg.id === id ? { ...leg, ...updates } : leg
     ));
   }, [legs, onLegsChange]);
@@ -102,18 +106,18 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
 
   // Calculate total trip duration
   const tripDates = legs.length > 0 ? {
-    start: legs.reduce((min, leg) => 
-      leg.start_date && (!min || leg.start_date < min) ? leg.start_date : min, 
+    start: legs.reduce((min, leg) =>
+      leg.start_date && (!min || leg.start_date < min) ? leg.start_date : min,
       ""
     ),
-    end: legs.reduce((max, leg) => 
-      leg.end_date && (!max || leg.end_date > max) ? leg.end_date : max, 
+    end: legs.reduce((max, leg) =>
+      leg.end_date && (!max || leg.end_date > max) ? leg.end_date : max,
       ""
     ),
   } : { start: "", end: "" };
 
-  const totalDays = tripDates.start && tripDates.end 
-    ? calculateDays(tripDates.start, tripDates.end) 
+  const totalDays = tripDates.start && tripDates.end
+    ? calculateDays(tripDates.start, tripDates.end)
     : 0;
 
   return (
@@ -124,8 +128,8 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4" />
             <span>
-              {tripDates.start && format(parseISO(tripDates.start), "MMM d")} 
-              {" – "} 
+              {tripDates.start && format(parseISO(tripDates.start), "MMM d")}
+              {" – "}
               {tripDates.end && format(parseISO(tripDates.end), "MMM d, yyyy")}
             </span>
           </div>
@@ -151,6 +155,8 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
             onMoveDown={() => moveLegDown(index)}
             autoOpenCountry={leg.id === newlyAddedLegId}
             onCountryOpened={() => setNewlyAddedLegId(null)}
+            hasDates={hasDates}
+            hideDateInputs={hideDateInputs}
           />
         ))}
       </div>
@@ -163,12 +169,12 @@ export const TripLegEditor = ({ legs, onLegsChange, minDate, className }: TripLe
         className="w-full border-dashed"
       >
         <Plus className="h-4 w-4 mr-2" />
-        Add {legs.length === 0 ? "Destination" : "Another Country"}
+        Add {legs.length === 0 ? "Country" : "Another Country"}
       </Button>
 
       {legs.length === 0 && (
         <p className="text-sm text-muted-foreground text-center">
-          Add at least one destination to your trip
+          Add at least one country to your trip
         </p>
       )}
     </div>
@@ -188,6 +194,8 @@ interface LegCardProps {
   onMoveDown: () => void;
   autoOpenCountry?: boolean;
   onCountryOpened?: () => void;
+  hasDates?: boolean;
+  hideDateInputs?: boolean;
 }
 
 const LegCard = ({
@@ -202,6 +210,8 @@ const LegCard = ({
   onMoveDown,
   autoOpenCountry,
   onCountryOpened,
+  hasDates = true,
+  hideDateInputs = false,
 }: LegCardProps) => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [cityInput, setCityInput] = useState("");
@@ -240,7 +250,7 @@ const LegCard = ({
   // Color palette for different legs
   const legColors = [
     "bg-blue-500",
-    "bg-emerald-500", 
+    "bg-emerald-500",
     "bg-purple-500",
     "bg-orange-500",
     "bg-pink-500",
@@ -253,7 +263,7 @@ const LegCard = ({
   return (
     <Card className="relative overflow-hidden">
       <div className={cn("absolute left-0 top-0 bottom-0 w-1", legColor)} />
-      
+
       <CardContent className="p-4">
         {/* Leg header */}
         <div className="flex items-center justify-between mb-3">
@@ -262,7 +272,7 @@ const LegCard = ({
               {index + 1}
             </span>
             <span className="text-sm font-medium text-muted-foreground">
-              {index === 0 ? "First Destination" : `Country ${index + 1}`}
+              {index === 0 ? "First Country" : `Country ${index + 1}`}
             </span>
           </div>
           <div className="flex items-center gap-1">
@@ -292,169 +302,193 @@ const LegCard = ({
         </div>
 
         <div className="space-y-4">
-            {/* Country selector */}
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Country</Label>
-              <Popover open={countryOpen} onOpenChange={setCountryOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={countryOpen}
-                    className="w-full justify-between h-10"
-                  >
-                    {selectedCountry ? (
-                      <span className="flex items-center gap-2">
-                        {(() => {
-                          const { code } = getEffectiveFlagCode(selectedCountry.name, selectedCountry.flag);
-                          return code ? (
-                            <CountryFlag countryCode={code} countryName={selectedCountry.name} size="sm" />
-                          ) : (
-                            <span>{selectedCountry.flag}</span>
-                          );
-                        })()}
-                        <span>{selectedCountry.name}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Select country...</span>
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search countries..." />
-                    <CommandList className="max-h-[300px]">
-                      <CommandEmpty>No country found.</CommandEmpty>
-                      <CommandGroup>
-                        {countries.map((country) => {
-                          const { code } = getEffectiveFlagCode(country.name, country.flag);
-                          return (
-                            <CommandItem
-                              key={country.code}
-                              value={country.name}
-                              onSelect={() => handleSelectCountry(country.name)}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  leg.country_name === country.name ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {code ? (
-                                <CountryFlag countryCode={code} countryName={country.name} size="sm" className="mr-2" />
-                              ) : (
-                                <span className="mr-2">{country.flag}</span>
-                              )}
-                              <span>{country.name}</span>
-                              <span className="ml-auto text-xs text-muted-foreground">{country.continent}</span>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Date range */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor={`start-${leg.id}`} className="text-xs text-muted-foreground">
-                  Arrive
-                </Label>
-                <Input
-                  id={`start-${leg.id}`}
-                  type="date"
-                  value={leg.start_date}
-                  min={previousLegEndDate || undefined}
-                  onChange={(e) => onUpdate({ start_date: e.target.value })}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`end-${leg.id}`} className="text-xs text-muted-foreground">
-                  Depart
-                </Label>
-                <Input
-                  id={`end-${leg.id}`}
-                  type="date"
-                  value={leg.end_date}
-                  min={leg.start_date || undefined}
-                  onChange={(e) => onUpdate({ end_date: e.target.value })}
-                  className="h-9"
-                />
-              </div>
-            </div>
-
-            {days > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {days} {days === 1 ? "day" : "days"} in {leg.country_name || "this country"}
-              </div>
-            )}
-
-            {/* Cities */}
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Cities (optional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Add a city..."
-                  value={cityInput}
-                  onChange={(e) => setCityInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addCity();
-                    }
-                  }}
-                  className="h-9"
-                />
+          {/* Country selector */}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Country</Label>
+            <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+              <PopoverTrigger asChild>
                 <Button
-                  type="button"
                   variant="outline"
-                  size="sm"
-                  onClick={addCity}
-                  disabled={!cityInput.trim()}
+                  role="combobox"
+                  aria-expanded={countryOpen}
+                  className="w-full justify-between h-10"
                 >
-                  <Plus className="h-4 w-4" />
+                  {selectedCountry ? (
+                    <span className="flex items-center gap-2">
+                      {(() => {
+                        const { code } = getEffectiveFlagCode(selectedCountry.name, selectedCountry.flag);
+                        return code ? (
+                          <CountryFlag countryCode={code} countryName={selectedCountry.name} size="sm" />
+                        ) : (
+                          <span>{selectedCountry.flag}</span>
+                        );
+                      })()}
+                      <span>{selectedCountry.name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Select country...</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
-              </div>
-              {leg.cities.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {leg.cities.map((city) => (
-                    <Badge key={city} variant="secondary" className="text-xs">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {city}
-                      <button
-                        type="button"
-                        onClick={() => removeCity(city)}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        ×
-                      </button>
-                    </Badge>
-                  ))}
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search countries..." />
+                  <CommandList className="max-h-[300px]">
+                    <CommandEmpty>No country found.</CommandEmpty>
+                    <CommandGroup>
+                      {countries.map((country) => {
+                        const { code } = getEffectiveFlagCode(country.name, country.flag);
+                        return (
+                          <CommandItem
+                            key={country.code}
+                            value={country.name}
+                            onSelect={() => handleSelectCountry(country.name)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                leg.country_name === country.name ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {code ? (
+                              <CountryFlag countryCode={code} countryName={country.name} size="sm" className="mr-2" />
+                            ) : (
+                              <span className="mr-2">{country.flag}</span>
+                            )}
+                            <span>{country.name}</span>
+                            <span className="ml-auto text-xs text-muted-foreground">{country.continent}</span>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {!hideDateInputs && (
+            <>
+              {/* Date range or Duration */}
+              {hasDates ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor={`start-${leg.id}`} className="text-xs text-muted-foreground">
+                      Arrive
+                    </Label>
+                    <Input
+                      id={`start-${leg.id}`}
+                      type="date"
+                      value={leg.start_date}
+                      min={previousLegEndDate || undefined}
+                      onChange={(e) => onUpdate({ start_date: e.target.value })}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`end-${leg.id}`} className="text-xs text-muted-foreground">
+                      Depart
+                    </Label>
+                    <Input
+                      id={`end-${leg.id}`}
+                      type="date"
+                      value={leg.end_date}
+                      min={leg.start_date || undefined}
+                      onChange={(e) => onUpdate({ end_date: e.target.value })}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor={`duration-${leg.id}`} className="text-xs text-muted-foreground">
+                    Approximate Duration (Days)
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id={`duration-${leg.id}`}
+                      type="number"
+                      min="1"
+                      max="90"
+                      value={leg.duration_days || 0}
+                      onChange={(e) => onUpdate({ duration_days: parseInt(e.target.value) || 0 })}
+                      className="h-10 w-24"
+                    />
+                    <span className="text-sm text-muted-foreground">days</span>
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Remove button */}
-          <div className="flex justify-end pt-2 border-t mt-4">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={onRemove}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Remove
-            </Button>
-          </div>
+              {hasDates && days > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {days} {days === 1 ? "day" : "days"} in {leg.country_name || "this country"}
+                </div>
+              )}
+
+              {/* Cities */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Cities (optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a city..."
+                    value={cityInput}
+                    onChange={(e) => setCityInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCity();
+                      }
+                    }}
+                    className="h-9"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addCity}
+                    disabled={!cityInput.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {leg.cities.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {leg.cities.map((city: any) => (
+                      <Badge key={city} variant="secondary" className="text-xs">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {city}
+                        <button
+                          type="button"
+                          onClick={() => removeCity(city)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Remove button */}
+        <div className="flex justify-end pt-2 border-t mt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={onRemove}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Remove
+          </Button>
+        </div>
       </CardContent>
-    </Card>
+    </Card >
   );
 };
 

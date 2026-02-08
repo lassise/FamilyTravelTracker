@@ -20,8 +20,8 @@ const EXAMPLE_PROMPTS = [
 
 export function ContextStep({ extraContext, onChange }: ContextStepProps) {
   const insertExample = (example: string) => {
-    const newValue = extraContext 
-      ? `${extraContext}\n${example}` 
+    const newValue = extraContext
+      ? `${extraContext}\n${example}`
       : example;
     onChange(newValue);
   };
@@ -37,36 +37,13 @@ export function ContextStep({ extraContext, onChange }: ContextStepProps) {
           id="extraContext"
           value={extraContext}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Tell us anything important about your trip in plain English. For example: special needs, dietary restrictions, mobility concerns, travel style preferences..."
+          placeholder="E.g. Birthday Party for a kid who loves dinosaurs, or any special needs, dietary restrictions, and travel style preferences..."
           className="min-h-[120px] resize-none"
         />
         <p className="text-xs text-muted-foreground">
           This helps our AI create a more personalized itinerary for you.
         </p>
       </div>
-
-      <Card className="bg-muted/50">
-        <CardContent className="pt-4">
-          <div className="flex items-start gap-2 mb-3">
-            <Lightbulb className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
-            <p className="text-sm text-muted-foreground">
-              Click any example below to add it to your context:
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLE_PROMPTS.map((example, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => insertExample(example)}
-                className="text-xs px-2 py-1 rounded-md bg-background border hover:bg-accent transition-colors text-left"
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

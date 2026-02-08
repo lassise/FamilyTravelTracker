@@ -329,17 +329,19 @@ const Dashboard = () => {
             </Card>
 
             <Card
-              className="cursor-pointer hover:shadow-md transition-shadow hover:border-primary/50 group"
+              className="cursor-pointer hover:shadow-md transition-all group opacity-80"
               onClick={() => navigate("/trips/new")}
             >
-              <CardContent className="flex flex-col items-center gap-3 p-4 text-center relative">
-                <Crown className="absolute top-2 right-2 h-4 w-4 text-amber-500" title="Premium" />
+              <CardContent className="flex flex-col items-center gap-3 p-4 text-center relative overflow-hidden">
+                <div className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary/10 rounded text-[9px] font-bold text-primary uppercase tracking-tighter">
+                  Soon
+                </div>
                 <div className="w-12 h-12 rounded-full bg-gradient-hero flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Sparkles className="h-6 w-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">AI Planner</h3>
-                  <p className="text-xs text-muted-foreground">Plan trip</p>
+                  <p className="text-xs text-muted-foreground italic">Coming soon</p>
                 </div>
               </CardContent>
             </Card>
@@ -349,7 +351,7 @@ const Dashboard = () => {
               onClick={() => navigate("/flights")}
             >
               <CardContent className="flex flex-col items-center gap-3 p-4 text-center relative">
-                <Crown className="absolute top-2 right-2 h-4 w-4 text-amber-500" title="Premium" />
+                <Crown className="absolute top-2 right-2 h-4 w-4 text-amber-500" />
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <PlaneTakeoff className="h-6 w-6 text-primary" />
                 </div>

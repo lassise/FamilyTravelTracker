@@ -44,23 +44,23 @@ interface DefaultProfile {
 
 const DEFAULT_PROFILES: DefaultProfile[] = [
   {
-    name: "Short Domestic Trips",
+    name: "Quick Getaway",
     is_active: true,
     is_default: true,
     trip_length_min: 1,
     trip_length_max: 5,
-    domestic_vs_international: 'domestic',
+    domestic_vs_international: 'both',
     preferred_seat_types: ['economy', 'premium_economy'],
     preferred_seat_features: ['aisle', 'extra_legroom'],
     prefer_nonstop: true,
     max_stops: 1,
     pace: 'moderate',
     budget_level: 'moderate',
-    kid_friendly_priority: 'moderate',
+    kid_friendly_priority: 'low',
     custom_preferences: {},
   },
   {
-    name: "Long International Trips",
+    name: "International Adventure",
     is_active: false,
     is_default: true,
     trip_length_min: 7,
@@ -72,7 +72,7 @@ const DEFAULT_PROFILES: DefaultProfile[] = [
     max_stops: 1,
     pace: 'relaxed',
     budget_level: 'moderate',
-    kid_friendly_priority: 'high',
+    kid_friendly_priority: 'moderate',
     custom_preferences: {},
   },
 ];
@@ -114,7 +114,7 @@ export const useTravelProfiles = () => {
           .select();
 
         if (insertError) throw insertError;
-        
+
         const typedInserted = inserted as TravelProfile[];
         setProfiles(typedInserted);
         setActiveProfile(typedInserted.find(p => p.is_active) || null);

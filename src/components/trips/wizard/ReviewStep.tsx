@@ -2,12 +2,12 @@ import { Badge } from "@/components/ui/badge";
 import { TripFormData } from "../TripWizard";
 import CountryFlag from "@/components/common/CountryFlag";
 import { getEffectiveFlagCode } from "@/lib/countriesData";
-import { 
-  MapPin, 
-  Calendar, 
-  Baby, 
-  Heart, 
-  Gauge, 
+import {
+  MapPin,
+  Calendar,
+  Baby,
+  Heart,
+  Gauge,
   DollarSign,
   Home,
   Clock,
@@ -37,13 +37,7 @@ const INTEREST_LABELS: Record<string, string> = {
   "golf": "Golf",
 };
 
-const NAP_LABELS: Record<string, string> = {
-  "morning": "Morning nap (9-11am)",
-  "afternoon": "Afternoon nap (1-3pm)",
-  "both": "Morning & afternoon naps",
-  "flexible": "Flexible napping",
-  "none": "No naps needed",
-};
+// Removed NAP_LABELS
 
 export const ReviewStep = ({ formData }: ReviewStepProps) => {
   const formatDate = (date: string) => {
@@ -64,6 +58,11 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
   };
 
   const getTripDuration = () => {
+    if (!formData.hasDates) {
+      const totalDays = formData.legs.reduce((sum, l) => sum + (l.duration_days || 0), 0);
+      return totalDays > 0 ? `${totalDays} day${totalDays !== 1 ? "s" : ""}` : null;
+    }
+
     if (formData.legs.length === 0) {
       if (!formData.startDate || !formData.endDate) return null;
       const start = new Date(formData.startDate);
@@ -84,9 +83,9 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
   // Generate trip title from legs if not provided
   const getTripTitle = () => {
     if (formData.title) return formData.title;
-    if (formData.legs.length === 0) return `${formData.destination || "New"} Family Trip`;
+    if (formData.legs.length === 0) return `${formData.destination || "New"} Trip`;
     const countries = [...new Set(formData.legs.map(l => l.country_name).filter(Boolean))];
-    if (countries.length === 1) return `${countries[0]} Family Trip`;
+    if (countries.length === 1) return `${countries[0]} Trip`;
     if (countries.length === 2) return `${countries[0]} & ${countries[1]} Trip`;
     return `${countries[0]} + ${countries.length - 1} more Trip`;
   };
@@ -112,7 +111,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
               <div className="space-y-2">
                 {formData.legs.map((leg, index) => {
                   const { code } = getEffectiveFlagCode(leg.country_name, "");
-                  const legDays = leg.start_date && leg.end_date 
+                  const legDays = leg.start_date && leg.end_date
                     ? differenceInDays(parseISO(leg.end_date), parseISO(leg.start_date)) + 1
                     : 0;
                   return (
@@ -122,9 +121,14 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
                         <CountryFlag countryCode={code} countryName={leg.country_name} size="sm" />
                       ) : null}
                       <span className="font-medium">{leg.country_name}</span>
-                      {leg.start_date && leg.end_date && (
+                      {formData.hasDates && leg.start_date && leg.end_date && (
                         <span className="text-muted-foreground">
                           ({formatShortDate(leg.start_date)} – {formatShortDate(leg.end_date)}, {legDays}d)
+                        </span>
+                      )}
+                      {!formData.hasDates && leg.duration_days && (
+                        <span className="text-muted-foreground text-xs">
+                          ({leg.duration_days} days)
                         </span>
                       )}
                       {leg.cities.length > 0 && (
@@ -175,7 +179,7 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
               <div className="flex flex-wrap gap-1 mt-1">
                 {formData.kidsAges.map((age, i) => (
                   <Badge key={i} variant="secondary">
-                    {age} {age === 1 ? "year" : "years"}
+                    {age < 1 ? "Under 1 yr" : `${age} ${age === 1 ? "year" : "years"}`}
                   </Badge>
                 ))}
               </div>
@@ -231,12 +235,12 @@ export const ReviewStep = ({ formData }: ReviewStepProps) => {
           </div>
         )}
 
-        {formData.napSchedule && (
+        {formData.napStartTime && formData.napEndTime && (
           <div className="flex items-start gap-3">
             <Clock className="h-5 w-5 text-primary mt-0.5" />
             <div>
               <div className="font-medium">Nap Schedule</div>
-              <div className="text-muted-foreground">{NAP_LABELS[formData.napSchedule]}</div>
+              <div className="text-muted-foreground">{formData.napStartTime} to {formData.napEndTime}</div>
             </div>
           </div>
         )}

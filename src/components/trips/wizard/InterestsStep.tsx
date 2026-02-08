@@ -4,12 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TripFormData } from "../TripWizard";
-import { 
-  Trees, 
-  Landmark, 
-  Ticket, 
-  Waves, 
-  Building2, 
+import {
+  Trees,
+  Landmark,
+  Ticket,
+  Waves,
+  Building2,
   Utensils,
   Camera,
   Music,
@@ -21,7 +21,8 @@ import {
   Church,
   Briefcase,
   Plus,
-  X
+  X,
+  LandPlot
 } from "lucide-react";
 
 interface InterestsStepProps {
@@ -43,7 +44,7 @@ const INTERESTS = [
   { id: "walking", label: "Walking Tours", icon: Footprints },
   { id: "arts", label: "Arts & Crafts", icon: Palette },
   { id: "playgrounds", label: "Playgrounds & Play Areas", icon: Gamepad2 },
-  { id: "golf", label: "Golf", icon: Target },
+  { id: "golf", label: "Golf", icon: LandPlot },
   { id: "business", label: "Business & Work", icon: Briefcase },
 ];
 
@@ -87,17 +88,16 @@ export const InterestsStep = ({ formData, updateFormData }: InterestsStepProps) 
         {INTERESTS.map((interest) => {
           const Icon = interest.icon;
           const isSelected = standardInterests.includes(interest.id);
-          
+
           return (
             <button
               key={interest.id}
               type="button"
               onClick={() => toggleInterest(interest.id)}
-              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${
-                isSelected
+              className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all ${isSelected
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-border hover:border-primary/50 hover:bg-muted/50"
-              }`}
+                }`}
             >
               <Icon className="h-6 w-6 mb-2" />
               <span className="text-xs text-center font-medium">{interest.label}</span>

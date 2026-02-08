@@ -95,7 +95,7 @@ const Header = () => {
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
             >
-              {link.label}
+              {link.label} {link.label === "AI Travel Planner" && <span className="text-[10px] opacity-70 ml-1">(Soon)</span>}
               {link.premium && <Crown className="h-4 w-4 text-amber-500" />}
             </Link>
           ))}
@@ -168,7 +168,7 @@ const Header = () => {
                         }`}
                     >
                       <Icon className="h-5 w-5 shrink-0" />
-                      <span className="flex-1 text-left">{link.label}</span>
+                      <span className="flex-1 text-left">{link.label} {link.label === "AI Travel Planner" && <span className="text-[10px] opacity-70 ml-1">(Soon)</span>}</span>
                       {link.premium && <Crown className="h-4 w-4 text-amber-500 shrink-0" />}
                     </button>
                   );

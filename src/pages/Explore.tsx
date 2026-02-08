@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Loader2, Search, Compass, MapPin, Globe, Sparkles, 
-  TrendingUp, Heart, Star, ArrowRight, Filter, 
+import {
+  Loader2, Search, Compass, MapPin, Globe, Sparkles,
+  TrendingUp, Heart, Star, ArrowRight, Filter,
   Mountain, Waves, Building, TreePine, Plane, Sun
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -69,7 +69,7 @@ const Explore = () => {
   const { countries, wishlist, loading } = useFamilyData();
   const { preferences } = useTravelPreferences();
   const navigate = useNavigate();
-  
+
   const [activeCategory, setActiveCategory] = useState<Category>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [aiRecommendations, setAiRecommendations] = useState<string[]>([]);
@@ -100,7 +100,7 @@ const Explore = () => {
           request_type: "quick_explore",
         },
       });
-      
+
       if (data?.recommendations) {
         setAiRecommendations(data.recommendations.map((r: any) => r.country));
       }
@@ -116,7 +116,7 @@ const Explore = () => {
     const countryEntry = Object.entries(allCountriesData).find(([, c]) => c.name === name);
     const flag = countryEntry ? String.fromCodePoint(...countryEntry[0].split('').map(c => c.charCodeAt(0) + 127397)) : '🌍';
     const continent = countryEntry ? (allCountriesData as any)[countryEntry[0]]?.continent || 'Unknown' : 'Unknown';
-    
+
     return {
       name,
       flag,
@@ -163,7 +163,7 @@ const Explore = () => {
               <p className="text-lg text-muted-foreground mb-6">
                 Find inspiration for your next family trip from around the world
               </p>
-              
+
               {/* Search Bar */}
               <div className="relative max-w-md mx-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -211,10 +211,11 @@ const Explore = () => {
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
                 AI-Powered Picks For You
+                <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary border-0 text-[10px] uppercase tracking-wider">Coming Soon</Badge>
               </CardTitle>
-              <Button onClick={generateAiRecommendations} disabled={loadingAi} size="sm">
-                {loadingAi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                {loadingAi ? "Thinking..." : "Get Personalized Picks"}
+              <Button disabled size="sm" className="opacity-50">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Get Personalized Picks
               </Button>
             </CardHeader>
             <CardContent>
@@ -276,8 +277,8 @@ const Explore = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredDestinations.map((dest) => (
-              <Card 
-                key={dest.name} 
+              <Card
+                key={dest.name}
                 className={cn(
                   "group hover:shadow-lg transition-all duration-300 cursor-pointer overflow-hidden",
                   dest.visited && "ring-2 ring-primary/50",
@@ -303,7 +304,7 @@ const Explore = () => {
                       <Heart className="h-4 w-4 text-destructive fill-destructive" />
                     )}
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-1 mb-3">
                     {dest.category.map((cat) => (
                       <Badge key={cat} variant="outline" className="text-xs">
@@ -311,7 +312,7 @@ const Explore = () => {
                       </Badge>
                     ))}
                   </div>
-                  
+
                   <ul className="space-y-1">
                     {dest.highlights.map((h, i) => (
                       <li key={i} className="text-xs text-muted-foreground flex items-center gap-1">
@@ -320,9 +321,9 @@ const Explore = () => {
                       </li>
                     ))}
                   </ul>
-                  
-                  <div className="mt-4 flex items-center text-xs text-primary font-medium group-hover:translate-x-1 transition-transform">
-                    Plan a trip <ArrowRight className="h-3 w-3 ml-1" />
+
+                  <div className="mt-4 flex items-center text-xs text-muted-foreground italic">
+                    Trip planning coming soon...
                   </div>
                 </CardContent>
               </Card>
