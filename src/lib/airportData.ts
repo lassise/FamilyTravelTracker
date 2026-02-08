@@ -374,8 +374,25 @@ export function extractAirportCodes(text: string): string[] {
     // First, look for 3-letter airport codes
     const codePattern = /\b([A-Z]{3})\b/g;
     const codeMatches = upperText.match(codePattern) || [];
+    const AMBIGUOUS_CODES = ['MRS', 'MR', 'MS', 'DR', 'JR', 'SR', 'STD', 'AVG', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
     for (const code of codeMatches) {
         if (airportData[code] && !foundCodes.includes(code)) {
+            // Check for contextual ambiguity
+            if (AMBIGUOUS_CODES.includes(code)) {
+                // If it looks like a title (followed by a name like "MRS SMITH" or "MRS LASSISE"), ignore it.
+                // Flight routes involving MRS usually have clear delimiters like "MRS-LHR" or "MRS -> LHR"
+                // OR are preceded by specific keywords like "To MRS" or "From MRS"
+                const contextRegex = new RegExp(`\\b${code}\\s+[A-Z][a-z]+|\\b${code}\\s+[A-Z]{2,}`, 'i');
+                const isTitle = contextRegex.test(upperText); // Check if followed by a name-like word
+
+                // Also check if it's explicitly preceded by "To", "From", "Via" which suggests it IS an airport
+                const isFlightContext = new RegExp(`(?:to|from|via|arrive|depart)\\s+${code}\\b`, 'i').test(upperText);
+
+                if (isTitle && !isFlightContext) {
+                    continue;
+                }
+            }
             foundCodes.push(code);
         }
     }
@@ -410,6 +427,37 @@ export function extractAirportCodes(text: string): string[] {
             if (lowerText.includes(alias) && !foundCodes.includes(code)) {
                 foundCodes.push(code);
             }
+        }
+    }
+
+    // NEW: Search for any known city names if we still don't have enough codes
+    if (foundCodes.length < 2) {
+        // Sort city names by length descending to match "New York" before "York"
+        const cities = Object.values(airportData)
+            .map(info => info.city.toLowerCase())
+            .sort((a, b) => b.length - a.length);
+
+        for (const city of cities) {
+            // Match with word boundaries to avoid partial words
+            const cityRegex = new RegExp(`\\b${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+            if (cityRegex.test(lowerText)) {
+                const code = findAirportByName(city);
+                if (code && !foundCodes.includes(code)) {
+                    foundCodes.push(code);
+                }
+            }
+        }
+    }
+
+    // Special pattern matching for "[City] to [City]" without prefixes
+    if (foundCodes.length < 2) {
+        const toPattern = /([A-Za-z\s]{3,})\s*(?:to|->|—|–)\s*([A-Za-z\s]{3,})/i;
+        const match = lowerText.match(toPattern);
+        if (match) {
+            const departure = findAirportByName(match[1].trim());
+            const arrival = findAirportByName(match[2].trim());
+            if (departure && !foundCodes.includes(departure)) foundCodes.unshift(departure);
+            if (arrival && !foundCodes.includes(arrival)) foundCodes.push(arrival);
         }
     }
 

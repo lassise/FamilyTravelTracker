@@ -307,7 +307,13 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                 setAddCountryDialogOpen(false);
                 if (newCountryId) {
                   setExpandedCountries((prev) => new Set([...prev, newCountryId]));
-                  setVisitDetailsDialogOpen((prev) => ({ ...prev, [newCountryId]: true }));
+                  // Scroll to the country card
+                  setTimeout(() => {
+                    const element = document.getElementById(`country-card-${newCountryId}`);
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }, 100);
                 }
               }}
             />
@@ -399,7 +405,10 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                 open={isExpanded}
                 onOpenChange={() => toggleCountry(country.id)}
               >
-                <div className="border rounded-lg bg-card overflow-hidden">
+                <div
+                  id={`country-card-${country.id}`}
+                  className="border rounded-lg bg-card overflow-hidden"
+                >
                   <div className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
                     <CollapsibleTrigger asChild>
                       <button className="flex-1 flex items-center gap-3 text-left">
@@ -441,17 +450,19 @@ const CountryTracker = ({ countries, familyMembers, onUpdate, selectedMemberId, 
                     </CollapsibleTrigger>
 
                     <div className="flex items-center gap-2 ml-4">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
-                        }}
-                      >
-                        Add Details
-                      </Button>
+                      {!hasAtLeastOneTrip && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVisitDetailsDialogOpen((prev) => ({ ...prev, [country.id]: 'add' }));
+                          }}
+                        >
+                          Add Details
+                        </Button>
+                      )}
 
                       <CollapsibleTrigger asChild>
                         <button className="flex items-center gap-2">

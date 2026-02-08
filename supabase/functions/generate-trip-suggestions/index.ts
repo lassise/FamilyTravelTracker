@@ -196,19 +196,20 @@ Return a JSON object with a "recommendations" array. Each recommendation should 
 
 Return ONLY valid JSON, no markdown or explanation.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+          "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-1.5-flash",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: "You are an expert travel advisor who creates personalized recommendations. Always respond with valid JSON only." },
             { role: "user", content: prompt }
           ],
           temperature: 0.8,
+          response_format: { type: "json_object" }
         }),
       });
 
@@ -274,19 +275,20 @@ Return a JSON object with:
 
 Return ONLY valid JSON, no markdown or explanation.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+          "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-1.5-flash",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: "You are an expert travel planner creating detailed, practical itineraries. Always respond with valid JSON only." },
             { role: "user", content: prompt }
           ],
           temperature: 0.7,
+          response_format: { type: "json_object" }
         }),
       });
 
@@ -346,19 +348,20 @@ Return ONLY the JSON, nothing else.`;
 
       console.log("[parse_documents] Sending to AI:", content.substring(0, 200) + "...");
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+          "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-1.5-flash",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: "You extract structured data from text. Always respond with valid JSON only. Be lenient - if you see anything that looks like travel info, extract it." },
             { role: "user", content: prompt }
           ],
           temperature: 0.1,
+          response_format: { type: "json_object" }
         }),
       });
 
@@ -412,19 +415,20 @@ Return a JSON array with exactly 3 suggestions. Each suggestion should have:
 
 Return ONLY valid JSON, no markdown or explanation.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-1.5-flash",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: "You are a travel expert. Always respond with valid JSON only." },
           { role: "user", content: prompt }
         ],
         temperature: 0.7,
+        response_format: { type: "json_object" }
       }),
     });
 

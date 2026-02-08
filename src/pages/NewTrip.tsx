@@ -23,6 +23,15 @@ const NewTrip = () => {
               We're polishing our AI engines to give you the most personalized,
               stress-free family travel planning experience ever.
             </p>
+            <div className="pt-2">
+              <Button
+                variant="link"
+                className="text-primary hover:text-primary/80 underline text-sm"
+                onClick={() => navigate("/simple-planner")}
+              >
+                Try our generic Beta Planner (Simple Version)
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">

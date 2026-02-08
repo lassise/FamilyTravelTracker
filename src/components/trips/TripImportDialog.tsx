@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import * as pdfjsLib from 'pdfjs-dist';
 import { getAirportInfo, extractAirportCodes, isSameCountry } from "@/lib/airportData";
 import { getAllCountries } from "@/lib/countriesData";
+import { supabase } from "@/integrations/supabase/client";
 
 // Set worker source for PDF.js
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -21,6 +22,7 @@ export interface ParsedTravelData {
     tripName: string;
     source: 'flight' | 'hotel' | 'country';
     isDomestic: boolean;
+    isDuplicate?: boolean;
 }
 
 interface TripImportDialogProps {
@@ -141,14 +143,20 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
             }
         }
 
-        // DD/MM/YYYY format (e.g., "26/09/2025")
-        const ddmmyyyyMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-        if (ddmmyyyyMatch) {
-            const [, day, month, year] = ddmmyyyyMatch;
-            return {
-                startDate: `${year}-${month}-${day}`,
-                endDate: null,
-            };
+        // Full multi-date range (e.g., "Jun 4, 2018 ... Jun 12, 2018")
+        const allDates = text.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/gi);
+        if (allDates && allDates.length >= 2) {
+            const startDate = parseDateString(allDates[0]);
+            // Take the last date that is different from the first one as potential end date
+            let endDate = null;
+            for (let i = allDates.length - 1; i > 0; i--) {
+                const candidate = parseDateString(allDates[i]);
+                if (candidate && candidate !== startDate) {
+                    endDate = candidate;
+                    break;
+                }
+            }
+            if (startDate) return { startDate, endDate };
         }
 
         // Single Month Day, Year format anywhere in text (e.g., "Jan 29, 2026")
@@ -253,6 +261,25 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
         return '';
     };
 
+    // Helper: Determine confidence level of local parsing
+    const calculateConfidence = (data: ParsedTravelData | null, text: string): 'high' | 'low' | 'none' => {
+        if (!data) return 'none';
+
+        // High Confidence Scenarios:
+        // 1. It's a flight with identified airports (source 'flight' implies airports were found)
+        if (data.source === 'flight') return 'high';
+
+        // 2. Explicit address marker found in text
+        if (text.match(/address[:\s]+/i)) return 'high';
+
+        // 3. Explicit "Check-in" dates found matching the trip
+        if (text.match(/check\s*-?\s*in/i) && data.startDate) return 'high';
+
+        // Low Confidence:
+        // Just matched a country name loosely in the text (e.g. "I love France")
+        return 'low';
+    };
+
     const processContent = async () => {
         if (activeTab === "paste" && !pasteContent.trim()) {
             toast({ title: "Please paste some text first", variant: "destructive" });
@@ -264,11 +291,10 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
         }
 
         setLoading(true);
-        setProcessingStatus("Analyzing...");
+        setProcessingStatus("Reading content...");
+        let textToAnalyze = "";
 
         try {
-            let textToAnalyze = "";
-
             if (activeTab === "paste") {
                 textToAnalyze = pasteContent;
             } else {
@@ -283,116 +309,217 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                     }
                 }
             }
+        } catch (readError) {
+            console.error("Error reading input:", readError);
+            toast({ title: "Failed to read input files", variant: "destructive" });
+            setLoading(false);
+            return;
+        }
 
+        // STEP 1: Local Parsing (Fast, Free, "Hard Coded")
+        setProcessingStatus("Scanning locally...");
+        const localData = parseLocally(textToAnalyze);
+        const confidence = calculateConfidence(localData, textToAnalyze);
 
-            // Try to detect airports first (boarding pass)
-            const detectedAirports = extractAirportCodes(textToAnalyze);
+        if (confidence === 'high' && localData) {
+            console.log("High confidence local match found:", localData);
+            handleSuccess(localData);
+            setLoading(false);
+            setProcessingStatus("");
+            return;
+        }
 
-            let parsedData: ParsedTravelData | null = null;
+        // STEP 2: AI Parsing (Fallback for complex/vague cases)
+        setProcessingStatus(confidence === 'low' ? "Verifying with AI..." : "Analyzing with AI...");
 
-            if (detectedAirports.length >= 2) {
-                // Flight detected
-                const uniqueAirports = [...new Set(detectedAirports)];
-                const departureCode = uniqueAirports[0];
-                const arrivalCode = uniqueAirports[uniqueAirports.length - 1];
+        try {
+            const { data, error } = await supabase.functions.invoke('parse-travel-document', {
+                body: { text: textToAnalyze, homeCountry }
+            });
 
-                if (departureCode !== arrivalCode) {
-                    const arrivalInfo = getAirportInfo(arrivalCode);
-                    const departureInfo = getAirportInfo(departureCode);
+            if (error) throw error;
 
-                    if (arrivalInfo) {
-                        const dates = extractDates(textToAnalyze);
-                        parsedData = {
-                            country: arrivalInfo.country,
-                            countryCode: arrivalInfo.countryCode,
-                            city: arrivalInfo.city,
-                            startDate: dates.startDate,
-                            endDate: dates.endDate,
-                            tripName: `Trip to ${arrivalInfo.city}`,
-                            source: 'flight',
-                            isDomestic: isSameCountry(departureCode, arrivalCode),
-                        };
-                    }
+            if (data && data.trips && data.trips.length > 0) {
+                const primaryTrip = data.trips[0];
+
+                // Map AI response to our app format
+                let aiCountryCode = "XX";
+                const matchedCountry = allCountries.find(c => c.name.toLowerCase() === primaryTrip.destination_country.toLowerCase());
+                if (matchedCountry) {
+                    aiCountryCode = matchedCountry.code;
                 }
-            }
 
-            // If no flight detected, try to find country name (hotel reservation, etc.)
-            if (!parsedData) {
-                const countryInfo = findCountryInText(textToAnalyze);
+                const parsedData: ParsedTravelData = {
+                    country: primaryTrip.destination_country,
+                    countryCode: aiCountryCode,
+                    city: primaryTrip.destination_city,
+                    startDate: primaryTrip.start_date,
+                    endDate: primaryTrip.end_date,
+                    tripName: primaryTrip.trip_name,
+                    source: 'flight',
+                    isDomestic: homeCountry ? (primaryTrip.destination_country.toLowerCase() === homeCountry.toLowerCase()) : false
+                };
 
-                if (countryInfo) {
-                    const dates = extractDates(textToAnalyze);
-                    const placeName = extractPlaceName(textToAnalyze);
-
-                    parsedData = {
-                        country: countryInfo.country,
-                        countryCode: countryInfo.code,
-                        city: countryInfo.city,
-                        startDate: dates.startDate,
-                        endDate: dates.endDate,
-                        tripName: placeName ? `Stay at ${placeName}` : `Trip to ${countryInfo.city || countryInfo.country}`,
-                        source: 'hotel',
-                        isDomestic: false,
-                    };
-                }
-            }
-
-            if (!parsedData) {
-                throw new Error("Could not detect any travel information. Please ensure the text contains airport codes, country names, or addresses.");
-            }
-
-
-            // Check if this is the home country
-            if (homeCountry && parsedData.country.toLowerCase() === homeCountry.toLowerCase()) {
-                toast({
-                    title: "Home Country Detected",
-                    description: `${parsedData.city || 'This location'} is within your home country (${homeCountry}). This won't be added to your Countries list.`,
-                    duration: 6000,
-                });
-                setOpen(false);
-                setPasteContent("");
-                setFiles([]);
+                handleSuccess(parsedData);
                 return;
+            } else {
+                throw new Error("AI did not find trip data");
             }
 
-            // If callback provided, use it to open the Add Country dialog
-            if (onCountryDetected) {
-                const dateInfo = parsedData.startDate
-                    ? (parsedData.endDate
-                        ? ` from ${parsedData.startDate} to ${parsedData.endDate}`
-                        : ` on ${parsedData.startDate}`)
-                    : '';
+        } catch (aiError) {
+            console.warn("AI parsing failed or unavailable, falling back to local regex:", aiError);
 
+            // STEP 3: Final Fallback
+            // If we had a 'low' confidence local match, use it now as a last resort
+            if (localData) {
                 toast({
-                    title: `${parsedData.source === 'flight' ? 'Flight' : 'Trip'} Detected!`,
-                    description: `${parsedData.city ? parsedData.city + ', ' : ''}${parsedData.country}${dateInfo}`,
-                    duration: 5000,
+                    title: "AI Analysis Failed",
+                    description: "Falling back to local scan. Please verify details.",
+                    variant: "destructive",
+                    duration: 4000,
                 });
-
-                setOpen(false);
-                setPasteContent("");
-                setFiles([]);
-                onCountryDetected(parsedData);
+                handleSuccess(localData);
             } else {
                 toast({
-                    title: "Travel Detected",
-                    description: `Detected: ${parsedData.city}, ${parsedData.country}. No handler attached.`,
-                    duration: 8000,
+                    title: "Import Failed",
+                    description: "Could not parse document via AI or local scan.",
+                    variant: "destructive",
+                    duration: 5000,
                 });
             }
-
-        } catch (error: any) {
-            console.error("[TripImportDialog] Import error:", error);
-            toast({
-                title: "Import Failed",
-                description: error.message || "Failed to parse travel information.",
-                variant: "destructive",
-                duration: 10000,
-            });
         } finally {
             setLoading(false);
             setProcessingStatus("");
         }
+    };
+
+    const handleSuccess = async (parsedData: ParsedTravelData) => {
+        let isDuplicate = false;
+
+        // Check for duplicates
+        if (parsedData.country && parsedData.startDate && parsedData.endDate) {
+            try {
+                const { data: existingCountry } = await supabase
+                    .from('countries')
+                    .select('id')
+                    .ilike('name', parsedData.country)
+                    .maybeSingle();
+
+                if (existingCountry) {
+                    const { data: duplicates } = await supabase
+                        .from('country_visit_details')
+                        .select('id')
+                        .eq('country_id', existingCountry.id)
+                        .eq('visit_date', parsedData.startDate)
+                        .eq('end_date', parsedData.endDate);
+
+                    if (duplicates && duplicates.length > 0) {
+                        isDuplicate = true;
+                    }
+                }
+            } catch (err) {
+                console.error("Error checking for duplicates:", err);
+            }
+        }
+
+        // Check if this is the home country
+        if (homeCountry && parsedData.country.toLowerCase() === homeCountry.toLowerCase()) {
+            toast({
+                title: "Home Country Detected",
+                description: `${parsedData.city || 'This location'} is within your home country (${homeCountry}). This won't be added to your Countries list.`,
+                duration: 6000,
+            });
+            setOpen(false);
+            setPasteContent("");
+            setFiles([]);
+            return;
+        }
+
+        if (onCountryDetected) {
+            const dateInfo = parsedData.startDate
+                ? (parsedData.endDate
+                    ? ` from ${parsedData.startDate} to ${parsedData.endDate}`
+                    : ` on ${parsedData.startDate}`)
+                : '';
+
+            if (isDuplicate) {
+                toast({
+                    title: "Duplicate Trip Detected",
+                    description: `A trip to ${parsedData.country} with these exact dates already exists. please review details.`,
+                    duration: 6000,
+                    variant: "default", // Or maybe warning style?
+                });
+            } else {
+                toast({
+                    title: "Trip Detected!",
+                    description: `${parsedData.city ? parsedData.city + ', ' : ''}${parsedData.country}${dateInfo}`,
+                    duration: 5000,
+                });
+            }
+
+            setOpen(false);
+            setPasteContent("");
+            setFiles([]);
+            onCountryDetected({ ...parsedData, isDuplicate });
+        }
+    };
+
+    const parseLocally = (text: string): ParsedTravelData | null => {
+        const detectedAirports = extractAirportCodes(text);
+        let parsedData: ParsedTravelData | null = null;
+
+        if (detectedAirports.length >= 2) {
+            const uniqueAirports = [...new Set(detectedAirports)];
+            let arrivalCode = uniqueAirports[uniqueAirports.length - 1];
+            let departureCode = uniqueAirports[0];
+
+            if (homeCountry) {
+                const international = uniqueAirports.find(code => {
+                    const info = getAirportInfo(code);
+                    return info && info.country.toLowerCase() !== homeCountry.toLowerCase();
+                });
+                if (international) {
+                    arrivalCode = international;
+                    departureCode = uniqueAirports[0] === international ? (uniqueAirports[1] || uniqueAirports[0]) : uniqueAirports[0];
+                }
+            }
+
+            if (departureCode !== arrivalCode) {
+                const arrivalInfo = getAirportInfo(arrivalCode);
+                if (arrivalInfo) {
+                    const dates = extractDates(text);
+                    parsedData = {
+                        country: arrivalInfo.country,
+                        countryCode: arrivalInfo.countryCode,
+                        city: arrivalInfo.city,
+                        startDate: dates.startDate,
+                        endDate: dates.endDate,
+                        tripName: `Trip to ${arrivalInfo.city}`,
+                        source: 'flight',
+                        isDomestic: isSameCountry(departureCode, arrivalCode),
+                    };
+                }
+            }
+        }
+
+        if (!parsedData) {
+            const countryInfo = findCountryInText(text);
+            if (countryInfo) {
+                const dates = extractDates(text);
+                const placeName = extractPlaceName(text);
+                parsedData = {
+                    country: countryInfo.country,
+                    countryCode: countryInfo.code,
+                    city: countryInfo.city,
+                    startDate: dates.startDate,
+                    endDate: dates.endDate,
+                    tripName: placeName ? `Stay at ${placeName}` : `Trip to ${countryInfo.city || countryInfo.country}`,
+                    source: 'hotel',
+                    isDomestic: false,
+                };
+            }
+        }
+        return parsedData;
     };
 
     return (
@@ -409,7 +536,7 @@ export const TripImportDialog = ({ onTripCreated, onCountryDetected, homeCountry
                 <DialogHeader>
                     <DialogTitle>Import Travel Document</DialogTitle>
                     <DialogDescription>
-                        Paste text from boarding passes, hotel reservations, or other travel documents to quickly add a country.
+                        Paste text from boarding passes or hotel reservations. We'll verify it with AI.
                     </DialogDescription>
                 </DialogHeader>
 

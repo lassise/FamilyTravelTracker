@@ -502,15 +502,16 @@ ${JSON.stringify(itinerary).substring(0, 10000)}
 Return ONLY the repaired valid JSON, no explanation.`;
 
   try {
-    const repairResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const repairResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-1.5-flash',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: repairPrompt }],
+        response_format: { type: "json_object" }
       }),
     });
 
@@ -1052,9 +1053,9 @@ serve(async (req: Request) => {
     const tripDetails = validationResult.data;
     logCtx.destination = tripDetails.destination;
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      log('error', 'LOVABLE_API_KEY not configured', logCtx);
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      log('error', 'OPENAI_API_KEY not configured', logCtx);
       return new Response(JSON.stringify({
         error: 'The AI service is not configured. Please contact support.',
         code: 'CONFIG_ERROR'
@@ -1103,19 +1104,20 @@ serve(async (req: Request) => {
     const userPrompt = buildUserPrompt(tripDetails, tripDays, dayDates, hasKids, italyWarnings);
 
     const response = await fetchWithRetry(
-      'https://ai.gateway.lovable.dev/v1/chat/completions',
+      'https://api.openai.com/v1/chat/completions',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-1.5-flash',
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
           ],
+          response_format: { type: "json_object" }
         }),
       },
       logCtx
@@ -1198,7 +1200,7 @@ serve(async (req: Request) => {
 
     logCtx.step = 'validating_schema';
     const { itinerary, wasRepaired } = await validateAndRepairItinerary(
-      rawItinerary, tripDetails, tripDays, dayDates, logCtx, LOVABLE_API_KEY
+      rawItinerary, tripDetails, tripDays, dayDates, logCtx, OPENAI_API_KEY
     );
 
     log('info', 'Itinerary generated successfully', logCtx, {

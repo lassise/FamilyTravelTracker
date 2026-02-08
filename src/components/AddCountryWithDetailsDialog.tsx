@@ -188,33 +188,35 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, ex
         .ilike("name", validated.name)
         .maybeSingle();
 
-      if (existing?.id) {
-        toast({ title: "Country already in your list", description: `"${validated.name}" is already added.`, variant: "destructive" });
-        setLoading(false);
-        return;
+      let countryId = existing?.id;
+
+      if (!countryId) {
+        const { data: newCountry, error } = await supabase
+          .from("countries")
+          .insert([{
+            name: validated.name,
+            flag: validated.code,
+            continent: validated.continent,
+            user_id: user.id,
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        countryId = newCountry.id;
       }
-
-      const { data: newCountry, error } = await supabase
-        .from("countries")
-        .insert([{
-          name: validated.name,
-          flag: validated.code,
-          continent: validated.continent,
-          user_id: user.id,
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
 
       const membersToAdd = familyMembers.length === 1 ? familyMembers.map((m) => m.id) : selectedMembers;
       if (membersToAdd.length > 0) {
         const visits = membersToAdd.map((memberId) => ({
-          country_id: newCountry.id,
+          country_id: countryId,
           family_member_id: memberId,
           user_id: user.id,
         }));
-        const { error: visitsError } = await supabase.from("country_visits").insert(visits);
+        const { error: visitsError } = await supabase
+          .from("country_visits")
+          .upsert(visits, { onConflict: 'country_id,family_member_id', ignoreDuplicates: true });
+
         if (visitsError) throw visitsError;
       }
 
@@ -225,9 +227,33 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, ex
         (numberOfDays != null && numberOfDays > 0);
 
       if (hasVisitDetails) {
+        // DUPLICATE CHECK
+        if (!isApproximate && visitDate && endDate) {
+          try {
+            const { data: duplicates } = await supabase
+              .from('country_visit_details')
+              .select('id')
+              .eq('country_id', countryId)
+              .eq('visit_date', visitDate)
+              .eq('end_date', endDate);
+
+            if (duplicates && duplicates.length > 0) {
+              const confirmAdd = window.confirm(
+                "A trip with these exact dates already exists for this country.\n\nDo you want to add it anyway?"
+              );
+              if (!confirmAdd) {
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (dupError) {
+            console.warn("Duplicate check failed, proceeding anyway", dupError);
+          }
+        }
+
         const membersForVisit = tripMemberIds.length > 0 ? tripMemberIds : membersToAdd;
         const { error: visitError } = await supabase.rpc("insert_country_visit_detail", {
-          p_country_id: newCountry.id,
+          p_country_id: countryId,
           p_trip_name: tripName?.trim() || null,
           p_is_approximate: isApproximate,
           p_approximate_month: isApproximate ? approximateMonth : null,
@@ -241,15 +267,16 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, ex
         if (visitError) throw visitError;
       }
 
-      toast({ title: "Country and trip details added!" });
+      toast({ title: existing?.id ? "Added new trip to existing country!" : "New country and trip added!" });
       setOpen(false);
       resetForm();
-      onSuccess(newCountry.id);
+      onSuccess(countryId);
     } catch (err) {
       if (err instanceof z.ZodError) {
         toast({ title: "Validation error", description: err.errors[0].message, variant: "destructive" });
       } else {
         toast({ title: "Error", description: "Failed to save.", variant: "destructive" });
+        console.error(err);
       }
     } finally {
       setLoading(false);
@@ -279,7 +306,7 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, ex
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Country with Trip Details</DialogTitle>
+          <DialogTitle>Add Country or Trip Details</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -312,18 +339,16 @@ const AddCountryWithDetailsDialog = ({ familyMembers, onSuccess, prefillData, ex
                           <CommandItem
                             key={opt.code}
                             value={opt.name}
-                            onSelect={() => !isAlreadyAdded && handleCountrySelect(opt)}
+                            onSelect={() => handleCountrySelect(opt)}
                             className={cn(
-                              isAlreadyAdded && "opacity-40 cursor-not-allowed"
+                              isAlreadyAdded && "text-muted-foreground"
                             )}
                           >
                             <Check className={cn("mr-2 h-4 w-4", selectedCountry?.name === opt.name ? "opacity-100" : "opacity-0")} />
                             <CountryFlag countryCode={opt.code} countryName={opt.name} size="sm" className="mr-2" />
                             <span>{opt.name}</span>
-                            {isAlreadyAdded ? (
-                              <span className="ml-auto text-xs text-muted-foreground italic">Already added</span>
-                            ) : (
-                              <span className="ml-auto text-muted-foreground text-xs">{opt.continent}</span>
+                            {isAlreadyAdded && (
+                              <span className="ml-auto text-xs text-muted-foreground italic">Already in list</span>
                             )}
                           </CommandItem>
                         );
